@@ -56,7 +56,7 @@ export default function UserSignup() {
         setIsSendingCode(true);
         toast.loading('인증번호를 발송 중입니다...');
         try {
-            await axios.post(`http://34.64.85.123/member/SendVerification?email=${formData.email}`);
+            await axios.post(`http://localhost:8080/api/core/member/SendVerification?email=${formData.email}`);
             toast.dismiss();
             toast.success('이메일로 인증번호가 발송되었습니다. 5분 내에 입력해주세요.');
         } catch (error) {
@@ -90,7 +90,7 @@ export default function UserSignup() {
                 provider: queryParams.provider || null,
                 providerId: queryParams.providerId || null
             };
-            await axios.post('http://34.64.85.123/member/signup', payload);
+            await axios.post('http://localhost:8080/api/core/member/signup', payload);
 
             toast.dismiss();
             toast.success('회원가입이 완료되었습니다! 환영합니다.');
@@ -136,14 +136,13 @@ export default function UserSignup() {
                                     <input
                                         type="email"
                                         name="email"
-                                        readOnly={!!queryParams.provider}
+                                        // readOnly={!!queryParams.provider}
                                         value={formData.email}
                                         onChange={handleChange}
                                         className={`pl-10 block w-full border border-gray-300 rounded-xl py-3 focus:ring-rose-500 focus:border-rose-500 sm:text-sm transition-colors ${queryParams.provider ? 'bg-gray-50 text-gray-500' : ''}`}
                                         placeholder="이메일 주소"
                                     />
                                 </div>
-                                {!queryParams.provider && (
                                     <button
                                         type="button"
                                         onClick={handleSendVerification}
@@ -152,12 +151,10 @@ export default function UserSignup() {
                                     >
                                         인증요청
                                     </button>
-                                )}
                             </div>
                         </div>
 
                         {/* 인증번호 입력 (소셜 아닐 때만 노출) */}
-                        {!queryParams.provider && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">인증번호 <span className="text-red-500">*</span></label>
                                 <div className="mt-1 relative rounded-md shadow-sm">
@@ -174,7 +171,6 @@ export default function UserSignup() {
                                     />
                                 </div>
                             </div>
-                        )}
 
                         {/* 비밀번호 (소셜 아닐 때만 노출) */}
                         {!queryParams.provider && (
