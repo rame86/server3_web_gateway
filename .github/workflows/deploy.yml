@@ -44,9 +44,9 @@ jobs:
           host: ${{ secrets.GCP_HOST }}
           username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.GCP_KEY }}
-          source: "dist/*"
+          source: "dist/public/*"
           target: "/home/${{ secrets.GCP_USER }}/nginx/frontend/dist"
-          strip_components: 1
+          strip_components: 2
 
       - name: Fix file permissions and restart Nginx
         uses: appleboy/ssh-action@master # 8. Nginx가 읽을 수 있도록 권한 부여 및 컨테이너 재시작
