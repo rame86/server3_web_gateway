@@ -44,5 +44,15 @@ jobs:
           host: ${{ secrets.GCP_HOST }}
           username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.GCP_KEY }}
-          source: "dist"
-          target: "/home/${{ secrets.GCP_USER }}/nginx/frontend"
+          source: "dist/*" # dist 하위 파일을 모두 전송
+          target: "/home/${{ secrets.GCP_USER }}/nginx/frontend/dist"
+          strip_components: 1
+
+      - name: Fix file permissions
+        uses: appleboy/ssh-action@master # 8. Nginx가 읽을 수 있도록 권한 부여
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_KEY }}
+          script: |
+            chmod -R 755 /home/${{ secrets.GCP_USER }}/nginx/frontend/dist
