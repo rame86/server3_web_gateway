@@ -35,8 +35,8 @@ jobs:
           username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.GCP_KEY }}
           script: |
-            mkdir -p /home/${{ secrets.GCP_USER }}/nginx/frontend
-            rm -rf /home/${{ secrets.GCP_USER }}/nginx/frontend/dist
+            mkdir -p /home/${{ secrets.GCP_USER }}/nginx/frontend/dist
+            rm -rf /home/${{ secrets.GCP_USER }}/nginx/frontend/dist/*
 
       - name: Copy dist to GCP Server 3
         uses: appleboy/scp-action@master # 7. 빌드된 dist 폴더를 서버로 전송
@@ -44,7 +44,7 @@ jobs:
           host: ${{ secrets.GCP_HOST }}
           username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.GCP_KEY }}
-          source: "dist/*" # dist 하위 파일을 모두 전송
+          source: "dist/*"
           target: "/home/${{ secrets.GCP_USER }}/nginx/frontend/dist"
           strip_components: 1
 
