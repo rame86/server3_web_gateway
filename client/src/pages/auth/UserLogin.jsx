@@ -10,10 +10,29 @@ export default function UserLogin() {
     const [formData, setFormData] = useState({ email: '', password: '' });
     const [isLoading, setIsLoading] = useState(false);
 
+    // 컴포넌트 내부에 추가할 상태값들
+    const [isEmailVerified, setIsEmailVerified] = useState(false); // 인증 완료 여부
+    const [authCode, setAuthCode] = useState(''); // 입력한 인증번호
+
+    // 1. 인증번호 발송 함수
+    const sendVerificationCode = async () => {
+        if (!formData.email) {
+            toast.error("이메일을 먼저 입력해주세요.");
+            return;
+        }
+        try {
+            // Nginx 게이트웨이를 통해 백엔드의 SendVerification 엔드포인트 호출
+            const response = await axios.post(`http://localhost/api/core/member/SendVerification?email=${formData.email}`);
+            toast.success(response.data.message || "인증번호가 발송되었습니다.");
+        } catch (error) {
+            toast.error("메일 발송에 실패했습니다.");
+        }
+    };
+
     const handleSocialLogin = (provider) => {
         // MSA Gateway(Server 3)를 경유하여 Core Service(Server 1)로 인증 요청
         // Spring Security 기본 OAuth2 경로 적용
-        window.location.href = `http://34.64.85.123/oauth2/authorization/${provider}`;
+        window.location.href = `http://localhost:8080/api/core/api/${provider}/login`;
     };
 
     const handleLocalLogin = async (e) => {
