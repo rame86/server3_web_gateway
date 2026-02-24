@@ -39,7 +39,46 @@ import AdminBooking from "./pages/admin/AdminBooking";
 import AdminCommunity from "./pages/admin/AdminCommunity";
 import AdminSettlement from "./pages/admin/AdminSettlement";
 
+// 로컬스토리지에 저장!!!!!!!!!!!!!!!!!!!
+import { useEffect } from "react"; // 1. useEffect 추가
+import { useLocation } from "wouter"; // 2. 이동을 위해 추가
+
 function Router() {
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
+
+  if (token) {
+    try {
+      // 1. 브라우저 지갑(LocalStorage)에 저장
+      localStorage.setItem("accessToken", token);
+
+      // 2. [핵심] 라이브러리 없이 수동으로 토큰 쪼개기
+      // JWT는 .으로 구분된 세 조각 중 두 번째가 데이터입니다.
+      const base64Payload = token.split('.')[1]; 
+      const payload = JSON.parse(atob(base64Payload)); 
+      
+      console.log("지갑 저장 및 분해 성공!", payload);
+
+      // 3. ID와 Role 저장 (백엔드 필드명에 따라 role 혹은 auth)
+      localStorage.setItem("memberId", payload.sub);
+      localStorage.setItem("role", payload.role); 
+
+      // 4. 주소창 청소
+      window.history.replaceState({}, null, window.location.pathname);
+      
+      // 만약 토큰을 받자마자 대시보드로 보내고 싶다면?
+      setLocation("/user"); 
+      
+      alert(`${payload.sub}님, 환영합니다!`);
+    } catch (e) {
+      console.error("토큰 처리 중 에러!", e);
+    }
+  }
+  }, []);
+
   return (
     <Switch>
       {/* Landing */}
