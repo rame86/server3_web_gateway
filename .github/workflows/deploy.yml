@@ -1,0 +1,49 @@
+name: Deploy Frontend to Nginx (GCP Server 3)
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build the project
+        run: pnpm run build
+
+      - name: Clear old dist on GCP Server 3
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_KEY }}
+          script: |
+            mkdir -p /home/${{ secrets.GCP_USER }}/nginx/frontend
+            rm -rf /home/${{ secrets.GCP_USER }}/nginx/frontend/dist
+
+      - name: Copy dist to GCP Server 3
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_KEY }}
+          source: "dist"
+          target: "/home/${{ secrets.GCP_USER }}/nginx/frontend"
