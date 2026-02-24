@@ -3,34 +3,33 @@ name: Deploy Frontend to Nginx (GCP Server 3)
 on:
   push:
     branches:
-      - master
+      - master  # master 브랜치에 코드 반영 시 자동 실행
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # 가상 실행 환경 설정
+    
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 # 1. 저장소 코드를 가상 환경으로 복제
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+        uses: pnpm/action-setup@v4 # 2. 패키지 매니저 pnpm 설치
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4 # 3. Node.js 환경 구축 및 캐싱 설정
         with:
           node-version: 20
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install # 4. 필요한 라이브러리 설치
 
       - name: Build the project
-        run: pnpm run build
+        run: pnpm run build # 5. 배포용 정적 파일 생성 (dist 폴더)
 
       - name: Clear old dist on GCP Server 3
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@master # 6. 원격 서버 접속 후 기존 파일 삭제
         with:
           host: ${{ secrets.GCP_HOST }}
           username: ${{ secrets.GCP_USER }}
@@ -40,7 +39,7 @@ jobs:
             rm -rf /home/${{ secrets.GCP_USER }}/nginx/frontend/dist
 
       - name: Copy dist to GCP Server 3
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@master # 7. 빌드된 dist 폴더를 서버로 전송
         with:
           host: ${{ secrets.GCP_HOST }}
           username: ${{ secrets.GCP_USER }}
