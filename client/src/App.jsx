@@ -13,7 +13,7 @@ import UserDashboard from "./pages/user/UserDashboard";
 import UserStore from "./pages/user/UserStore";
 import UserEvents from "./pages/user/UserEvents";
 import UserChat from "./pages/user/UserChat";
-import UserCommunity from "./pages/user/UserCommunity";
+import UserCommunity from "./pages/user/UserCommunity1";
 import UserArtists from "./pages/user/UserArtists";
 import UserWallet from "./pages/user/UserWallet";
 import UserEventDetail from "./pages/user/UserEventDetail";
