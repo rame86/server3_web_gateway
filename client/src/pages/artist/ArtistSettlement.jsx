@@ -1,5 +1,5 @@
 /*
- * FanVerse - Artist Settlement Page
+ * Lumina - Artist Settlement Page
  * Soft Bloom Design: Revenue breakdown, settlement history
  */
 

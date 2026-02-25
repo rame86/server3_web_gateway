@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================
- * FanVerse - Soft Bloom Design System
+ * Lumina - Soft Bloom Design System
  * Palette: Creamy White bg, Deep Rose primary, Lavender accent
  * Typography: Playfair Display (display) + DM Sans (body) + Noto Sans KR
  * ============================================================ */
@@ -157,7 +157,7 @@
     }
   }
 
-  /* === FanVerse Design Utilities === */
+  /* === Lumina Design Utilities === */
 
   /* Glass Card */
   .glass-card {

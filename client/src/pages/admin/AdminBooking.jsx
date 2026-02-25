@@ -1,5 +1,5 @@
 /*
- * FanVerse - Admin Booking Management
+ * Lumina - Admin Booking Management
  * Soft Bloom Design: Event approval queue
  */
 

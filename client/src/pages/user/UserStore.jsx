@@ -1,5 +1,5 @@
 /*
- * FanVerse - User Store Page
+ * Lumina - User Store Page
  * Soft Bloom Design: Goods shop with filtering, product cards
  */
 
@@ -107,7 +107,7 @@ export default function UserStore() {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <ShoppingBag size={18} className="text-white" />
-                <span className="text-white/80 text-sm font-medium">FanVerse Store</span>
+                <span className="text-white/80 text-sm font-medium">Lumina Store</span>
               </div>
               <h1 className="text-2xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
                 굿즈 샵

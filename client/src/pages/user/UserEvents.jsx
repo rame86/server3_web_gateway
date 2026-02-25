@@ -1,5 +1,5 @@
 /*
- * FanVerse - User Events & Booking Page
+ * Lumina - User Events & Booking Page
  * Soft Bloom Design: Event cards with booking flow
  */
 

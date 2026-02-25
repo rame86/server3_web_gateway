@@ -1,5 +1,5 @@
 /*
- * FanVerse - Top Navigation Component
+ * Lumina - Top Navigation Component
  * Soft Bloom Design: Horizontal menu bar with role-based categories
  */
 
@@ -100,7 +100,7 @@ export default function TopNav({ role }) {
                 <span className="text-white font-bold text-xs" style={{ fontFamily: "'Playfair Display', serif" }}>F</span>
               </div>
               <span className="font-bold text-sm text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>
-                FanVerse
+                Lumina
               </span>
             </div>
           </Link>
@@ -147,7 +147,7 @@ export default function TopNav({ role }) {
                 <span className="text-white font-bold text-xs" style={{ fontFamily: "'Playfair Display', serif" }}>F</span>
               </div>
               <span className="font-bold text-xs text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>
-                FanVerse
+                Lumina
               </span>
             </div>
           </Link>

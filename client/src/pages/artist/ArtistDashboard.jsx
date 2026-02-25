@@ -1,5 +1,5 @@
 /*
- * FanVerse - Artist Dashboard
+ * Lumina - Artist Dashboard
  * Soft Bloom Design: Artist activity summary, fan stats, recent fan letters
  */
 

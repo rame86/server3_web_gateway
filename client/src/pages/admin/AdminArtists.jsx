@@ -1,5 +1,5 @@
 /**
- * FanVerse - Admin Artists Management
+ * Lumina - Admin Artists Management
  * Soft Bloom Design: Artist approval, management with web-style UI
  */
 

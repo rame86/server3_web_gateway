@@ -1,5 +1,5 @@
 /*
- * FanVerse - Layout Component
+ * Lumina - Layout Component
  * Soft Bloom Design: Sidebar navigation with glass effect
  * Role-based: user / artist / admin
  */
@@ -132,7 +132,7 @@ export default function Layout({ children, role }) {
             </div>
             <div>
               <span className="font-bold text-lg text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>
-                FanVerse
+                Lumina
               </span>
               <div className={`text-xs ${config.textColor} font-medium`}>{config.label}</div>
             </div>

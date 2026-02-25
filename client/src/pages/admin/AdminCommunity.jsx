@@ -1,5 +1,5 @@
 /*
- * FanVerse - Admin Community Management
+ * Lumina - Admin Community Management
  * Soft Bloom Design: Post management, reports
  */
 
