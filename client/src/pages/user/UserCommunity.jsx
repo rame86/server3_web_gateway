@@ -1,5 +1,5 @@
 /*
- * FanVerse - User Community Page
+ * Lumina - User Community Page
  * Soft Bloom Design: Posts, fan letters, artist letters, notices
  */
 

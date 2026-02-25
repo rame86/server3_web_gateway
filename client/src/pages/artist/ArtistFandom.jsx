@@ -1,5 +1,5 @@
 /*
- * FanVerse - Artist Fandom Page
+ * Lumina - Artist Fandom Page
  * Soft Bloom Design: Fandom dashboard with media, fan letters, artist letters
  */
 

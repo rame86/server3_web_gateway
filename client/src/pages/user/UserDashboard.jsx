@@ -1,5 +1,5 @@
 /*
- * FanVerse - User Dashboard
+ * Lumina - User Dashboard
  * Soft Bloom Design: Activity summary, artist cards, recent posts
  */
 

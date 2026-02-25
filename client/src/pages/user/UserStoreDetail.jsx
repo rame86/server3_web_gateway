@@ -117,7 +117,7 @@ export default function UserStoreDetail() {
                         </div>
 
                         <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1.5">
-                            <Info size={14} /> 이 상품은 Fanverse 포인트 서비스로만 결제 가능합니다.
+                            <Info size={14} /> 이 상품은 Lumina 포인트 서비스로만 결제 가능합니다.
                         </p>
                     </div>
                 </div>

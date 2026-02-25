@@ -1,5 +1,5 @@
 /*
- * FanVerse - User Chat Page
+ * Lumina - User Chat Page
  * Soft Bloom Design: AI chatbot + artist chat + friend chat
  */
 

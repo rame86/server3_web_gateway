@@ -1,5 +1,5 @@
 /*
- * FanVerse - Admin Store Management
+ * Lumina - Admin Store Management
  * Soft Bloom Design: Goods approval queue
  */
 
