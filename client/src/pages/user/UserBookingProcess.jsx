@@ -118,7 +118,7 @@ export default function UserBookingProcess() {
                                 <CreditCard size={20} className="text-rose-500" />
                                 포인트 결제
                             </h2>
-                            <p className="text-sm text-muted-foreground mb-4">FanVerse 내 모든 스토어 및 예매 결제는 포인트로 진행됩니다.</p>
+                            <p className="text-sm text-muted-foreground mb-4">Lumina 내 모든 스토어 및 예매 결제는 포인트로 진행됩니다.</p>
 
                             <div className="bg-rose-50 rounded-2xl p-5 border border-rose-100 flex justify-between items-center">
                                 <div>

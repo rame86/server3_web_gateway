@@ -73,7 +73,7 @@ export default function UserLogin() {
                         <Heart size={32} fill="currentColor" />
                     </div>
                     <h1 className="text-3xl font-bold text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>
-                        FanVerse
+                        Lumina
                     </h1>
                     <p className="text-muted-foreground text-sm font-medium">당신의 최애와 가장 가까워지는 공간</p>
                 </div>
@@ -160,7 +160,7 @@ export default function UserLogin() {
 
                 {/* Footer info */}
                 <div className="mt-8 text-center text-xs text-muted-foreground">
-                    계속하기를 누르시면 Fanverse의{' '}
+                    계속하기를 누르시면 Lumina의{' '}
                     <button className="underline hover:text-rose-500">이용약관</button> 및{' '}
                     <button className="underline hover:text-rose-500">개인정보처리방침</button>에 동의하게 됩니다.
                 </div>

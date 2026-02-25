@@ -1,5 +1,5 @@
 /*
- * FanVerse - Landing Page
+ * Lumina - Landing Page
  * Soft Bloom Design: Hero with generated image, floating blobs, glass cards
  * Light background, dark plum text, rose/lavender accents
  */
@@ -48,7 +48,7 @@ export default function Home() {
             <Heart size={16} className="text-white" fill="white" />
           </div>
           <span className="font-bold text-xl text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>
-            FanVerse
+            Lumina
           </span>
         </div>
 
@@ -80,7 +80,7 @@ export default function Home() {
         <div className="absolute inset-0 overflow-hidden">
           <img
             src={HERO_IMAGE}
-            alt="FanVerse Hero"
+            alt="Lumina Hero"
             className="w-full h-full object-cover" />
 
           <div className="absolute inset-0 bg-gradient-to-r from-white/90 via-white/60 to-white/20" />
@@ -219,7 +219,7 @@ export default function Home() {
           <div className="text-center mb-12">
             <p className="text-sm font-semibold text-rose-500 mb-2 uppercase tracking-wide">서비스</p>
             <h2 className="text-3xl font-bold text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>
-              FanVerse에서 할 수 있는 모든 것
+              Lumina에서 할 수 있는 모든 것
             </h2>
           </div>
 
@@ -370,7 +370,7 @@ export default function Home() {
               <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center">
                 <Heart size={14} className="text-white" fill="white" />
               </div>
-              <span className="font-bold text-lg" style={{ fontFamily: "'Playfair Display', serif" }}>FanVerse</span>
+              <span className="font-bold text-lg" style={{ fontFamily: "'Playfair Display', serif" }}>Lumina</span>
             </div>
             <div className="flex items-center gap-6">
               {['이용약관', '개인정보처리방침', '고객센터'].map((item) =>
@@ -379,7 +379,7 @@ export default function Home() {
                 </a>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">© 2026 FanVerse. All rights reserved.</p>
+            <p className="text-sm text-muted-foreground">© 2026 Lumina. All rights reserved.</p>
           </div>
         </div>
       </footer>

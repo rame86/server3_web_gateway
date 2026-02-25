@@ -1,5 +1,5 @@
 /**
- * FanVerse - Admin Users Management
+ * Lumina - Admin Users Management
  * Soft Bloom Design: User management with enhanced web-style UI
  */
 

@@ -1,5 +1,5 @@
 /**
- * FanVerse - Admin Dashboard
+ * Lumina - Admin Dashboard
  * Soft Bloom Design: Platform overview, key metrics, recent activities
  * Web-style design with enhanced visual hierarchy
  */
@@ -70,7 +70,7 @@ export default function AdminDashboard() {
               <BarChart3 size={28} />
               <span className="text-amber-100 text-sm font-semibold">관리자 대시보드</span>
             </div>
-            <h1 className="text-4xl font-bold mb-2">FanVerse 대시보드</h1>
+            <h1 className="text-4xl font-bold mb-2">Lumina 대시보드</h1>
             <p className="text-amber-50 text-lg">플랫폼 전체 현황을 한눈에 확인하세요</p>
           </div>
         </div>

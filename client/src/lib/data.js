@@ -1,4 +1,4 @@
-/* FanVerse - Shared Mock Data & Types */
+/* Lumina - Shared Mock Data & Types */
 
 
 
@@ -349,7 +349,7 @@ export const posts = [
   type: 'notice',
   title: '[공지] 3월 팬미팅 예매 안내',
   content: '3월 15일 NOVA 팬미팅 예매가 2월 25일 오후 2시에 시작됩니다. 예매 방법 및 주의사항을 확인해주세요.',
-  author: 'FanVerse 운영팀',
+  author: 'Lumina 운영팀',
   authorImage: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&h=100&fit=crop',
   createdAt: '2026-02-16',
   likes: 156,
