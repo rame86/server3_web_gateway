@@ -110,7 +110,7 @@ export default function UserSignup() {
                     추가 정보 입력
                 </h2>
                 <p className="mt-2 text-center text-sm text-gray-600">
-                    Fanverse 서비스 이용을 위해 몇 가지 정보를 더 알려주세요.
+                    Lumina 서비스 이용을 위해 몇 가지 정보를 더 알려주세요.
                 </p>
 
                 {queryParams.provider && (

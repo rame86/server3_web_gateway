@@ -1,5 +1,5 @@
 /*
- * FanVerse - User Wallet Page
+ * Lumina - User Wallet Page
  * Soft Bloom Design: Point wallet, charge, history
  */
 

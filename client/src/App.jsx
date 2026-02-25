@@ -14,6 +14,7 @@ import UserStore from "./pages/user/UserStore";
 import UserEvents from "./pages/user/UserEvents";
 import UserChat from "./pages/user/UserChat";
 import UserCommunity from "./pages/user/UserCommunity";
+import UserCommunity1 from "./pages/user/UserCommunity1";
 import UserArtists from "./pages/user/UserArtists";
 import UserWallet from "./pages/user/UserWallet";
 import UserEventDetail from "./pages/user/UserEventDetail";
@@ -99,6 +100,7 @@ function Router() {
       <Route path="/user/booking/:id" component={UserBookingProcess} />
       <Route path="/user/chat" component={UserChat} />
       <Route path="/user/community" component={UserCommunity} />
+      <Route path="/user/community1" component={UserCommunity1} />
       <Route path="/user/artists" component={UserArtists} />
       <Route path="/user/wallet" component={UserWallet} />
 

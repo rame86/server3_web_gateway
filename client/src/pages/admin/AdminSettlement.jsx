@@ -1,5 +1,5 @@
 /*
- * FanVerse - Admin Settlement
+ * Lumina - Admin Settlement
  * Soft Bloom Design: Platform settlement overview
  */
 
