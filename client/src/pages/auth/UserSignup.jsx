@@ -56,7 +56,7 @@ export default function UserSignup() {
         setIsSendingCode(true);
         toast.loading('인증번호를 발송 중입니다...');
         try {
-            await axios.post(`http://localhost:8080/api/core/member/SendVerification?email=${formData.email}`);
+            await axios.post(`http://localhost:8080/msa/core/member/SendVerification?email=${formData.email}`);
             toast.dismiss();
             toast.success('이메일로 인증번호가 발송되었습니다. 5분 내에 입력해주세요.');
         } catch (error) {
@@ -69,7 +69,7 @@ export default function UserSignup() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.name || !formData.phone || !formData.age || !formData.email) {
+        if (!formData.name || !formData.phone || !formData.age || !formData.email || !formData.authCode) {
             toast.error('필수 정보를 모두 입력해주세요.');
             return;
         }
@@ -90,7 +90,7 @@ export default function UserSignup() {
                 provider: queryParams.provider || null,
                 providerId: queryParams.providerId || null
             };
-            await axios.post('http://localhost:8080/api/core/member/signup', payload);
+            await axios.post('http://localhost:8080/msa/core/member/signup', payload);
 
             toast.dismiss();
             toast.success('회원가입이 완료되었습니다! 환영합니다.');

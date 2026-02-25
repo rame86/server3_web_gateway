@@ -22,7 +22,7 @@ export default function UserLogin() {
         }
         try {
             // Nginx 게이트웨이를 통해 백엔드의 SendVerification 엔드포인트 호출
-            const response = await axios.post(`http://localhost/api/core/member/SendVerification?email=${formData.email}`);
+            const response = await axios.post(`http://localhost:8080/msa/core/member/SendVerification?email=${formData.email}`);
             toast.success(response.data.message || "인증번호가 발송되었습니다.");
         } catch (error) {
             toast.error("메일 발송에 실패했습니다.");
@@ -32,7 +32,7 @@ export default function UserLogin() {
     const handleSocialLogin = (provider) => {
         // MSA Gateway(Server 3)를 경유하여 Core Service(Server 1)로 인증 요청
         // Spring Security 기본 OAuth2 경로 적용
-        window.location.href = `http://localhost:8080/api/core/api/${provider}/login`;
+        window.location.href = `http://localhost:8080/msa/core/api/login/${provider}`;
     };
 
     const handleLocalLogin = async (e) => {
@@ -45,19 +45,23 @@ export default function UserLogin() {
         setIsLoading(true);
         try {
             // Spring Security Custom JSON Auth Filter 또는 Form Login 엔드포인트 호출
-            const response = await axios.post('http://34.64.85.123/login', {
+            const response = await axios.post('http://localhost:8080/msa/core/member/login', {
                 email: formData.email,
                 username: formData.email, // Spring Security 기본을 위해 username도 같이 전송
                 password: formData.password
             });
 
             if (response.data && response.data.token) {
-                localStorage.setItem('token', response.data.token);
+                localStorage.setItem('accessToken', response.data.token);
+                localStorage.setItem('memberId', response.data.memberId);
+                localStorage.setItem('role', response.data.role);
+
+                toast.success('로그인 성공!');
+                setLocation('/user');
             }
-            toast.success('로그인 성공!');
-            setLocation('/user');
         } catch (error) {
-            toast.error('로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.');
+            const errMsg = error.response?.data?.message || '로그인에 실패했습니다.';
+            toast.error(errMsg);
         } finally {
             setIsLoading(false);
         }
