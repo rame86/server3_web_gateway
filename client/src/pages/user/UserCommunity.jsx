@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '@/components/Layout';
-import { BookOpen, Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell } from 'lucide-react';
+import { BookOpen, Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 // [DB 설정] 백엔드 카테고리와 매칭
@@ -15,49 +15,58 @@ const boardTabs = [
 
 // [디자인 설정] 카테고리별 배지 색상
 const typeConfig = {
-  '팬레터': { label: '팬레터', badgeClass: 'badge-rose' },
-  '아티스트 레터': { label: '아티스트 레터', badgeClass: 'badge-lavender' },
+  '팬레터': { label: '팬레터', badgeClass: 'bg-rose-100 text-rose-600' },
+  '아티스트 레터': { label: '아티스트 레터', badgeClass: 'bg-purple-100 text-purple-600' },
   '공지사항': { label: '공지', badgeClass: 'bg-amber-100 text-amber-700' },
-  '팬덤게시판': { label: '팬덤', badgeClass: 'badge-mint' },
+  '팬덤게시판': { label: '팬덤', badgeClass: 'bg-teal-100 text-teal-600' },
   '자유게시판': { label: '자유', badgeClass: 'bg-gray-100 text-gray-600' }
 };
 
 function PostCard({ post }) {
   const [liked, setLiked] = useState(false);
-  // DB에서 넘어온 category가 typeConfig에 없으면 '자유게시판' 기본값 사용
   const config = typeConfig[post.category] || typeConfig['자유게시판'];
+  
+  // 아티스트 여부 및 이름 판단
+  const isArtist = post.category === '아티스트 레터' || post.isArtistPost || post.is_artist_post;
+  const authorDisplayName = post.authorName || post.artist_name || post.memberId || '익명';
 
   return (
     <div
-      className="glass-card rounded-2xl p-4 soft-shadow hover:bg-rose-50/30 transition-colors cursor-pointer group"
+      className="glass-card rounded-2xl p-4 soft-shadow hover:bg-rose-50/30 transition-all cursor-pointer group mb-3 border border-rose-50/50"
       onClick={() => toast.info('게시글 상세보기 기능 준비 중입니다')}>
       
       <div className="flex items-start gap-3">
-        {/* 프로필 이미지 (DB에 없으면 기본 rose 배경) */}
+        {/* [수정 포인트] 프로필 이미지 우선, 없으면 카테고리에 따른 텍스트 표시 */}
         {post.authorImage ? (
           <img src={post.authorImage} alt="author" className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-2 ring-white shadow-sm" />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0 ring-2 ring-white text-[10px] font-bold text-rose-400">
-            User
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ring-2 ring-white shadow-sm text-[9px] font-black tracking-tighter ${
+            isArtist 
+              ? 'bg-gradient-to-tr from-purple-600 to-indigo-400 text-white' 
+              : 'bg-rose-100 text-rose-400'
+          }`}>
+            {isArtist ? 'ARTIST' : 'USER'}
           </div>
         )}
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${config.badgeClass}`}>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${config.badgeClass}`}>
               {config.label}
             </span>
-            {(post.isArtistPost || post.is_artist_post) && (
-              <span className="text-xs text-rose-500 font-medium">Artist ✨</span>
+            {isArtist && (
+              <span className="text-[10px] bg-purple-600 text-white px-2 py-0.5 rounded-full font-bold">Official ✨</span>
             )}
           </div>
           <h3 className="font-semibold text-sm text-foreground mb-1 line-clamp-1 group-hover:text-rose-600 transition-colors">
             {post.title}
           </h3>
-          <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{post.content}</p>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">{post.authorName || post.memberId || '익명'}</span>
-            <span className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground line-clamp-2 mb-2 leading-relaxed">{post.content}</p>
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className={`font-bold ${isArtist ? 'text-purple-600' : 'text-rose-400'}`}>
+              {isArtist && '⭐ '} {authorDisplayName}
+            </span>
+            <span className="text-gray-400">
               {post.createdAt || post.created_at ? new Date(post.createdAt || post.created_at).toLocaleDateString() : '-'}
             </span>
           </div>
@@ -92,57 +101,59 @@ export default function UserCommunity() {
   const [activeBoard, setActiveBoard] = useState('all');
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterKeyword, setFilterKeyword] = useState('');
 
   // [DB 연동 로직]
-  useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        setLoading(true);
-       // 1. 로컬 스토리지에서 토큰 가져오기 (로그인 시 저장된 키 이름 확인 필요)
+  const fetchPosts = useCallback(async (categoryKey = 'all') => {
+    try {
+      setLoading(true);
       const token = localStorage.getItem('accessToken') || localStorage.getItem('token'); 
-      
-      // 2. application.properties의 context-path(/msa/core)를 포함한 풀 경로 작성
-      // 프록시 설정이 없다면 http://localhost:8080을 앞에 붙여야 합니다.
-      const API_URL = 'http://localhost:8080/msa/core/api/board/posts';
+      const categoryParam = categoryKey === 'all' ? '전체' : categoryKey;
+      const API_URL = `http://localhost:8080/msa/core/api/board/posts?category=${encodeURIComponent(categoryParam)}`;
 
       const response = await fetch(API_URL, {
         method: 'GET',
         headers: {
-          // 3. 401 에러 해결을 위한 Authorization 헤더
           'Authorization': token ? `Bearer ${token}` : '', 
           'Content-Type': 'application/json'
         }
       });
 
-      // 401 에러(권한 없음) 발생 시 처리
       if (response.status === 401) {
         toast.error("로그인이 필요한 서비스입니다.");
-        // 필요 시 로그인 페이지로 리다이렉트 로직 추가
         return;
       }
-if (!response.ok) throw new Error(`데이터 로드 실패: ${response.status}`);
+      if (!response.ok) throw new Error(`데이터 로드 실패: ${response.status}`);
       
       const data = await response.json();
-      setPosts(Array.isArray(data) ? data : []);
+      setPosts(Array.isArray(data) ? data : (data.content || []));
       
     } catch (error) {
       console.error("DB 연동 에러:", error);
-      toast.error("게시글을 불러오지 못했습니다. 서버 연결을 확인하세요.");
+      toast.error("게시글을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
-  };
-    fetchPosts();
   }, []);
 
-  // 필터링 로직 (카테고리 매칭)
-  const filteredPosts = activeBoard === 'all' ?
-    posts :
-    posts.filter((p) => p.category === activeBoard);
+  useEffect(() => {
+    fetchPosts(activeBoard);
+  }, [activeBoard, fetchPosts]);
+
+  // 프론트엔드 검색 필터링
+  const filteredDisplayPosts = useMemo(() => {
+    if (!filterKeyword.trim()) return posts;
+    const low = filterKeyword.toLowerCase();
+    return posts.filter(p => 
+      p.title?.toLowerCase().includes(low) || 
+      p.content?.toLowerCase().includes(low)
+    );
+  }, [posts, filterKeyword]);
 
   return (
     <Layout role="user">
-      <div className="p-4 lg:p-6 space-y-6">
+      <div className="p-4 lg:p-6 space-y-6 max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -153,7 +164,7 @@ if (!response.ok) throw new Error(`데이터 로드 실패: ${response.status}`)
           </div>
           <button
             onClick={() => toast.info('글쓰기 기능 준비 중입니다')}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl btn-primary-gradient shadow-sm hover:opacity-90 transition-opacity">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl bg-rose-500 shadow-md hover:bg-rose-600 transition-all">
             <PenLine size={14} />
             글쓰기
           </button>
@@ -164,8 +175,11 @@ if (!response.ok) throw new Error(`데이터 로드 실패: ${response.status}`)
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="게시글 검색..."
-            className="w-full pl-9 pr-4 py-2.5 bg-white border border-rose-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 shadow-sm" />
+            placeholder="게시글 검색 후 Enter..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && setFilterKeyword(searchQuery)}
+            className="w-full pl-10 pr-4 py-3 bg-white border border-rose-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 shadow-sm" />
         </div>
 
         {/* Board Tabs */}
@@ -174,10 +188,10 @@ if (!response.ok) throw new Error(`데이터 로드 실패: ${response.status}`)
             <button
               key={tab.key}
               onClick={() => setActiveBoard(tab.key)}
-              className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              className={`flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
                 activeBoard === tab.key ?
                 'bg-rose-500 text-white shadow-md' :
-                'bg-white border border-rose-100 text-muted-foreground hover:bg-rose-50'
+                'bg-white border border-rose-50 text-gray-400 hover:bg-rose-50'
               }`}>
               {tab.label}
             </button>
@@ -185,79 +199,60 @@ if (!response.ok) throw new Error(`데이터 로드 실패: ${response.status}`)
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Main Content (Posts) */}
-          <div className="lg:col-span-2 space-y-3">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="lg:col-span-2 space-y-1">
+            <div className="flex items-center gap-2 mb-3">
               <TrendingUp size={16} className="text-rose-500" />
-              <span className="text-sm font-semibold text-foreground">최신 게시글</span>
+              <span className="text-sm font-bold">최신 게시글</span>
             </div>
 
             {loading ? (
-              <div className="text-center py-20 animate-pulse text-rose-300">데이터를 가져오는 중입니다...</div>
-            ) : filteredPosts.length > 0 ? (
-              filteredPosts.map((post) => (
-                <PostCard key={post.boardId || post.id} post={post} />
+              <div className="text-center py-20 animate-pulse text-rose-300 font-medium">소식을 가져오는 중입니다...</div>
+            ) : filteredDisplayPosts.length > 0 ? (
+              filteredDisplayPosts.map((post) => (
+                <PostCard key={post.boardId || post.id || Math.random()} post={post} />
               ))
             ) : (
-              <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-rose-200">
+              <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-rose-200">
                 <BookOpen size={40} className="text-muted-foreground/30 mx-auto mb-3" />
                 <p className="text-muted-foreground text-sm">표시할 게시글이 없습니다.</p>
               </div>
             )}
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar (공지사항 & 인기글) */}
           <div className="space-y-4">
-            {/* Notice Section */}
-            <div className="glass-card rounded-2xl p-4 soft-shadow">
+            <div className="glass-card rounded-2xl p-4 border border-rose-50 shadow-sm bg-white">
               <div className="flex items-center gap-2 mb-3">
                 <Bell size={16} className="text-amber-500" />
-                <h3 className="font-semibold text-sm text-foreground">공지사항</h3>
+                <h3 className="font-bold text-sm">공지사항</h3>
               </div>
               <div className="space-y-2">
-                {posts.filter(p => p.category === '공지사항').slice(0, 4).map((notice, i) => (
-                  <div key={i} className="flex items-start gap-2 cursor-pointer hover:bg-amber-50 rounded-lg p-1.5 -mx-1.5 transition-colors">
-                    <div className="w-1.5 h-1.5 bg-amber-400 rounded-full mt-1.5 flex-shrink-0" />
-                    <p className="text-xs text-foreground line-clamp-1">{notice.title}</p>
-                  </div>
+                {posts.filter(p => p.category === '공지사항').slice(0, 3).map((notice, i) => (
+                  <p key={i} className="text-xs text-gray-600 line-clamp-1 hover:text-rose-500 cursor-pointer">• {notice.title}</p>
                 ))}
-                {posts.filter(p => p.category === '공지사항').length === 0 && (
-                  <p className="text-[11px] text-muted-foreground">등록된 공지가 없습니다.</p>
-                )}
               </div>
             </div>
 
-            {/* Hot Posts Section */}
-            <div className="glass-card rounded-2xl p-4 soft-shadow">
+            <div className="glass-card rounded-2xl p-4 border border-rose-50 shadow-sm bg-white">
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp size={16} className="text-rose-500" />
-                <h3 className="font-semibold text-sm text-foreground">실시간 인기</h3>
+                <h3 className="font-bold text-sm text-foreground">실시간 인기</h3>
               </div>
-              <div className="space-y-2">
-                {[...posts].sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0)).slice(0, 5).map((post, i) => (
-                  <div key={post.boardId || i} className="flex items-start gap-2 cursor-pointer hover:bg-rose-50 rounded-lg p-1.5 -mx-1.5 transition-colors">
-                    <span className={`text-xs font-bold w-4 flex-shrink-0 ${i < 3 ? 'text-rose-500' : 'text-muted-foreground'}`}>
-                      {i + 1}
-                    </span>
-                    <p className="text-xs text-foreground line-clamp-1">{post.title}</p>
-                  </div>
-                ))}
-              </div>
+              {[...posts].sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0)).slice(0, 5).map((post, i) => (
+                <div key={i} className="flex gap-2 mb-2 cursor-pointer group">
+                  <span className={`text-xs font-bold ${i < 3 ? 'text-rose-500' : 'text-gray-300'}`}>{i+1}</span>
+                  <p className="text-xs text-gray-600 line-clamp-1 group-hover:text-rose-600">{post.title}</p>
+                </div>
+              ))}
             </div>
 
-            {/* Write Fan Letter Banner */}
-            <div
-              className="rounded-2xl p-4 cursor-pointer hover:shadow-md transition-all shadow-sm"
-              style={{ background: 'linear-gradient(135deg, #FFF1F2 0%, #F5F3FF 100%)' }}
-              onClick={() => toast.info('팬레터 쓰기 기능 준비 중입니다')}>
+            <div className="rounded-2xl p-5 cursor-pointer border border-rose-100 bg-gradient-to-br from-rose-50 to-purple-50" onClick={() => toast.info('준비 중입니다')}>
               <div className="flex items-center gap-2 mb-2">
                 <Heart size={16} className="text-rose-500" fill="currentColor" />
-                <h3 className="font-semibold text-sm text-foreground">팬레터 쓰기</h3>
+                <h3 className="font-bold text-sm">팬레터 쓰기</h3>
               </div>
-              <p className="text-xs text-muted-foreground mb-3 font-medium">아티스트에게 따뜻한 마음을 전하세요</p>
-              <button className="w-full py-2 text-xs font-bold text-white rounded-xl btn-primary-gradient shadow-sm">
-                작성하기
-              </button>
+              <p className="text-[11px] text-gray-500 mb-4 leading-relaxed">아티스트에게 진심을 전해보세요.</p>
+              <button className="w-full py-2.5 text-xs font-bold text-white bg-rose-500 rounded-xl">작성하기</button>
             </div>
           </div>
         </div>
