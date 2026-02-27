@@ -105,12 +105,14 @@ export default function UserCommunity() {
   const [filterKeyword, setFilterKeyword] = useState('');
 
   // [DB 연동 로직]
-  const fetchPosts = useCallback(async (categoryKey = 'all') => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token'); 
-      const categoryParam = categoryKey === 'all' ? '전체' : categoryKey;
-      const API_URL = `http://localhost:8080/msa/core/api/board/posts?category=${encodeURIComponent(categoryParam)}`;
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        setLoading(true);
+
+       // 1. 로컬 스토리지에서 토큰 가져오기 (로그인 시 저장된 키 이름 확인 필요)
+      const token = localStorage.getItem('TOKEN');
+      const API_URL = 'http://localhost/msa/core/board/list';
 
       const response = await fetch(API_URL, {
         method: 'GET',
