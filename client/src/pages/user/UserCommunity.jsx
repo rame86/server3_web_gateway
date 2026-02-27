@@ -98,12 +98,10 @@ export default function UserCommunity() {
     const fetchPosts = async () => {
       try {
         setLoading(true);
+
        // 1. 로컬 스토리지에서 토큰 가져오기 (로그인 시 저장된 키 이름 확인 필요)
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('token'); 
-      
-      // 2. application.properties의 context-path(/msa/core)를 포함한 풀 경로 작성
-      // 프록시 설정이 없다면 http://localhost:8080을 앞에 붙여야 합니다.
-      const API_URL = 'http://localhost:8080/msa/core/api/board/posts';
+      const token = localStorage.getItem('TOKEN');
+      const API_URL = 'http://localhost/msa/core/board/list';
 
       const response = await fetch(API_URL, {
         method: 'GET',
