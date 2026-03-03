@@ -1,17 +1,21 @@
+/*
+ * Lumina - User Community Page
+ * 사이드바 고정(공지/인기글) 및 팬레터 버튼 보라색 포인트 수정본
+ */
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Layout from '@/components/Layout';
-import { BookOpen, Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell, Lock, AlertCircle } from 'lucide-react';
+import { BookOpen, Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
-// [DB 설정] 하드코딩 지양 및 MSA 구조 참조
+const API_BASE_URL = 'http://localhost/msa/core/board';
 const TOKEN_KEY = 'TOKEN';
-const API_BASE_URL = 'http://localhost/msa/core/board/list';
 
 const boardTabs = [
-  { key: 'all', label: '전체', private: true },
+  { key: 'all', label: '전체', private: false },
   { key: '팬레터', label: '팬레터', private: true },
   { key: '아티스트 레터', label: '아티스트 레터', private: true },
-  { key: '공지사항', label: '공지사항', private: true },
+  { key: '공지사항', label: '공지사항', private: false },
   { key: '팬덤게시판', label: '팬덤', private: true },
   { key: '자유게시판', label: '자유게시판', private: false }
 ];
@@ -25,173 +29,210 @@ const typeConfig = {
 };
 
 function PostCard({ post }) {
+  const [liked, setLiked] = useState(false);
   const config = typeConfig[post.category] || typeConfig['자유게시판'];
-  const isArtist = post.category === '아티스트 레터' || post.isArtistPost || post.is_artist_post;
-  const authorDisplayName = post.authorName || post.artist_name || post.memberId || '익명';
+  const postId = post.boardId || post.id;
 
   return (
-    <div className="glass-card rounded-2xl p-4 soft-shadow hover:bg-rose-50/30 transition-all cursor-pointer mb-3 border border-rose-50/50">
+    <div
+      className="glass-card rounded-2xl p-4 soft-shadow hover:bg-rose-50/30 transition-colors cursor-pointer border border-rose-50/50 mb-3"
+      onClick={() => window.location.href = `/community/${postId}`}
+    >
       <div className="flex items-start gap-3">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ring-2 ring-white shadow-sm text-[9px] font-black ${isArtist ? 'bg-gradient-to-tr from-purple-600 to-indigo-400 text-white' : 'bg-rose-100 text-rose-400'}`}>
-          {isArtist ? 'ARTIST' : 'USER'}
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ring-2 ring-white shadow-sm text-[9px] font-black ${post.category === '아티스트 레터' ? 'bg-gradient-to-tr from-purple-600 to-indigo-400 text-white' : 'bg-rose-100 text-rose-400'}`}>
+          {post.category === '아티스트 레터' ? 'ARTIST' : 'USER'}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${config.badgeClass}`}>{config.label}</span>
           </div>
-          <h3 className="font-semibold text-sm mb-1 line-clamp-1">{post.title}</h3>
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{post.content}</p>
-          <div className="flex items-center gap-3 mt-2 text-[11px]">
-            <span className="font-bold text-rose-400">{authorDisplayName}</span>
+          <h3 className="font-semibold text-sm text-foreground mb-1 line-clamp-1">{post.title}</h3>
+          <p className="text-xs text-muted-foreground line-clamp-2 mb-2 leading-relaxed">{post.content}</p>
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="font-bold text-rose-400">{post.authorName || '익명'}</span>
             <span className="text-gray-400">{post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '-'}</span>
           </div>
         </div>
+      </div>
+      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-rose-100">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Heart size={13} className={liked ? 'text-rose-500' : ''} fill={liked ? '#f43f5e' : 'none'} /> {post.likeCount || 0}
+        </div>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground"><MessageCircle size={13} /> {post.commentCount || 0}</div>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground"><Eye size={13} /> {(post.viewCount || 0).toLocaleString()}</div>
       </div>
     </div>
   );
 }
 
 export default function UserCommunity() {
-  const [activeBoard, setActiveBoard] = useState('자유게시판'); // 기본값을 자유게시판으로 설정
+  const [activeBoard, setActiveBoard] = useState('all');
   const [posts, setPosts] = useState([]);
+  const [sidebarData, setSidebarData] = useState({ notices: [], hotPosts: [] });
   const [loading, setLoading] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const token = localStorage.getItem(TOKEN_KEY);
+  const isLoggedIn = !!token;
 
-  useEffect(() => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    setIsLoggedIn(!!token);
-    // 토큰이 있으면 '전체', 없으면 '자유게시판'으로 시작
-    setActiveBoard(token ? 'all' : '자유게시판');
-  }, []);
+  // 사이드바 전용 데이터 로드 (모든 탭에서 유지됨)
+  const fetchSidebarData = useCallback(async () => {
+    try {
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const response = await fetch(`${API_BASE_URL}/list`, { headers });
+      const data = await response.json();
+      const rawData = Array.isArray(data) ? data : (data.content || []);
+      
+      setSidebarData({
+        notices: rawData.filter(p => p.category === '공지사항').slice(0, 5),
+        hotPosts: [...rawData].sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0)).slice(0, 5)
+      });
+    } catch (err) {
+      console.error("Sidebar Load Error:", err);
+    }
+  }, [token]);
 
-  const fetchPosts = useCallback(async (boardKey) => {
+  // 메인 리스트 패칭
+  const fetchPosts = useCallback(async (category) => {
     try {
       setLoading(true);
-      const token = localStorage.getItem(TOKEN_KEY);
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const categoryParam = category === 'all' ? '' : `category=${encodeURIComponent(category)}`;
+      const url = `${API_BASE_URL}/list${categoryParam ? `?${categoryParam}` : ''}`;
       
-      // 요청 헤더 설정
-      const headers = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const response = await fetch(API_BASE_URL, {
-        method: 'GET',
-        headers: headers
-      });
-
-      // 401 에러 발생 시 처리
-      if (response.status === 401) {
-        if (token) {
-          toast.error("세션이 만료되었습니다.");
-          localStorage.removeItem(TOKEN_KEY);
-          setIsLoggedIn(false);
-        }
-        // 토큰 없이 재시도하거나 자유게시판 데이터만 필터링하도록 유도
-        // 여기서는 서버가 401을 주면 비회원 데이터도 못 가져오는 구조이므로 
-        // 서버의 permitAll 설정이 필수적입니다.
-        setPosts([]); 
-        return;
-      }
-
-      if (!response.ok) throw new Error('네트워크 응답 없음');
-
+      const response = await fetch(url, { headers });
       const data = await response.json();
-      const rawPosts = Array.isArray(data) ? data : (data.content || []);
+      const rawData = Array.isArray(data) ? data : (data.content || []);
       
-      // [로직] 비회원은 '자유게시판' 카테고리만 필터링해서 보여줌
-      let filtered = rawPosts;
-      if (!token) {
-        filtered = rawPosts.filter(p => p.category === '자유게시판');
-      } else if (boardKey !== 'all') {
-        filtered = rawPosts.filter(p => p.category === boardKey);
-      }
-      
-      setPosts(filtered);
+      setPosts(!isLoggedIn ? rawData.filter(p => p.category === '자유게시판' || p.category === '공지사항') : rawData);
     } catch (err) {
-      console.error("Fetch Error:", err);
-      // 에러가 나더라도 비회원에게 알림을 최소화하고 싶다면 무음 처리 가능
+      setPosts([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token, isLoggedIn]);
 
   useEffect(() => {
-    fetchPosts(activeBoard);
-  }, [activeBoard, fetchPosts]);
+    fetchSidebarData();
+    fetchPosts('all');
+  }, [fetchSidebarData, fetchPosts]);
 
-  const handleTabClick = (tab) => {
-    if (tab.private && !isLoggedIn) {
-      toast.error("로그인한 회원만 이용할 수 있는 게시판입니다.");
-      return;
-    }
-    setActiveBoard(tab.key);
-  };
+  const displayPosts = useMemo(() => {
+    return posts.filter(p => 
+      p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      p.content?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [posts, searchQuery]);
 
   return (
     <Layout role="user">
-      <div className="p-4 lg:p-6 space-y-6 max-w-5xl mx-auto">
-        <header className="flex items-center justify-between">
+      <div className="p-4 lg:p-6 space-y-6 max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">종합 커뮤니티</h1>
-            <p className="text-sm text-muted-foreground">
-              {isLoggedIn ? '모든 소식을 확인하세요.' : '자유게시판을 둘러보세요. (로그인 시 전체 공개)'}
-            </p>
+            <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>종합 커뮤니티</h1>
+            <p className="text-sm text-muted-foreground">팬과 아티스트가 함께 나누는 따뜻한 이야기</p>
           </div>
-        </header>
+          <button
+            onClick={() => isLoggedIn ? (window.location.href = '/community/write') : toast.error("로그인이 필요합니다.")}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white rounded-xl bg-rose-500 shadow-md active:scale-95 transition-all"
+          >
+            <PenLine size={16} /> 글쓰기
+          </button>
+        </div>
 
-        {/* Board Tabs */}
-        <nav className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+        {/* Search */}
+        <div className="relative">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-rose-300" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="검색어를 입력하세요..."
+            className="w-full pl-11 pr-4 py-3 bg-white border border-rose-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-200"
+          />
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
           {boardTabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => handleTabClick(tab)}
-              className={`flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
-                activeBoard === tab.key ? 'bg-rose-500 text-white shadow-md' : 'bg-white text-gray-400 border border-rose-50'
-              }`}>
-              {tab.label}
-              {tab.private && !isLoggedIn && <Lock size={12} className="opacity-50" />}
+              onClick={() => {
+                if (tab.private && !isLoggedIn) return toast.error("로그인이 필요합니다.");
+                setActiveBoard(tab.key);
+                fetchPosts(tab.key);
+              }}
+              className={`flex-shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                activeBoard === tab.key ? 'bg-rose-500 text-white shadow-md' : 'bg-white border border-rose-50 text-gray-400 hover:bg-rose-50'
+              }`}
+            >
+              {tab.label} {tab.private && !isLoggedIn && <Lock size={12} className="inline ml-1" />}
             </button>
           ))}
-        </nav>
+        </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          <main className="lg:col-span-2">
+          {/* Main List */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="flex items-center gap-2 mb-2 font-bold text-sm text-gray-700">
+              <TrendingUp size={16} className="text-rose-500" /> {activeBoard === 'all' ? '전체 게시글' : `${activeBoard} 목록`}
+            </div>
             {loading ? (
-              <div className="py-20 text-center animate-pulse text-rose-300 font-medium">소식을 불러오는 중...</div>
-            ) : posts.length > 0 ? (
-              posts.map((post) => <PostCard key={post.id || Math.random()} post={post} />)
+              <div className="py-20 text-center animate-pulse text-rose-300">데이터를 불러오는 중...</div>
+            ) : displayPosts.length > 0 ? (
+              displayPosts.map((post, idx) => <PostCard key={post.id || idx} post={post} />)
             ) : (
-              <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-rose-200">
-                <BookOpen size={40} className="text-muted-foreground/20 mx-auto mb-3" />
-                <p className="text-muted-foreground text-sm">표시할 게시글이 없습니다.</p>
-              </div>
+              <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-rose-100 text-gray-400 text-sm">게시글이 없습니다.</div>
             )}
-          </main>
+          </div>
 
-          <aside className="space-y-4">
-            {!isLoggedIn && (
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg">
-                <h3 className="font-bold text-sm mb-1 text-white">더 많은 기능을 원하시나요?</h3>
-                <p className="text-[11px] opacity-90 mb-4 text-white">로그인 시 아티스트 레터와 팬레터 작성이 가능합니다.</p>
-                <button 
-                  onClick={() => window.location.href = '/login'}
-                  className="w-full py-2 bg-white text-indigo-600 rounded-lg text-xs font-bold hover:bg-opacity-90 transition-all">
-                  1초만에 로그인하기
-                </button>
-              </div>
-            )}
-            
-            <div className="glass-card rounded-2xl p-4 border border-rose-50 bg-white shadow-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp size={16} className="text-rose-500" />
-                <h3 className="font-bold text-sm">인기 급상승</h3>
-              </div>
-              <div className="space-y-2">
-                {posts.slice(0, 3).map((p, i) => (
-                  <p key={i} className="text-xs text-gray-500 line-clamp-1">• {p.title}</p>
+          {/* Sidebar */}
+          <div className="space-y-5">
+            {/* 공지사항 */}
+            <div className="glass-card rounded-2xl p-5 border border-rose-50 bg-white shadow-sm">
+              <div className="flex items-center gap-2 mb-4 font-bold text-sm"><Bell size={18} className="text-amber-500" /> 공지사항</div>
+              <div className="space-y-3">
+                {sidebarData.notices.map((n, i) => (
+                  <div key={i} onClick={() => window.location.href = `/community/${n.id}`} className="flex items-start gap-2 cursor-pointer group hover:text-rose-500">
+                    <div className="w-1.5 h-1.5 bg-amber-400 rounded-full mt-1.5 flex-shrink-0" />
+                    <p className="text-xs line-clamp-1">{n.title}</p>
+                  </div>
                 ))}
               </div>
             </div>
-          </aside>
+
+            {/* 실시간 인기 (모든 탭 유지) */}
+            <div className="glass-card rounded-2xl p-5 border border-rose-50 bg-white shadow-sm">
+              <div className="flex items-center gap-2 mb-4 font-bold text-sm"><TrendingUp size={18} className="text-rose-500" /> 실시간 인기</div>
+              <div className="space-y-3">
+                {sidebarData.hotPosts.map((p, i) => (
+                  <div key={i} onClick={() => window.location.href = `/community/${p.id}`} className="flex items-start gap-3 cursor-pointer group hover:text-rose-500">
+                    <span className={`text-xs font-black w-4 flex-shrink-0 ${i < 3 ? 'text-rose-500' : 'text-gray-300'}`}>{i + 1}</span>
+                    <p className="text-xs line-clamp-1">{p.title}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 팬레터 배너 (기존 CSS + 보라색 버튼 포인트) */}
+            <div 
+              className="rounded-2xl p-5 cursor-pointer hover:shadow-lg transition-all border border-rose-100"
+              style={{ background: 'linear-gradient(135deg, oklch(0.92 0.06 10), oklch(0.92 0.06 290))' }}
+              onClick={() => isLoggedIn ? (window.location.href = '/community/write?type=fanletter') : toast.error("로그인 필요")}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Heart size={18} className="text-rose-500" fill="#f43f5e" />
+                <h3 className="font-bold text-sm text-gray-800">팬레터 쓰기</h3>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">아티스트에게 따뜻한 마음을 전해보세요</p>
+              
+              {/* 버튼만 보라색 포인트 적용 */}
+              <button className="w-full py-2.5 text-xs font-bold text-white rounded-xl bg-gradient-to-r from-purple-600 to-indigo-500 shadow-md active:scale-95 transition-all">
+                팬레터 작성하기
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>
