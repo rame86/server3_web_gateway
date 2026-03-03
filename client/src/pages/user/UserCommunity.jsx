@@ -105,8 +105,7 @@ export default function UserCommunity() {
   const [filterKeyword, setFilterKeyword] = useState('');
 
   // [DB 연동 로직]
-  useEffect(() => {
-    const fetchPosts = async () => {
+    const fetchPosts = useCallback(async () => {
       try {
         setLoading(true);
 
