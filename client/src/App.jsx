@@ -15,12 +15,14 @@ import UserEvents from "./pages/user/UserEvents";
 import UserChat from "./pages/user/UserChat";
 import UserCommunity from "./pages/user/UserCommunity";
 import UserCommunity1 from "./pages/user/UserCommunity1";
+import UserCommunityDetail from "./pages/user/UserCommunityDetail";
 import UserArtists from "./pages/user/UserArtists";
 import UserWallet from "./pages/user/UserWallet";
 import UserEventDetail from "./pages/user/UserEventDetail";
 import UserBookingProcess from "./pages/user/UserBookingProcess";
 import UserStoreDetail from "./pages/user/UserStoreDetail";
 import UserPurchaseProcess from "./pages/user/UserPurchaseProcess";
+import UserCommunityWrite from './pages/user/UserCommunityWrite'; 
 
 // Auth pages
 import UserLogin from "./pages/auth/UserLogin";
@@ -100,6 +102,10 @@ function Router() {
       <Route path="/user/booking/:id" component={UserBookingProcess} />
       <Route path="/user/chat" component={UserChat} />
       <Route path="/user/community" component={UserCommunity} />
+      <Route path="/user/community/write" component={UserCommunityWrite} />
+
+      {/* :board_id 파라미터를 통해 상세 페이지로 연결 */}
+      <Route path="/user/community/:board_id" component={UserCommunityDetail} />
       <Route path="/user/community1" component={UserCommunity1} />
       <Route path="/user/artists" component={UserArtists} />
       <Route path="/user/wallet" component={UserWallet} />
