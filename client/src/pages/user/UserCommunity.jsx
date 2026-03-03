@@ -104,44 +104,39 @@ export default function UserCommunity() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterKeyword, setFilterKeyword] = useState('');
 
-  // [DB 연동 로직]
-// [DB 연동 로직]
-  useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        setLoading(true);
+// [DB 연동 로직] - useCallback으로 감싸서 무한 루프 방지!
+  const fetchPosts = useCallback(async (category = 'all') => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('TOKEN');
+      const API_URL = 'http://localhost/msa/core/board/list';
 
-        const token = localStorage.getItem('TOKEN');
-        const API_URL = 'http://localhost/msa/core/board/list';
-
-        const response = await fetch(API_URL, {
-          method: 'GET',
-          headers: {
-            'Authorization': token ? `Bearer ${token}` : '', 
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.status === 401) {
-          toast.error("로그인이 필요한 서비스입니다.");
-          return;
+      const response = await fetch(API_URL, {
+        method: 'GET',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '', 
+          'Content-Type': 'application/json'
         }
-        if (!response.ok) throw new Error(`데이터 로드 실패: ${response.status}`);
-        
-        const data = await response.json();
-        setPosts(Array.isArray(data) ? data : (data.content || []));
-        
-      } catch (error) {
-        console.error("DB 연동 에러:", error);
-        toast.error("게시글을 불러오지 못했습니다.");
-      } finally {
-        setLoading(false);
+      });
+
+      if (response.status === 401) {
+        toast.error("로그인이 필요한 서비스입니다.");
+        return;
       }
-    }; // fetchPosts 정의 끝
+      if (!response.ok) throw new Error(`데이터 로드 실패: ${response.status}`);
+      
+      const data = await response.json();
+      setPosts(Array.isArray(data) ? data : (data.content || []));
+      
+    } catch (error) {
+      console.error("DB 연동 에러:", error);
+      toast.error("게시글을 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }, []); // []는 이 함수를 처음 한 번만 만들겠다는 뜻!
 
-    fetchPosts(); // 함수 호출 잊지 마세요!
-  }, []); // useEffect 닫기 (중괄호 하나 제거)
-
+  // activeBoard가 바뀔 때마다 실행됨
   useEffect(() => {
     fetchPosts(activeBoard);
   }, [activeBoard, fetchPosts]);
