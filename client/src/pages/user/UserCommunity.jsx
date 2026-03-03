@@ -105,39 +105,42 @@ export default function UserCommunity() {
   const [filterKeyword, setFilterKeyword] = useState('');
 
   // [DB 연동 로직]
+// [DB 연동 로직]
   useEffect(() => {
     const fetchPosts = async () => {
       try {
         setLoading(true);
 
-       // 1. 로컬 스토리지에서 토큰 가져오기 (로그인 시 저장된 키 이름 확인 필요)
-      const token = localStorage.getItem('TOKEN');
-      const API_URL = 'http://localhost/msa/core/board/list';
+        const token = localStorage.getItem('TOKEN');
+        const API_URL = 'http://localhost/msa/core/board/list';
 
-      const response = await fetch(API_URL, {
-        method: 'GET',
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '', 
-          'Content-Type': 'application/json'
+        const response = await fetch(API_URL, {
+          method: 'GET',
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '', 
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.status === 401) {
+          toast.error("로그인이 필요한 서비스입니다.");
+          return;
         }
-      });
-
-      if (response.status === 401) {
-        toast.error("로그인이 필요한 서비스입니다.");
-        return;
+        if (!response.ok) throw new Error(`데이터 로드 실패: ${response.status}`);
+        
+        const data = await response.json();
+        setPosts(Array.isArray(data) ? data : (data.content || []));
+        
+      } catch (error) {
+        console.error("DB 연동 에러:", error);
+        toast.error("게시글을 불러오지 못했습니다.");
+      } finally {
+        setLoading(false);
       }
-      if (!response.ok) throw new Error(`데이터 로드 실패: ${response.status}`);
-      
-      const data = await response.json();
-      setPosts(Array.isArray(data) ? data : (data.content || []));
-      
-    } catch (error) {
-      console.error("DB 연동 에러:", error);
-      toast.error("게시글을 불러오지 못했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    }; // fetchPosts 정의 끝
+
+    fetchPosts(); // 함수 호출 잊지 마세요!
+  }, []); // useEffect 닫기 (중괄호 하나 제거)
 
   useEffect(() => {
     fetchPosts(activeBoard);
