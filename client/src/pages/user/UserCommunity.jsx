@@ -72,9 +72,9 @@ export default function UserCommunity() {
   const [activeBoard, setActiveBoard] = useState('all');
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');  //검색어 상태
-  const [filterKeyword, setFilterKeyword] = useState('');  
+  const [searchQuery, setSearchQuery] = useState(''); 
 
+  // [DB 연동 로직 - 충돌 해결 통합본]
   const fetchPosts = useCallback(async (category) => {
     try {
       setLoading(true);
@@ -91,7 +91,7 @@ export default function UserCommunity() {
       });
 
       if (response.status === 401) {
-        localStorage.removeItem('accessToken');
+        localStorage.removeItem('TOKEN');
         toast.error("인증이 만료되었습니다.");
         setLocation('/login');
         return;
@@ -107,27 +107,27 @@ export default function UserCommunity() {
     } finally {
       setLoading(false);
     }
-    }, [setLocation]);
+  }, [setLocation]);
 
-    useEffect(() => { 
-      fetchPosts(activeBoard); 
-    }, [activeBoard, fetchPosts]);
+  useEffect(() => { 
+    fetchPosts(activeBoard); 
+  }, [activeBoard, fetchPosts]);
 
-    const handleDetail = (boardId) => {
-      if (!boardId) return;
-      setLocation(`/user/community/${boardId}`);
-    };
+  const handleDetail = (boardId) => {
+    if (!boardId) return;
+    setLocation(`/user/community/${boardId}`);
+  };
 
-    // 실시간 필터링: 검색엔진 searchQuery 상태가 변할 때마다 즉시 반영
-    const filteredDisplayPosts = useMemo(() => {
-      const term = searchQuery.toLowerCase().trim();
-      if (!term) return posts;
-      
-      return posts.filter(p => 
-        p.title?.toLowerCase().includes(term) || 
-        p.content?.toLowerCase().includes(term)
-      );
-    }, [posts, searchQuery]);
+  // 실시간 필터링: searchQuery가 변할 때마다 즉시 반영
+  const filteredDisplayPosts = useMemo(() => {
+    const term = searchQuery.toLowerCase().trim();
+    if (!term) return posts;
+    
+    return posts.filter(p => 
+      p.title?.toLowerCase().includes(term) || 
+      p.content?.toLowerCase().includes(term)
+    );
+  }, [posts, searchQuery]);
 
   return (
     <Layout role="user">
@@ -146,10 +146,9 @@ export default function UserCommunity() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text" 
-            placeholder="검색어 입력 후 Enter..." 
+            placeholder="검색어를 입력하세요..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && setFilterKeyword(searchQuery)}
             className={styles.searchInput} 
           />
         </div>
