@@ -7,11 +7,11 @@ import { toast } from 'sonner';
 // 스타일 파일 임포트
 import { styles, typeConfig } from './UserCommunityStyles';
 
+// 1. PostCard 컴포넌트
 function PostCard({ post, onDetail }) {
   const [liked, setLiked] = useState(false);
   const config = typeConfig[post.category] || typeConfig['자유게시판'];
   
-  // 포스트맨 응답 데이터 구조 반영
   const isArtist = post.artistPost === true; 
   const authorName = post.authorName || `User_${post.memberId || '익명'}`;
 
@@ -45,8 +45,11 @@ function PostCard({ post, onDetail }) {
       
       <div className="flex items-center gap-4 mt-3 pt-3 border-t border-rose-100 text-xs text-muted-foreground">
         <button 
-          onClick={(e) => { e.stopPropagation(); setLiked(!liked); }} 
-          className="flex items-center gap-1 hover:text-rose-500"
+          onClick={(e) => { 
+            e.stopPropagation(); // 카드 상세 이동 방지
+            setLiked(!liked); 
+          }} 
+          className="flex items-center gap-1 hover:text-rose-500 transition-colors"
         >
           <Heart size={13} className={liked ? 'text-rose-500' : ''} fill={liked ? 'currentColor' : 'none'} /> 
           { (post.likeCount || 0) + (liked ? 1 : 0) }
@@ -67,17 +70,18 @@ const boardTabs = [
   { key: '자유게시판', label: '자유게시판' }
 ];
 
+// 2. 메인 UserCommunity 컴포넌트
 export default function UserCommunity() {
   const [, setLocation] = useLocation();
   const [activeBoard, setActiveBoard] = useState('all');
   const [posts, setPosts] = useState([]);
+  const [allPosts, setAllPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(''); 
 
-  // [DB 연동 로직 - 충돌 해결 통합본]
-  const fetchPosts = useCallback(async (category) => {
+  const fetchPosts = useCallback(async (category, isInitial = false) => {
     try {
-      setLoading(true);
+      if (!isInitial) setLoading(true);
       const token = localStorage.getItem('TOKEN');
       const categoryParam = category === 'all' ? '전체' : category;
       const url = `http://localhost/msa/core/board/list?category=${encodeURIComponent(categoryParam)}`;
@@ -97,37 +101,57 @@ export default function UserCommunity() {
         return;
       }
 
-      if (!response.ok) throw new Error("Load Failed");
+      if (!response.ok) throw new Error("데이터 로드 실패");
       
       const data = await response.json();
-      setPosts(Array.isArray(data) ? data : (data.content || []));
+      const result = Array.isArray(data) ? data : (data.content || []);
+      
+      setPosts(result);
+      // 전체 데이터를 사이드바용으로 저장
+      if (isInitial || category === 'all') {
+        setAllPosts(result);
+      }
     } catch (error) {
       console.error("Fetch Error:", error);
-      toast.error("게시글을 불러오는 중 오류가 발생했습니다.");
+      toast.error("서버와 통신 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
   }, [setLocation]);
 
+  // 초기 데이터 로드 (전체)
+  useEffect(() => {
+    fetchPosts('all', true);
+  }, [fetchPosts]);
+
+  // 탭 변경 시 데이터 필터링 또는 fetch
   useEffect(() => { 
-    fetchPosts(activeBoard); 
-  }, [activeBoard, fetchPosts]);
+    if (activeBoard !== 'all') {
+      fetchPosts(activeBoard); 
+    } else {
+      setPosts(allPosts);
+    }
+  }, [activeBoard, fetchPosts, allPosts]);
 
   const handleDetail = (boardId) => {
-    if (!boardId) return;
+    if (!boardId) {
+      toast.error("존재하지 않는 게시글입니다.");
+      return;
+    }
     setLocation(`/user/community/${boardId}`);
   };
 
-  // 실시간 필터링: searchQuery가 변할 때마다 즉시 반영
   const filteredDisplayPosts = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
     if (!term) return posts;
-    
     return posts.filter(p => 
       p.title?.toLowerCase().includes(term) || 
       p.content?.toLowerCase().includes(term)
     );
   }, [posts, searchQuery]);
+
+  const noticePosts = useMemo(() => allPosts.filter(p => p.category === '공지사항').slice(0, 3), [allPosts]);
+  const popularPosts = useMemo(() => [...allPosts].sort((a,b) => (b.likeCount || 0) - (a.likeCount || 0)).slice(0, 5), [allPosts]);
 
   return (
     <Layout role="user">
@@ -135,7 +159,7 @@ export default function UserCommunity() {
         <div className={styles.header}>
           <div>
             <h1 className={styles.title} style={{ fontFamily: "'Playfair Display', serif" }}>종합 커뮤니티</h1>
-            <p className="text-sm text-muted-foreground">Redis 세션 기반 커뮤니티</p>
+            <p className="text-sm text-muted-foreground font-medium">실시간 팬덤 소통 커뮤니티</p>
           </div>
           <button onClick={() => setLocation('/user/community/write')} className={styles.writeBtn}>
             <PenLine size={14} /> 글쓰기
@@ -146,7 +170,7 @@ export default function UserCommunity() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text" 
-            placeholder="검색어를 입력하세요..." 
+            placeholder="궁금한 게시글을 검색해보세요..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={styles.searchInput} 
@@ -163,12 +187,15 @@ export default function UserCommunity() {
 
         <div className={styles.grid}>
           <div className={styles.mainCol}>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-3 px-1">
               <TrendingUp size={16} className="text-rose-500" />
-              <span className="text-sm font-bold">최신 게시글</span>
+              <span className="text-sm font-bold text-gray-700">최신 피드</span>
             </div>
             {loading ? (
-              <div className="text-center py-20 text-rose-300">로딩 중...</div>
+              <div className="flex flex-col items-center py-20 gap-3">
+                <div className="w-8 h-8 border-4 border-rose-200 border-t-rose-500 rounded-full animate-spin"></div>
+                <p className="text-rose-300 text-sm">로딩 중...</p>
+              </div>
             ) : filteredDisplayPosts.length > 0 ? (
               filteredDisplayPosts.map((post) => (
                 <PostCard 
@@ -178,7 +205,7 @@ export default function UserCommunity() {
                 />
               ))
             ) : (
-              <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-rose-200 text-muted-foreground text-sm">
+              <div className="text-center py-20 bg-white/50 rounded-3xl border border-dashed border-rose-100 text-muted-foreground text-sm">
                 조회된 게시글이 없습니다.
               </div>
             )}
@@ -187,24 +214,24 @@ export default function UserCommunity() {
           <aside className={styles.sidebar}>
             <div className={styles.glassCard}>
               <div className="flex items-center gap-2 mb-3"><Bell size={16} className="text-amber-500" /><h3 className="font-bold text-sm">공지사항</h3></div>
-              {posts.filter(p => p.category === '공지사항').slice(0, 3).map((n) => (
-                <p key={n.boardId} className="text-xs text-gray-600 truncate cursor-pointer hover:text-rose-500 mb-2" onClick={() => handleDetail(n.boardId)}>• {n.title}</p>
-              ))}
+              {noticePosts.length > 0 ? noticePosts.map((n) => (
+                <p key={n.boardId} className="text-xs text-gray-600 truncate cursor-pointer hover:text-rose-500 mb-2 transition-colors" onClick={() => handleDetail(n.boardId)}>• {n.title}</p>
+              )) : <p className="text-[11px] text-gray-400">등록된 공지가 없습니다.</p>}
             </div>
 
             <div className={styles.glassCard}>
               <div className="flex items-center gap-2 mb-3"><TrendingUp size={16} className="text-rose-500" /><h3 className="font-bold text-sm">인기 포스트</h3></div>
-              {[...posts].sort((a,b) => (b.likeCount || 0) - (a.likeCount || 0)).slice(0, 5).map((p, i) => (
+              {popularPosts.length > 0 ? popularPosts.map((p, i) => (
                 <div key={p.boardId} className="flex gap-2 mb-2 cursor-pointer group" onClick={() => handleDetail(p.boardId)}>
                   <span className={`text-xs font-bold ${i < 3 ? 'text-rose-500' : 'text-gray-300'}`}>{i+1}</span>
-                  <p className="text-xs text-gray-600 truncate group-hover:text-rose-600">{p.title}</p>
+                  <p className="text-xs text-gray-600 truncate group-hover:text-rose-600 transition-colors">{p.title}</p>
                 </div>
-              ))}
+              )) : <p className="text-[11px] text-gray-400">인기 글이 아직 없습니다.</p>}
             </div>
 
             <div className={styles.letterCard} onClick={() => setLocation('/user/community/write')}>
               <div className="flex items-center gap-2 mb-2"><Heart size={16} className="text-rose-500" fill="currentColor" /><h3 className="font-bold text-sm">팬레터 작성</h3></div>
-              <button className="w-full py-2.5 text-xs font-bold text-white bg-rose-500 rounded-xl transition-transform active:scale-95">지금 작성하기</button>
+              <button className="w-full py-2.5 text-xs font-bold text-white bg-rose-500 rounded-xl transition-all hover:bg-rose-600 active:scale-95 shadow-md shadow-rose-200">지금 작성하기</button>
             </div>
           </aside>
         </div>
