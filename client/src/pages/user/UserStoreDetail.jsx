@@ -4,6 +4,7 @@ import Layout from '@/components/Layout';
 import { ChevronLeft, ShoppingCart, Heart, Share2, Star, Truck, Info, ShieldCheck } from 'lucide-react';
 import { goodsItems, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
+import { shopApi } from '@/lib/api';
 
 export default function UserStoreDetail() {
     const [, setLocation] = useLocation();
@@ -92,9 +93,14 @@ export default function UserStoreDetail() {
 
                         <div className="flex gap-4">
                             <button
-                                onClick={() => {
-                                    setWishlisted(!wishlisted);
-                                    toast.success(wishlisted ? '위시리스트에서 제거했습니다' : '위시리스트에 담았습니다');
+                                onClick={async () => {
+                                    try {
+                                        await shopApi.post('/shop/wishlist', { productId: item.id });
+                                        setWishlisted(!wishlisted);
+                                        toast.success(wishlisted ? '위시리스트에서 제거했습니다' : '위시리스트에 담았습니다');
+                                    } catch (error) {
+                                        toast.error('요청 처리에 실패했습니다.');
+                                    }
                                 }}
                                 className="w-14 h-14 rounded-2xl border-2 border-gray-200 flex items-center justify-center hover:bg-gray-50 hover:border-rose-200 transition-colors"
                             >
@@ -102,7 +108,14 @@ export default function UserStoreDetail() {
                             </button>
 
                             <button
-                                onClick={() => toast.success('장바구니에 담았습니다')}
+                                onClick={async () => {
+                                    try {
+                                        await shopApi.post('/shop/cart', { productId: item.id, quantity: 1 });
+                                        toast.success('장바구니에 담았습니다');
+                                    } catch (error) {
+                                        toast.error('장바구니 담기에 실패했습니다.');
+                                    }
+                                }}
                                 className="w-14 h-14 rounded-2xl border-2 border-rose-200 bg-rose-50 flex items-center justify-center hover:border-rose-400 transition-colors"
                             >
                                 <ShoppingCart size={24} className="text-rose-500" />

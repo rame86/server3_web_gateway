@@ -8,6 +8,7 @@ import Layout from '@/components/Layout';
 import { BookOpen, Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell } from 'lucide-react';
 import { posts } from '@/lib/data';
 import { toast } from 'sonner';
+import { coreApi } from '@/lib/api';
 
 const boardTabs = [
 { key: 'all', label: '전체' },
@@ -60,10 +61,15 @@ function PostCard({ post }) {
       </div>
       <div className="flex items-center gap-4 mt-3 pt-3 border-t border-rose-100">
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
-            setLiked(!liked);
-            toast.success(liked ? '좋아요를 취소했습니다' : '좋아요!');
+            try {
+              await coreApi.post(`/board/${post.id}/like`);
+              setLiked(!liked);
+              toast.success(liked ? '좋아요를 취소했습니다' : '좋아요!');
+            } catch (error) {
+              toast.error('요청 처리에 실패했습니다.');
+            }
           }}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-rose-500 transition-colors">
           

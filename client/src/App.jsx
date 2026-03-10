@@ -16,6 +16,9 @@ import UserChat from "./pages/user/UserChat";
 import UserCommunity from "./pages/user/UserCommunity";
 import UserArtists from "./pages/user/UserArtists";
 import UserWallet from "./pages/user/UserWallet";
+import UserWalletSuccess from "./pages/user/UserWalletSuccess";
+import UserWalletFail from "./pages/user/UserWalletFail";
+import UserWalletCancel from "./pages/user/UserWalletCancel";
 import UserEventDetail from "./pages/user/UserEventDetail";
 import UserBookingProcess from "./pages/user/UserBookingProcess";
 import UserStoreDetail from "./pages/user/UserStoreDetail";
@@ -101,6 +104,9 @@ function Router() {
       <Route path="/user/community" component={UserCommunity} />
       <Route path="/user/artists" component={UserArtists} />
       <Route path="/user/wallet" component={UserWallet} />
+      <Route path="/user/wallet/success" component={UserWalletSuccess} />
+      <Route path="/user/wallet/fail" component={UserWalletFail} />
+      <Route path="/user/wallet/cancel" component={UserWalletCancel} />
 
       {/* Artist Routes */}
       <Route path="/artist" component={ArtistDashboard} />
