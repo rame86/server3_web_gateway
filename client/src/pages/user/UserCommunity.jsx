@@ -1,64 +1,49 @@
-/*
- * Lumina - User Community Page
- * Soft Bloom Design: Posts, fan letters, artist letters, notices
- */
-
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { BookOpen, Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell } from 'lucide-react';
-import { posts } from '@/lib/data';
+import { Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import { coreApi } from '@/lib/api';
 
-const boardTabs = [
-{ key: 'all', label: '전체' },
-{ key: 'fanletter', label: '팬레터' },
-{ key: 'artist-letter', label: '아티스트 레터' },
-{ key: 'notice', label: '공지사항' },
-{ key: 'fandom', label: '팬덤게시판' },
-{ key: 'free', label: '자유게시판' }];
+// 스타일 파일 임포트
+import { styles, typeConfig } from './UserCommunityStyles';
 
-
-const typeConfig = {
-  fanletter: { label: '팬레터', badgeClass: 'badge-rose' },
-  'artist-letter': { label: '아티스트 레터', badgeClass: 'badge-lavender' },
-  notice: { label: '공지', badgeClass: 'bg-amber-100 text-amber-700' },
-  fandom: { label: '팬덤', badgeClass: 'badge-mint' },
-  free: { label: '자유', badgeClass: 'bg-gray-100 text-gray-600' }
-};
-
-function PostCard({ post }) {
+// 1. PostCard 컴포넌트
+function PostCard({ post, onDetail }) {
   const [liked, setLiked] = useState(false);
-  const config = typeConfig[post.type];
+  const config = typeConfig[post.category] || typeConfig['자유게시판'];
+  
+  const isArtist = post.artistPost === true; 
+  const authorName = post.authorName || `User_${post.memberId || '익명'}`;
 
   return (
     <div
-      className="glass-card rounded-2xl p-4 soft-shadow hover:bg-rose-50/30 transition-colors cursor-pointer"
-      onClick={() => toast.info('게시글 상세보기 기능 준비 중입니다')}>
-      
+      className="glass-card rounded-2xl p-4 soft-shadow hover:bg-rose-50/30 transition-all cursor-pointer group mb-3 border border-rose-50/50" 
+      onClick={() => onDetail(post.boardId)}
+    >
       <div className="flex items-start gap-3">
-        <img
-          src={post.authorImage}
-          alt={post.author}
-          className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-2 ring-white shadow-sm" />
-        
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ring-2 ring-white shadow-sm text-[9px] font-black ${isArtist ? 'bg-gradient-to-tr from-purple-600 to-indigo-400 text-white' : 'bg-rose-100 text-rose-400'}`}>
+          {isArtist ? 'ARTIST' : 'USER'}
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${config.badgeClass}`}>
-              {config.label}
-            </span>
-            {post.artistName &&
-            <span className="text-xs text-rose-500 font-medium">{post.artistName}</span>
-            }
+          <div className="flex items-center gap-2 mb-1">
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${config.badgeClass}`}>{config.label}</span>
           </div>
-          <h3 className="font-semibold text-sm text-foreground mb-1 line-clamp-1">{post.title}</h3>
-          <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{post.content}</p>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-muted-foreground">{post.author}</span>
-            <span className="text-xs text-muted-foreground">{post.createdAt}</span>
+          <h3 className="font-semibold text-sm text-foreground mb-1 line-clamp-1 group-hover:text-rose-600 transition-colors">
+            {post.title}
+          </h3>
+          <p className="text-xs text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
+            {post.content}
+          </p>
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className={`font-bold ${isArtist ? 'text-purple-600' : 'text-rose-400'}`}>{authorName}</span>
+            <span className="text-gray-400">
+              {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '-'}
+            </span>
           </div>
         </div>
       </div>
+
       <div className="flex items-center gap-4 mt-3 pt-3 border-t border-rose-100">
         <button
           onClick={async (e) => {
@@ -75,159 +60,190 @@ function PostCard({ post }) {
           
           <Heart size={13} className={liked ? 'text-rose-500' : ''} fill={liked ? 'currentColor' : 'none'} />
           {post.likes + (liked ? 1 : 0)}
-        </button>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <MessageCircle size={13} />
-          {post.comments}
-        </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Eye size={13} />
-          {post.views.toLocaleString()}
-        </div>
-      </div>
-    </div>);
 
+        </button>
+        <div className="flex items-center gap-1"><MessageCircle size={13} /> {post.commentCount || 0}</div>
+        <div className="flex items-center gap-1"><Eye size={13} /> {(post.viewCount || 0).toLocaleString()}</div>
+      </div>
+    </div>
+  );
 }
 
-export default function UserCommunity() {
-  const [activeBoard, setActiveBoard] = useState('all');
+const boardTabs = [
+  { key: 'all', label: '전체' },
+  { key: '팬레터', label: '팬레터' },
+  { key: '아티스트 레터', label: '아티스트 레터' },
+  { key: '공지사항', label: '공지사항' },
+  { key: '팬덤게시판', label: '팬덤게시판' },
+  { key: '자유게시판', label: '자유게시판' }
+];
 
-  const filteredPosts = activeBoard === 'all' ?
-  posts :
-  posts.filter((p) => p.type === activeBoard);
+// 2. 메인 UserCommunity 컴포넌트
+export default function UserCommunity() {
+  const [, setLocation] = useLocation();
+  const [activeBoard, setActiveBoard] = useState('all');
+  const [posts, setPosts] = useState([]);
+  const [allPosts, setAllPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState(''); 
+
+  const fetchPosts = useCallback(async (category, isInitial = false) => {
+    try {
+      if (!isInitial) setLoading(true);
+      const token = localStorage.getItem('TOKEN');
+      const categoryParam = category === 'all' ? '전체' : category;
+      const url = `http://localhost/msa/core/board/list?category=${encodeURIComponent(categoryParam)}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('TOKEN');
+        toast.error("인증이 만료되었습니다.");
+        setLocation('/login');
+        return;
+      }
+
+      if (!response.ok) throw new Error("데이터 로드 실패");
+      
+      const data = await response.json();
+      const result = Array.isArray(data) ? data : (data.content || []);
+      
+      setPosts(result);
+      // 전체 데이터를 사이드바용으로 저장
+      if (isInitial || category === 'all') {
+        setAllPosts(result);
+      }
+    } catch (error) {
+      console.error("Fetch Error:", error);
+      toast.error("서버와 통신 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }, [setLocation]);
+
+  // 초기 데이터 로드 (전체)
+  useEffect(() => {
+    fetchPosts('all', true);
+  }, [fetchPosts]);
+
+  // 탭 변경 시 데이터 필터링 또는 fetch
+  useEffect(() => { 
+    if (activeBoard !== 'all') {
+      fetchPosts(activeBoard); 
+    } else {
+      setPosts(allPosts);
+    }
+  }, [activeBoard, fetchPosts, allPosts]);
+
+  const handleDetail = (boardId) => {
+    if (!boardId) {
+      toast.error("존재하지 않는 게시글입니다.");
+      return;
+    }
+    setLocation(`/user/community/${boardId}`);
+  };
+
+  const filteredDisplayPosts = useMemo(() => {
+    const term = searchQuery.toLowerCase().trim();
+    if (!term) return posts;
+    return posts.filter(p => 
+      p.title?.toLowerCase().includes(term) || 
+      p.content?.toLowerCase().includes(term)
+    );
+  }, [posts, searchQuery]);
+
+  const noticePosts = useMemo(() => allPosts.filter(p => p.category === '공지사항').slice(0, 3), [allPosts]);
+  const popularPosts = useMemo(() => [...allPosts].sort((a,b) => (b.likeCount || 0) - (a.likeCount || 0)).slice(0, 5), [allPosts]);
 
   return (
     <Layout role="user">
-      <div className="p-4 lg:p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+      <div className={styles.container}>
+        <div className={styles.header}>
           <div>
-            <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>
-              종합 커뮤니티
-            </h1>
-            <p className="text-sm text-muted-foreground">팬레터, 아티스트 레터, 공지사항, 게시판</p>
+            <h1 className={styles.title} style={{ fontFamily: "'Playfair Display', serif" }}>종합 커뮤니티</h1>
+            <p className="text-sm text-muted-foreground font-medium">실시간 팬덤 소통 커뮤니티</p>
           </div>
-          <button
-            onClick={() => toast.info('글쓰기 기능 준비 중입니다')}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl btn-primary-gradient shadow-sm">
-            
-            <PenLine size={14} />
-            글쓰기
+          <button onClick={() => setLocation('/user/community/write')} className={styles.writeBtn}>
+            <PenLine size={14} /> 글쓰기
           </button>
         </div>
 
-        {/* Search */}
-        <div className="relative">
+        <div className={styles.searchWrapper}>
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
-            type="text"
-            placeholder="게시글 검색..."
-            className="w-full pl-9 pr-4 py-2.5 bg-white border border-rose-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300" />
-          
+            type="text" 
+            placeholder="궁금한 게시글을 검색해보세요..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={styles.searchInput} 
+          />
         </div>
 
-        {/* Board Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {boardTabs.map((tab) =>
-          <button
-            key={tab.key}
-            onClick={() => setActiveBoard(tab.key)}
-            className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-            activeBoard === tab.key ?
-            'bg-rose-500 text-white shadow-sm' :
-            'bg-white border border-rose-100 text-muted-foreground hover:bg-rose-50'}`
-            }>
-            
+        <div className={styles.tabWrapper}>
+          {boardTabs.map((tab) => (
+            <button key={tab.key} onClick={() => setActiveBoard(tab.key)} className={styles.tabBtn(activeBoard === tab.key)}>
               {tab.label}
             </button>
-          )}
+          ))}
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Posts */}
-          <div className="lg:col-span-2 space-y-3">
-            <div className="flex items-center gap-2 mb-2">
+        <div className={styles.grid}>
+          <div className={styles.mainCol}>
+            <div className="flex items-center gap-2 mb-3 px-1">
               <TrendingUp size={16} className="text-rose-500" />
-              <span className="text-sm font-semibold text-foreground">인기 게시글</span>
+              <span className="text-sm font-bold text-gray-700">최신 피드</span>
             </div>
-            {filteredPosts.map((post) =>
-            <PostCard key={post.id} post={post} />
+            {loading ? (
+              <div className="flex flex-col items-center py-20 gap-3">
+                <div className="w-8 h-8 border-4 border-rose-200 border-t-rose-500 rounded-full animate-spin"></div>
+                <p className="text-rose-300 text-sm">로딩 중...</p>
+              </div>
+            ) : filteredDisplayPosts.length > 0 ? (
+              filteredDisplayPosts.map((post) => (
+                <PostCard 
+                  key={post.boardId} 
+                  post={post} 
+                  onDetail={handleDetail} 
+                />
+              ))
+            ) : (
+              <div className="text-center py-20 bg-white/50 rounded-3xl border border-dashed border-rose-100 text-muted-foreground text-sm">
+                조회된 게시글이 없습니다.
+              </div>
             )}
-            {filteredPosts.length === 0 &&
-            <div className="text-center py-12">
-                <BookOpen size={40} className="text-muted-foreground/30 mx-auto mb-3" />
-                <p className="text-muted-foreground text-sm">게시글이 없습니다</p>
-              </div>
-            }
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-4">
-            {/* Notice */}
-            <div className="glass-card rounded-2xl p-4 soft-shadow">
-              <div className="flex items-center gap-2 mb-3">
-                <Bell size={16} className="text-amber-500" />
-                <h3 className="font-semibold text-sm text-foreground">공지사항</h3>
-              </div>
-              <div className="space-y-2">
-                {[
-                '3월 팬미팅 예매 안내',
-                '포인트 충전 이벤트',
-                '새로운 아티스트 입점 안내',
-                '서비스 점검 공지'].
-                map((notice, i) =>
-                <div
-                  key={i}
-                  onClick={() => toast.info('공지사항 기능 준비 중입니다')}
-                  className="flex items-start gap-2 cursor-pointer hover:bg-amber-50 rounded-lg p-1.5 -mx-1.5 transition-colors">
-                  
-                    <div className="w-1.5 h-1.5 bg-amber-400 rounded-full mt-1.5 flex-shrink-0" />
-                    <p className="text-xs text-foreground">{notice}</p>
-                  </div>
-                )}
-              </div>
+          <aside className={styles.sidebar}>
+            <div className={styles.glassCard}>
+              <div className="flex items-center gap-2 mb-3"><Bell size={16} className="text-amber-500" /><h3 className="font-bold text-sm">공지사항</h3></div>
+              {noticePosts.length > 0 ? noticePosts.map((n) => (
+                <p key={n.boardId} className="text-xs text-gray-600 truncate cursor-pointer hover:text-rose-500 mb-2 transition-colors" onClick={() => handleDetail(n.boardId)}>• {n.title}</p>
+              )) : <p className="text-[11px] text-gray-400">등록된 공지가 없습니다.</p>}
             </div>
 
-            {/* Hot Posts */}
-            <div className="glass-card rounded-2xl p-4 soft-shadow">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp size={16} className="text-rose-500" />
-                <h3 className="font-semibold text-sm text-foreground">실시간 인기</h3>
-              </div>
-              <div className="space-y-2">
-                {posts.map((post, i) =>
-                <div
-                  key={post.id}
-                  onClick={() => toast.info('게시글 기능 준비 중입니다')}
-                  className="flex items-start gap-2 cursor-pointer hover:bg-rose-50 rounded-lg p-1.5 -mx-1.5 transition-colors">
-                  
-                    <span className={`text-xs font-bold w-4 flex-shrink-0 ${i < 3 ? 'text-rose-500' : 'text-muted-foreground'}`}>
-                      {i + 1}
-                    </span>
-                    <p className="text-xs text-foreground line-clamp-1">{post.title}</p>
-                  </div>
-                )}
-              </div>
+            <div className={styles.glassCard}>
+              <div className="flex items-center gap-2 mb-3"><TrendingUp size={16} className="text-rose-500" /><h3 className="font-bold text-sm">인기 포스트</h3></div>
+              {popularPosts.length > 0 ? popularPosts.map((p, i) => (
+                <div key={p.boardId} className="flex gap-2 mb-2 cursor-pointer group" onClick={() => handleDetail(p.boardId)}>
+                  <span className={`text-xs font-bold ${i < 3 ? 'text-rose-500' : 'text-gray-300'}`}>{i+1}</span>
+                  <p className="text-xs text-gray-600 truncate group-hover:text-rose-600 transition-colors">{p.title}</p>
+                </div>
+              )) : <p className="text-[11px] text-gray-400">인기 글이 아직 없습니다.</p>}
             </div>
 
-            {/* Write Fan Letter */}
-            <div
-              className="rounded-2xl p-4 cursor-pointer hover-lift"
-              style={{ background: 'linear-gradient(135deg, oklch(0.92 0.06 10), oklch(0.92 0.06 290))' }}
-              onClick={() => toast.info('팬레터 쓰기 기능 준비 중입니다')}>
-              
-              <div className="flex items-center gap-2 mb-2">
-                <Heart size={16} className="text-rose-500" fill="currentColor" />
-                <h3 className="font-semibold text-sm text-foreground">팬레터 쓰기</h3>
-              </div>
-              <p className="text-xs text-muted-foreground mb-3">좋아하는 아티스트에게 마음을 전해보세요</p>
-              <button className="w-full py-2 text-xs font-semibold text-white rounded-xl btn-primary-gradient">
-                팬레터 작성하기
-              </button>
+            <div className={styles.letterCard} onClick={() => setLocation('/user/community/write')}>
+              <div className="flex items-center gap-2 mb-2"><Heart size={16} className="text-rose-500" fill="currentColor" /><h3 className="font-bold text-sm">팬레터 작성</h3></div>
+              <button className="w-full py-2.5 text-xs font-bold text-white bg-rose-500 rounded-xl transition-all hover:bg-rose-600 active:scale-95 shadow-md shadow-rose-200">지금 작성하기</button>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
-    </Layout>);
-
+    </Layout>
+  );
 }
