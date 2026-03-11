@@ -171,11 +171,24 @@ export default defineConfig({
     strictPort: false, // Will find next available port if 3000 is busy
     host: true,
     proxy: {
-      '/msa/res': {
-        target: 'http://localhost:8082',
+      // 모든 /msa/* 경로를 Nginx API Gateway (port 80)로 프록시
+      // 브라우저는 localhost:3001으로 요청 → Vite가 localhost:80으로 전달 → CORS 없음
+      '/msa/core': {
+        target: 'http://localhost:80',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/msa\/res/, '')
-      }
+      },
+      '/msa/pay': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+      '/msa/shop': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+      '/msa/res': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
     },
     allowedHosts: [
     ".manuspre.computer",
