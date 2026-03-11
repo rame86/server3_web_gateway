@@ -57,9 +57,12 @@ export default function UserLogin() {
             });
 
             if (response.data && response.data.token) {
-                localStorage.setItem('TOKEN', response.data.token);
-                toast.success('로그인 성공!');
-                setLocation('/user');
+
+                localStorage.setItem('token', response.data.token);
+                localStorage.setItem('memberId', response.data.member_id);
+                localStorage.setItem('role', response.data.role);
+                localStorage.setItem('userName', response.data.name);
+
             }
         } catch (error) {
             const errMsg = error.response?.data?.message || '로그인에 실패했습니다.';

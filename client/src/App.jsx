@@ -16,7 +16,7 @@ import UserEvents from "./pages/user/UserEvents";
 import UserChat from "./pages/user/UserChat";
 import UserCommunity from "./pages/user/UserCommunity";
 import UserCommunityDetail from "./pages/user/UserCommunityDetail";
-import UserCommunityWrite from './pages/user/UserCommunityWrite'; 
+import UserCommunityWrite from './pages/user/UserCommunityWrite';
 import UserArtists from "./pages/user/UserArtists";
 import UserWallet from "./pages/user/UserWallet";
 import UserWalletSuccess from "./pages/user/UserWalletSuccess";
@@ -52,23 +52,32 @@ function Router() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
 
+    const memberId = params.get("member_id");
+    const role = params.get("role");
+    const name = params.get("name");
+
     if (token) {
       try {
-        // MSA 표준 토큰 저장 키 사용
-        localStorage.setItem("TOKEN", token);
+        // 1. 브라우저 지갑(LocalStorage)에 저장
+        localStorage.setItem("accessToken", token);
+        localStorage.setItem("token", token); // 호환성을 위해 두 키 모두 저장
 
-        const base64Payload = token.split('.')[1]; 
-        const payload = JSON.parse(atob(base64Payload)); 
-        
-        localStorage.setItem("memberId", payload.sub);
-        localStorage.setItem("role", payload.role); 
+        // 2. ID, Role, Name 저장
+        if (memberId) localStorage.setItem("memberId", memberId);
+        if (role) localStorage.setItem("role", role);
+        if (name) localStorage.setItem("userName", name);
 
+        console.log("지갑 저장 및 리다이렉트 데이터 처리 성공!", { memberId, role, name });
+
+        // 3. 주소창 청소
         window.history.replaceState({}, null, window.location.pathname);
-        setLocation("/user"); 
-        
-        alert(`${payload.sub}님, 환영합니다!`);
+
+        // 대시보드로 이동
+        setLocation("/user");
+
       } catch (e) {
-        console.error("Token processing error:", e);
+        console.error("토큰 처리 중 에러!", e);
+
       }
     }
   }, [setLocation]);
@@ -92,12 +101,12 @@ function Router() {
       <Route path="/user/events/:id" component={UserEventDetail} />
       <Route path="/user/booking/:id" component={UserBookingProcess} />
       <Route path="/user/chat" component={UserChat} />
-      
+
       {/* 커뮤니티 경로: 구체적인 경로(write)를 동적 파라미터(:id)보다 먼저 선언해야 합니다. */}
       <Route path="/user/community" component={UserCommunity} />
       <Route path="/user/community/write" component={UserCommunityWrite} />
       <Route path="/user/community/:id" component={UserCommunityDetail} />
-      
+
       <Route path="/user/artists" component={UserArtists} />
       <Route path="/user/wallet" component={UserWallet} />
       <Route path="/user/wallet/success" component={UserWalletSuccess} />
