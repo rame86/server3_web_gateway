@@ -102,7 +102,7 @@ export default function Home() {
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-100 text-rose-600 text-sm font-semibold mb-6 fade-in-up">
               <Sparkles size={14} />
-              K-POP 팬덤 플랫폼 #1
+              팬덤 플랫폼 #1
             </div>
 
             <h1
@@ -117,8 +117,8 @@ export default function Home() {
             </h1>
 
             <p className="text-lg text-muted-foreground leading-relaxed mb-8 fade-in-up" style={{ animationDelay: '0.2s' }}>
-              좋아하는 아티스트와 더 가까워지세요. 굿즈 구매부터 팬미팅 예매,
-              AI 챗봇까지 — 팬덤 생활의 모든 것을 한 곳에서.
+              좋아하는 아티스트와 더 가까워지세요. <br />
+              굿즈 구매부터 팬미팅 예매, AI 챗봇까지 — 팬덤 생활의 모든 것을 한 곳에서.
             </p>
 
             <div className="flex flex-wrap gap-3 fade-in-up" style={{ animationDelay: '0.3s' }}>
@@ -334,7 +334,7 @@ export default function Home() {
       <section className="py-20 relative overflow-hidden">
         <div className="absolute inset-0">
           <img src={HERO_IMAGE} alt="" className="w-full h-full object-cover opacity-30" />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, oklch(0.60 0.20 10)/90%, oklch(0.55 0.18 290)/90%)' }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, oklch(0.60 0.20 10 / 90%), oklch(0.55 0.18 290 / 90%))' }} />
         </div>
         <div className="relative container mx-auto px-6 text-center">
           <h2 className="text-4xl font-bold text-white mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>
