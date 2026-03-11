@@ -1,16 +1,112 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
 import Layout from '@/components/Layout';
-import { Calendar, MapPin, Ticket, ChevronLeft, Heart, Share2, Info } from 'lucide-react';
-import { events, formatPrice, eventTypeLabel, eventTypeBadgeClass } from '@/lib/data';
+import { Calendar, MapPin, Ticket, ChevronLeft, Heart, Share2, Info, X } from 'lucide-react';
+import { formatPrice, eventTypeLabel, eventTypeBadgeClass } from '@/lib/data';
 import { toast } from 'sonner';
+import { resApi } from '@/lib/api';
+import { MapView } from '@/components/Map';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function UserEventDetail() {
     const [, setLocation] = useLocation();
     const params = useParams();
-    const eventId = parseInt(params.id || '1', 10);
-    const event = events.find(e => e.id === eventId) || events[0];
+    const eventId = params.id;
+    const [event, setEvent] = useState(null);
     const [wishlisted, setWishlisted] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [isMapOpen, setIsMapOpen] = useState(false);
+
+    useEffect(() => {
+        const fetchEventDetail = async () => {
+            try {
+                setLoading(true);
+                const { data } = await resApi.get(`/events/${eventId}`);
+                const e = data.event || data;
+                
+                // Map backend snake_case to frontend camelCase
+                setEvent({
+                    id: e.event_id,
+                    title: e.title,
+                    artistId: e.artist_id ? Number(e.artist_id) : null,
+                    artistName: e.artist_name || 'Artist',
+                    type: (e.event_type || 'fanmeeting').toLowerCase(),
+                    date: e.event_date ? new Date(e.event_date).toLocaleDateString() : 'TBD',
+                    time: e.open_time ? new Date(e.open_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD',
+                    venue: e.venue || e.location_name || 'KSPO DOME',
+                    capacity: e.total_capacity || 0,
+                    remaining: e.available_seats || 0,
+                    price: e.price || 0,
+                    image: (e.images && e.images.length > 0) ? e.images[0] : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=300&fit=crop',
+                    description: e.description || ''
+                });
+            } catch (error) {
+                toast.error('이벤트 상세 정보를 가져오는데 실패했습니다.');
+                console.error('Fetch event detail error:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (eventId) {
+            fetchEventDetail();
+        }
+    }, [eventId]);
+
+    const handleMapReady = async (map) => {
+        try {
+            // First set the existing venue name if available
+            if (event?.venue && event.venue !== 'KSPO DOME') {
+                map.addMarker({ lat: 37.5203, lng: 127.1155 }, event.venue);
+            }
+
+            // Then fetch precise coordinates/details from backend
+            const { data } = await resApi.get(`/events/${eventId}/location`);
+            
+            if (data) {
+                const location = { 
+                    lat: parseFloat(data.lat || 37.5203), 
+                    lng: parseFloat(data.lng || 127.1155) 
+                };
+                map.setCenter(location);
+                map.addMarker(location, data.venue || data.location_name || event?.venue);
+            }
+        } catch (error) {
+            console.error("Failed to fetch event location:", error);
+            // Even if fetch fails, show the initial marker with the event's venue name
+            if (event?.venue) {
+                map.addMarker({ lat: 37.5203, lng: 127.1155 }, event.venue);
+            }
+        }
+    };
+
+    if (loading) {
+        return (
+            <Layout role="user">
+                <div className="p-4 lg:p-6 flex justify-center items-center h-64">
+                    <p className="text-muted-foreground">이벤트 정보를 불러오는 중...</p>
+                </div>
+            </Layout>
+        );
+    }
+
+    if (!event) {
+        return (
+            <Layout role="user">
+                <div className="p-4 lg:p-6 flex flex-col justify-center items-center h-64">
+                    <p className="text-muted-foreground mb-4">이벤트를 찾을 수 없습니다.</p>
+                    <button onClick={() => setLocation('/user/events')} className="text-rose-600 hover:underline">
+                        목록으로 돌아가기
+                    </button>
+                </div>
+            </Layout>
+        );
+    }
 
     return (
         <Layout role="user">
@@ -99,7 +195,12 @@ export default function UserEventDetail() {
                                     <div>
                                         <p className="text-xs text-muted-foreground font-medium mb-0.5">장소</p>
                                         <p className="text-sm font-bold text-foreground">{event.venue}</p>
-                                        <button className="text-xs text-rose-500 font-medium mt-1 hover:underline">지도 보기</button>
+                                        <button 
+                                            onClick={() => setIsMapOpen(true)}
+                                            className="text-xs text-rose-500 font-medium mt-1 hover:underline"
+                                        >
+                                            지도 보기
+                                        </button>
                                     </div>
                                 </div>
 
@@ -122,6 +223,40 @@ export default function UserEventDetail() {
                         </div>
                     </div>
                 </div>
+
+                {/* Map Modal */}
+                <Dialog open={isMapOpen} onOpenChange={setIsMapOpen}>
+                    <DialogContent className="sm:max-w-2xl p-0 overflow-hidden bg-white rounded-3xl border-none">
+                        <DialogHeader className="p-6 pb-2">
+                            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                                <MapPin className="text-rose-500" size={20} />
+                                공연장 위치 안내
+                            </DialogTitle>
+                        </DialogHeader>
+                        <div className="p-6 pt-0 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-bold text-foreground">{event.venue}</p>
+                                    <p className="text-xs text-muted-foreground">정확한 위치는 지도를 참조해주세요.</p>
+                                </div>
+                            </div>
+                            <div className="rounded-2xl overflow-hidden border border-rose-100 h-[400px]">
+                                <MapView 
+                                    className="h-full w-full"
+                                    onMapReady={handleMapReady}
+                                />
+                            </div>
+                            <div className="flex justify-end pt-2">
+                                <button 
+                                    onClick={() => setIsMapOpen(false)}
+                                    className="px-6 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 transition-colors"
+                                >
+                                    닫기
+                                </button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
         </Layout>
     );

@@ -3,12 +3,13 @@
  * Soft Bloom Design: Event cards with booking flow
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
 import { Calendar, MapPin, Users, Ticket, Search, Filter } from 'lucide-react';
-import { events, bookings, formatPrice, eventTypeLabel, eventTypeBadgeClass } from '@/lib/data';
+import { formatPrice, eventTypeLabel, eventTypeBadgeClass } from '@/lib/data';
 import { toast } from 'sonner';
+import { resApi } from '@/lib/api';
 
 const EVENT_BANNER = 'https://private-us-east-1.manuscdn.com/sessionFile/umqDS2iCyxhwdKkQqabwQ5/sandbox/5OYI281mcXf2naQYMxZ8bN-img-4_1771469993000_na1fn_ZXZlbnQtYmFubmVy.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvdW1xRFMyaUN5eGh3ZEtrUXFhYndRNS9zYW5kYm94LzVPWUkyODFtY1hmMm5hUVlNeFo4Yk4taW1nLTRfMTc3MTQ2OTk5MzAwMF9uYTFmbl9aWFpsYm5RdFltRnVibVZ5LnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=SpS9~fyVvbYsm2qctqJZV9eUrlIfhyCabWJgO-3X5SXV2pHfoLaIwtRR7ue8UIvhE3Yng8ezsBmKmhnHeDqN0FT-1aftlegleiZ6X8~5TtlKRrpO5wjQmWXVdO--NP31HCS0i55-KKwDDcNu~XzhMXd1lgbpZ9CRTP5eHveHhlJlsdAVoePEwGYZDhXZoSAe7TF1VEVQ16GXCSk1k63Poa0dON-KDYYNzP1NTW7kXD-aHpMalMS7WTrQbeqDv3lr3Dynh~jEekjHzTnuRpERwFfcMZEaBQ213--VePnE6oNHUb~pnkMQdc7myD2YF~EA~OkcBxEoLNJXBN~HtICNzw__';
 
@@ -26,6 +27,81 @@ const statusConfig = {
 export default function UserEvents() {
   const [activeTab, setActiveTab] = useState('events');
   const [, setLocation] = useLocation();
+  const [events, setEvents] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('전체');
+
+  useEffect(() => {
+    const mapBackendEvent = (e) => ({
+      id: e.event_id,
+      title: e.title,
+      artistId: e.artist_id ? Number(e.artist_id) : null,
+      artistName: e.artist_name || 'Artist',
+      type: (e.event_type || 'fanmeeting').toLowerCase(),
+      date: e.event_date ? new Date(e.event_date).toLocaleDateString() : 'TBD',
+      time: e.open_time ? new Date(e.open_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD',
+      venue: e.venue || e.location_name || 'KSPO DOME',
+      capacity: e.total_capacity || 0,
+      remaining: e.available_seats || 0,
+      price: e.price || 0,
+      image: (e.images && e.images.length > 0) ? e.images[0] : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=300&fit=crop'
+    });
+
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        const { data } = await resApi.get('/events');
+        const rawEvents = data.events || data;
+        const eventsArray = Array.isArray(rawEvents) ? rawEvents : [];
+        setEvents(eventsArray.map(mapBackendEvent));
+      } catch (error) {
+        toast.error('이벤트 목록을 가져오는데 실패했습니다.');
+        setEvents([]);
+        console.error('Fetch events error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const fetchBookings = async () => {
+      const userId = localStorage.getItem('userId') || '1';
+      try {
+        const { data } = await resApi.get(`/reserve/status/${userId}`);
+        const rawBookings = data.reservations || data;
+        const bookingsArray = Array.isArray(rawBookings) ? rawBookings : [];
+        
+        setBookings(bookingsArray.map(b => ({
+            id: b.reservation_id || b.ticket_code || Math.random(),
+            eventTitle: b.event_title || b.eventTitle || 'Event Title',
+            artistName: b.artist_name || b.artistName || 'Artist',
+            date: b.event_date ? new Date(b.event_date).toLocaleDateString() : 'TBD',
+            venue: b.venue || b.location_name || 'KSPO DOME',
+            seats: b.ticket_count || 1,
+            totalPrice: b.total_price || b.totalPrice || 0,
+            status: (b.status || 'confirmed').toLowerCase(),
+            ticketCode: b.ticket_code
+        })));
+      } catch (error) {
+        setBookings([]);
+        console.error('Fetch bookings error:', error);
+      }
+    };
+
+    if (activeTab === 'events') {
+        fetchEvents();
+    } else if (activeTab === 'my-bookings') {
+        fetchBookings();
+    }
+  }, [activeTab]);
+
+  const filteredEvents = events.filter(event => {
+    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         event.artistName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filterType === '전체' || eventTypeLabel[event.type] === filterType;
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <Layout role="user">
@@ -73,11 +149,13 @@ export default function UserEvents() {
                 <input
                   type="text"
                   placeholder="이벤트 검색..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 bg-white border border-rose-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-300" />
 
               </div>
               <button
-                onClick={() => toast.info('필터 기능 준비 중입니다')}
+                onClick={() => toast.info('고급 필터 기능 준비 중입니다')}
                 className="flex items-center gap-2 px-4 py-2.5 bg-white border border-rose-100 rounded-xl text-sm font-medium text-muted-foreground hover:bg-rose-50 transition-colors">
 
                 <Filter size={16} />
@@ -90,8 +168,8 @@ export default function UserEvents() {
               {['전체', '팬미팅', '팬사인회', '팬파티', '콘서트'].map((type) =>
                 <button
                   key={type}
-                  onClick={() => toast.info(`${type} 필터 적용`)}
-                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${type === '전체' ?
+                  onClick={() => setFilterType(type)}
+                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${filterType === type ?
                       'bg-rose-500 text-white' :
                       'bg-white border border-rose-100 text-muted-foreground hover:bg-rose-50'}`
                   }>
@@ -103,53 +181,59 @@ export default function UserEvents() {
 
             {/* Events List */}
             <div className="space-y-4">
-              {events.map((event) =>
-                <div key={event.id} className="glass-card rounded-2xl overflow-hidden soft-shadow hover-lift">
-                  <div className="flex flex-col sm:flex-row">
-                    <div className="relative sm:w-48 h-36 sm:h-auto flex-shrink-0">
-                      <img
-                        src={event.image}
-                        alt={event.title}
-                        className="w-full h-full object-cover" />
+              {loading ? (
+                <div className="text-center py-10 text-muted-foreground">로딩 중...</div>
+              ) : filteredEvents.length > 0 ? (
+                filteredEvents.map((event) =>
+                  <div key={event.id} className="glass-card rounded-2xl overflow-hidden soft-shadow hover-lift">
+                    <div className="flex flex-col sm:flex-row">
+                      <div className="relative sm:w-48 h-36 sm:h-auto flex-shrink-0">
+                        <img
+                          src={event.image}
+                          alt={event.title}
+                          className="w-full h-full object-cover" />
 
-                      <div className="absolute top-2 left-2">
-                        <span className={`px-2 py-1 rounded-lg text-xs font-bold ${eventTypeBadgeClass[event.type]}`}>
-                          {eventTypeLabel[event.type]}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-4 flex-1">
-                      <h3 className="font-bold text-foreground mb-2">{event.title}</h3>
-                      <div className="space-y-1.5 mb-3">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar size={14} className="text-rose-400" />
-                          {event.date} {event.time}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <MapPin size={14} className="text-rose-400" />
-                          {event.venue}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Users size={14} className="text-rose-400" />
-                          잔여석 {event.remaining}석 / {event.capacity}석
+                        <div className="absolute top-2 left-2">
+                          <span className={`px-2 py-1 rounded-lg text-xs font-bold ${eventTypeBadgeClass[event.type]}`}>
+                            {eventTypeLabel[event.type]}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-xl font-bold text-rose-600">{formatPrice(event.price)}</span>
-                          <span className="text-xs text-muted-foreground ml-1">/ 1인</span>
+                      <div className="p-4 flex-1">
+                        <h3 className="font-bold text-foreground mb-2">{event.title}</h3>
+                        <div className="space-y-1.5 mb-3">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar size={14} className="text-rose-400" />
+                            {event.date} {event.time}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <MapPin size={14} className="text-rose-400" />
+                            {event.venue}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Users size={14} className="text-rose-400" />
+                            잔여석 {event.remaining}석 / {event.capacity}석
+                          </div>
                         </div>
-                        <button
-                          onClick={() => setLocation(`/user/events/${event.id}`)}
-                          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl btn-primary-gradient shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xl font-bold text-rose-600">{formatPrice(event.price)}</span>
+                            <span className="text-xs text-muted-foreground ml-1">/ 1인</span>
+                          </div>
+                          <button
+                            onClick={() => setLocation(`/user/events/${event.id}`)}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl btn-primary-gradient shadow-sm">
 
-                          <Ticket size={14} />
-                          예매하기
-                        </button>
+                            <Ticket size={14} />
+                            예매하기
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )
+              ) : (
+                <div className="text-center py-10 text-muted-foreground">검색 결과가 없습니다.</div>
               )}
             </div>
           </>
@@ -160,51 +244,61 @@ export default function UserEvents() {
             <h2 className="text-lg font-bold text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>
               내 예매 내역
             </h2>
-            {bookings.map((booking) =>
-              <div key={booking.id} className="glass-card rounded-2xl p-4 soft-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-bold text-foreground text-sm">{booking.eventTitle}</h3>
-                    <p className="text-xs text-muted-foreground">{booking.artistName}</p>
+            {bookings.length > 0 ? (
+              bookings.map((booking) =>
+                <div key={booking.id} className="glass-card rounded-2xl p-4 soft-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-bold text-foreground text-sm">{booking.eventTitle}</h3>
+                      <p className="text-xs text-muted-foreground">{booking.artistName}</p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${statusConfig[booking.status]?.class || 'bg-gray-100'}`}>
+                      {statusConfig[booking.status]?.label || '확인 중'}
+                    </span>
                   </div>
-                  <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${statusConfig[booking.status].class}`}>
-                    {statusConfig[booking.status].label}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Calendar size={12} className="text-rose-400" />
-                    {booking.date}
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Calendar size={12} className="text-rose-400" />
+                      {booking.date}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <MapPin size={12} className="text-rose-400" />
+                      {booking.venue}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Ticket size={12} className="text-rose-400" />
+                      {booking.seats}매
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-600">
+                      {formatPrice(booking.totalPrice)}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <MapPin size={12} className="text-rose-400" />
-                    {booking.venue}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Ticket size={12} className="text-rose-400" />
-                    {booking.seats}매
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-600">
-                    {formatPrice(booking.totalPrice)}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => toast.info('예매 상세 정보 기능 준비 중입니다')}
-                    className="flex-1 py-2 text-xs font-semibold text-rose-600 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors">
-
-                    상세보기
-                  </button>
-                  {booking.status !== 'cancelled' &&
+                  {booking.ticketCode && (
+                    <div className="mb-3 p-2 bg-rose-50 rounded-lg border border-rose-100">
+                        <p className="text-[10px] text-rose-400 font-semibold uppercase tracking-wider mb-0.5">Ticket Code</p>
+                        <p className="text-sm font-mono font-bold text-rose-700">{booking.ticketCode}</p>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
                     <button
-                      onClick={() => toast.warning('취소 신청이 접수되었습니다')}
-                      className="flex-1 py-2 text-xs font-semibold text-muted-foreground bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                      onClick={() => toast.info('예매 상세 정보 기능 준비 중입니다')}
+                      className="flex-1 py-2 text-xs font-semibold text-rose-600 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors">
 
-                      취소/환불
+                      상세보기
                     </button>
-                  }
+                    {booking.status !== 'cancelled' &&
+                      <button
+                        onClick={() => toast.warning('취소 신청이 접수되었습니다')}
+                        className="flex-1 py-2 text-xs font-semibold text-muted-foreground bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+
+                        취소/환불
+                      </button>
+                    }
+                  </div>
                 </div>
-              </div>
+              )
+            ) : (
+              <div className="text-center py-10 text-muted-foreground">예매 내역이 없습니다.</div>
             )}
           </div>
         }
