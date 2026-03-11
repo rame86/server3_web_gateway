@@ -64,6 +64,12 @@ jspm_packages/
 # Optional eslint cache
 .eslintcache
 
+extract.ps1
+reservation구조.docx
+tmp_read_docx.py
+리서치.md
+
+
 # Microbundle cache
 .rpt2_cache/
 .rts2_cache_cjs/
