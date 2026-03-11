@@ -22,7 +22,9 @@ export default function UserLogin() {
         }
         try {
             // Nginx 게이트웨이를 통해 백엔드의 SendVerification 엔드포인트 호출
+
             const response = await coreApi.post(`/member/SendVerification?email=${formData.email}`);
+
             toast.success(response.data.message || "인증번호가 발송되었습니다.");
         } catch (error) {
             toast.error("메일 발송에 실패했습니다.");
@@ -32,7 +34,9 @@ export default function UserLogin() {
     const handleSocialLogin = (provider) => {
         // MSA Gateway(Server 3)를 경유하여 Core Service(Server 1)로 인증 요청
         // Spring Security 기본 OAuth2 경로 적용
+
         window.location.href = `${getGatewayUrl()}/msa/core/api/login/${provider}`;
+
     };
 
     const handleLocalLogin = async (e) => {
@@ -45,6 +49,7 @@ export default function UserLogin() {
         setIsLoading(true);
         try {
             // Spring Security Custom JSON Auth Filter 또는 Form Login 엔드포인트 호출
+
             const response = await coreApi.post('/member/login', {
                 email: formData.email,
                 username: formData.email, // Spring Security 기본을 위해 username도 같이 전송
@@ -52,15 +57,20 @@ export default function UserLogin() {
             });
 
             if (response.data && response.data.token) {
+<<<<<<< HEAD
                 localStorage.setItem('token', response.data.token);
                 localStorage.setItem('memberId', response.data.member_id);
                 localStorage.setItem('role', response.data.role);
                 localStorage.setItem('userName', response.data.name);
+=======
+                localStorage.setItem('TOKEN', response.data.token);
+                toast.success('로그인 성공!');
+                setLocation('/user');
+>>>>>>> ae427ecbcbc2bc4aae25e9ce4d068f4ef1114a81
             }
-            toast.success('로그인 성공!');
-            setLocation('/user');
         } catch (error) {
-            toast.error('로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.');
+            const errMsg = error.response?.data?.message || '로그인에 실패했습니다.';
+            toast.error(errMsg);
         } finally {
             setIsLoading(false);
         }

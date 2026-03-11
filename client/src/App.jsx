@@ -1,9 +1,10 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { useEffect } from "react";
 
 // Landing
 import Home from "./pages/Home";
@@ -14,6 +15,8 @@ import UserStore from "./pages/user/UserStore";
 import UserEvents from "./pages/user/UserEvents";
 import UserChat from "./pages/user/UserChat";
 import UserCommunity from "./pages/user/UserCommunity";
+import UserCommunityDetail from "./pages/user/UserCommunityDetail";
+import UserCommunityWrite from './pages/user/UserCommunityWrite'; 
 import UserArtists from "./pages/user/UserArtists";
 import UserWallet from "./pages/user/UserWallet";
 import UserWalletSuccess from "./pages/user/UserWalletSuccess";
@@ -42,16 +45,13 @@ import AdminBooking from "./pages/admin/AdminBooking";
 import AdminCommunity from "./pages/admin/AdminCommunity";
 import AdminSettlement from "./pages/admin/AdminSettlement";
 
-// 로컬스토리지에 저장!!!!!!!!!!!!!!!!!!!
-import { useEffect } from "react"; // 1. useEffect 추가
-import { useLocation } from "wouter"; // 2. 이동을 위해 추가
-
 function Router() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
+<<<<<<< HEAD
     const memberId = params.get("member_id");
     const role = params.get("role");
     const name = params.get("name");
@@ -77,6 +77,26 @@ function Router() {
         
       } catch (e) {
         console.error("토큰 처리 중 에러!", e);
+=======
+
+    if (token) {
+      try {
+        // MSA 표준 토큰 저장 키 사용
+        localStorage.setItem("TOKEN", token);
+
+        const base64Payload = token.split('.')[1]; 
+        const payload = JSON.parse(atob(base64Payload)); 
+        
+        localStorage.setItem("memberId", payload.sub);
+        localStorage.setItem("role", payload.role); 
+
+        window.history.replaceState({}, null, window.location.pathname);
+        setLocation("/user"); 
+        
+        alert(`${payload.sub}님, 환영합니다!`);
+      } catch (e) {
+        console.error("Token processing error:", e);
+>>>>>>> ae427ecbcbc2bc4aae25e9ce4d068f4ef1114a81
       }
     }
   }, [setLocation]);
@@ -100,7 +120,12 @@ function Router() {
       <Route path="/user/events/:id" component={UserEventDetail} />
       <Route path="/user/booking/:id" component={UserBookingProcess} />
       <Route path="/user/chat" component={UserChat} />
+      
+      {/* 커뮤니티 경로: 구체적인 경로(write)를 동적 파라미터(:id)보다 먼저 선언해야 합니다. */}
       <Route path="/user/community" component={UserCommunity} />
+      <Route path="/user/community/write" component={UserCommunityWrite} />
+      <Route path="/user/community/:id" component={UserCommunityDetail} />
+      
       <Route path="/user/artists" component={UserArtists} />
       <Route path="/user/wallet" component={UserWallet} />
       <Route path="/user/wallet/success" component={UserWalletSuccess} />
@@ -130,8 +155,8 @@ function Router() {
       {/* Fallback */}
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
-    </Switch>);
-
+    </Switch>
+  );
 }
 
 function App() {
@@ -143,8 +168,8 @@ function App() {
           <Router />
         </TooltipProvider>
       </ThemeProvider>
-    </ErrorBoundary>);
-
+    </ErrorBoundary>
+  );
 }
 
 export default App;

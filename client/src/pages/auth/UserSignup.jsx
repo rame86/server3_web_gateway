@@ -57,6 +57,7 @@ export default function UserSignup() {
         toast.loading('인증번호를 발송 중입니다...');
         try {
             await coreApi.post(`/member/SendVerification?email=${formData.email}`);
+
             toast.dismiss();
             toast.success('이메일로 인증번호가 발송되었습니다. 5분 내에 입력해주세요.');
         } catch (error) {
@@ -69,7 +70,7 @@ export default function UserSignup() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.name || !formData.phone || !formData.age || !formData.email) {
+        if (!formData.name || !formData.phone || !formData.age || !formData.email || !formData.authCode) {
             toast.error('필수 정보를 모두 입력해주세요.');
             return;
         }
@@ -90,6 +91,7 @@ export default function UserSignup() {
                 provider: queryParams.provider || null,
                 providerId: queryParams.providerId || null
             };
+
             await coreApi.post('/member/signup', payload);
 
             toast.dismiss();
