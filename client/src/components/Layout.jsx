@@ -70,7 +70,7 @@ const roleConfig = {
     userImage: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop'
   },
   artist: {
-    label: '아티스트',
+    label: '아티스트 계정',
     color: 'from-violet-400 to-purple-500',
     bgColor: 'bg-violet-50',
     textColor: 'text-violet-600',
@@ -98,6 +98,7 @@ export default function Layout({ children, role }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const config = roleConfig[role];
+  const userName = localStorage.getItem('userName') || config?.userName || '사용자';
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -148,7 +149,7 @@ export default function Layout({ children, role }) {
               className="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
             
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm text-foreground truncate">{config.userName}</p>
+              <p className="font-semibold text-sm text-foreground truncate">{userName}</p>
               <p className={`text-xs ${config.textColor} font-medium`}>{config.label}</p>
             </div>
             <button

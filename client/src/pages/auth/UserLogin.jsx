@@ -53,6 +53,9 @@ export default function UserLogin() {
 
             if (response.data && response.data.token) {
                 localStorage.setItem('token', response.data.token);
+                localStorage.setItem('memberId', response.data.member_id);
+                localStorage.setItem('role', response.data.role);
+                localStorage.setItem('userName', response.data.name);
             }
             toast.success('로그인 성공!');
             setLocation('/user');

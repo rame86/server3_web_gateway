@@ -50,37 +50,36 @@ function Router() {
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get("token");
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    const memberId = params.get("member_id");
+    const role = params.get("role");
+    const name = params.get("name");
 
-  if (token) {
-    try {
-      // 1. 브라우저 지갑(LocalStorage)에 저장
-      localStorage.setItem("accessToken", token);
+    if (token) {
+      try {
+        // 1. 브라우저 지갑(LocalStorage)에 저장
+        localStorage.setItem("accessToken", token);
+        localStorage.setItem("token", token); // 호환성을 위해 두 키 모두 저장
 
-      // 2. [핵심] 라이브러리 없이 수동으로 토큰 쪼개기
-      // JWT는 .으로 구분된 세 조각 중 두 번째가 데이터입니다.
-      const base64Payload = token.split('.')[1]; 
-      const payload = JSON.parse(atob(base64Payload)); 
-      
-      console.log("지갑 저장 및 분해 성공!", payload);
+        // 2. ID, Role, Name 저장
+        if (memberId) localStorage.setItem("memberId", memberId);
+        if (role) localStorage.setItem("role", role); 
+        if (name) localStorage.setItem("userName", name);
 
-      // 3. ID와 Role 저장 (백엔드 필드명에 따라 role 혹은 auth)
-      localStorage.setItem("memberId", payload.sub);
-      localStorage.setItem("role", payload.role); 
+        console.log("지갑 저장 및 리다이렉트 데이터 처리 성공!", { memberId, role, name });
 
-      // 4. 주소창 청소
-      window.history.replaceState({}, null, window.location.pathname);
-      
-      // 만약 토큰을 받자마자 대시보드로 보내고 싶다면?
-      setLocation("/user"); 
-      
-      alert(`${payload.sub}님, 환영합니다!`);
-    } catch (e) {
-      console.error("토큰 처리 중 에러!", e);
+        // 3. 주소창 청소
+        window.history.replaceState({}, null, window.location.pathname);
+        
+        // 대시보드로 이동
+        setLocation("/user"); 
+        
+      } catch (e) {
+        console.error("토큰 처리 중 에러!", e);
+      }
     }
-  }
-  }, []);
+  }, [setLocation]);
 
   return (
     <Switch>
