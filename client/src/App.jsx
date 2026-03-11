@@ -34,6 +34,9 @@ import UserSignup from "./pages/auth/UserSignup";
 // Artist pages
 import ArtistDashboard from "./pages/artist/ArtistDashboard";
 import ArtistFandom from "./pages/artist/ArtistFandom";
+import ArtistChat from "./pages/artist/ArtistChat";
+import ArtistStore from "./pages/artist/ArtistStore";
+import ArtistBooking from "./pages/artist/ArtistBooking";
 import ArtistSettlement from "./pages/artist/ArtistSettlement";
 
 // Admin pages
@@ -107,11 +110,11 @@ function Router() {
       {/* Artist Routes */}
       <Route path="/artist" component={ArtistDashboard} />
       <Route path="/artist/fandom" component={ArtistFandom} />
-      <Route path="/artist/store" component={ArtistFandom} />
-      <Route path="/artist/chat" component={ArtistFandom} />
-      <Route path="/artist/booking" component={ArtistFandom} />
+      <Route path="/artist/store" component={ArtistStore} />
+      <Route path="/artist/chat" component={ArtistChat} />
+      <Route path="/artist/booking" component={ArtistBooking} />
       <Route path="/artist/community" component={ArtistFandom} />
-      <Route path="/artist/events" component={ArtistFandom} />
+      <Route path="/artist/events" component={ArtistBooking} />
       <Route path="/artist/donations" component={ArtistSettlement} />
       <Route path="/artist/settlement" component={ArtistSettlement} />
 
