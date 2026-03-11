@@ -1,19 +1,104 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
 import Layout from '@/components/Layout';
-import { ChevronLeft, CheckCircle2, Ticket, CreditCard, AlertCircle } from 'lucide-react';
-import { events, formatPrice } from '@/lib/data';
+import { formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
+import { resApi } from '@/lib/api';
+import { ChevronLeft, CheckCircle2, CreditCard, AlertCircle, Ticket, MapPin } from 'lucide-react';
+import { MapView } from '@/components/Map';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function UserBookingProcess() {
     const [, setLocation] = useLocation();
     const params = useParams();
-    const eventId = parseInt(params.id || '1', 10);
-    const event = events.find(e => e.id === eventId) || events[0];
+    const eventId = params.id;
+    const [event, setEvent] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     const [step, setStep] = useState(1);
     const [ticketCount, setTicketCount] = useState(1);
-    const mockUserPoints = 45200;
+    const [reservationResult, setReservationResult] = useState(null);
+    const [isMapOpen, setIsMapOpen] = useState(false);
+    const mockUserPoints = 45200; // Wallet 연동 전 하드코딩
+
+    useEffect(() => {
+        const fetchEventDetail = async () => {
+            try {
+                setLoading(true);
+                const { data } = await resApi.get(`/events/${eventId}`);
+                const e = data.event || data;
+                
+                setEvent({
+                    id: e.event_id,
+                    title: e.title,
+                    price: e.price || 0,
+                    remaining: e.available_seats || 0,
+                    venue: e.venue || e.location_name || 'KSPO DOME',
+                    date: e.event_date ? new Date(e.event_date).toLocaleDateString() : 'TBD',
+                    time: e.open_time ? new Date(e.open_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD'
+                });
+            } catch (error) {
+                toast.error('이벤트 상세 정보를 가져오는데 실패했습니다.');
+                console.error('Fetch event detail error:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (eventId) {
+            fetchEventDetail();
+        }
+    }, [eventId]);
+
+    const handleMapReady = async (map) => {
+        try {
+            if (event?.venue) {
+                map.addMarker({ lat: 37.5203, lng: 127.1155 }, event.venue);
+            }
+
+            const { data } = await resApi.get(`/events/${eventId}/location`);
+            
+            if (data) {
+                const location = { 
+                    lat: parseFloat(data.lat || 37.5203), 
+                    lng: parseFloat(data.lng || 127.1155) 
+                };
+                map.setCenter(location);
+                map.addMarker(location, data.venue || data.location_name || event?.venue);
+            }
+        } catch (error) {
+            console.error("Failed to fetch event location:", error);
+        }
+    };
+
+    if (loading) {
+        return (
+            <Layout role="user">
+                <div className="p-4 lg:p-6 flex justify-center items-center h-64">
+                    <p className="text-muted-foreground">결제 정보를 준비하는 중...</p>
+                </div>
+            </Layout>
+        );
+    }
+
+    if (!event) {
+        return (
+            <Layout role="user">
+                <div className="p-4 lg:p-6 flex flex-col justify-center items-center h-64">
+                    <p className="text-muted-foreground mb-4">결제할 이벤트를 찾을 수 없습니다.</p>
+                    <button onClick={() => setLocation('/user/events')} className="text-rose-600 hover:underline">
+                        목록으로 돌아가기
+                    </button>
+                </div>
+            </Layout>
+        );
+    }
+
     const totalPrice = event.price * ticketCount;
     const grandTotal = totalPrice + (ticketCount * 1000);
     const isEnoughPoints = mockUserPoints >= grandTotal;
@@ -42,9 +127,9 @@ export default function UserBookingProcess() {
                 </div>
 
                 {/* Progress */}
-                <div className="flex items-center justify-between mb-8 px-4">
+                <div className="flex items-center justify-between mb-8 px-4 relative">
                     {[1, 2, 3].map((s) => (
-                        <div key={s} className="flex flex-col items-center gap-2">
+                        <div key={s} className="flex flex-col items-center gap-2 z-10">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all
                 ${step === s ? 'btn-primary-gradient text-white shadow-md' :
                                     step > s ? 'bg-rose-100 text-rose-500' : 'bg-gray-100 text-gray-400'}`}
@@ -57,7 +142,7 @@ export default function UserBookingProcess() {
                         </div>
                     ))}
                     {/* Progress Lines */}
-                    <div className="absolute left-0 right-0 top-4 h-[2px] bg-gray-100 -z-10 px-8 mx-auto" style={{ width: 'calc(100% - 4rem)' }}>
+                    <div className="absolute left-8 right-8 top-4 h-[2px] bg-gray-100 -z-0">
                         <div
                             className="h-full bg-rose-300 transition-all duration-300"
                             style={{ width: step === 1 ? '0%' : step === 2 ? '50%' : '100%' }}
@@ -154,9 +239,27 @@ export default function UserBookingProcess() {
                         </div>
 
                         <button
-                            onClick={() => {
-                                toast.success('포인트 결제가 진행 중입니다...');
-                                setTimeout(handleNext, 800);
+                            onClick={async () => {
+                                toast.loading('포인트 결제가 진행 중입니다...');
+                                const memberId = localStorage.getItem('userId') || '1';
+                                try {
+                                    // Backend resController expects: { event_id, ticket_count, member_id }
+                                    const { data } = await resApi.post('/reserve', { 
+                                        event_id: event.id, 
+                                        ticket_count: ticketCount,
+                                        member_id: memberId
+                                    });
+                                    toast.dismiss();
+                                    
+                                    // Save reservation response to show on completion screen
+                                    setReservationResult({
+                                        ticket_code: data.ticket_id || data.ticketCode
+                                    });
+                                    handleNext();
+                                } catch (error) {
+                                    toast.dismiss();
+                                    toast.error(error.response?.data?.message || error.response?.data?.error || '예약 결제에 실패했습니다.');
+                                }
                             }}
                             disabled={!isEnoughPoints}
                             className="w-full py-4 btn-primary-gradient text-white rounded-2xl font-bold shadow-lg disabled:opacity-50 disabled:grayscale transition-all hover:scale-[1.02]"
@@ -181,11 +284,25 @@ export default function UserBookingProcess() {
                         <div className="glass-card p-4 rounded-2xl text-left bg-white inline-block w-full max-w-sm">
                             <div className="flex items-center justify-center border-b border-dashed border-rose-200 pb-4 mb-4">
                                 <Ticket className="text-rose-400 mr-2" />
-                                <span className="font-bold text-rose-500 tracking-widest font-mono">TICKET ID: {Math.floor(Math.random() * 10000) + 80000}</span>
+                                <span className="font-bold text-rose-500 tracking-widest font-mono">
+                                    TICKET ID: {reservationResult?.ticket_code || Math.floor(Math.random() * 10000) + 80000}
+                                </span>
                             </div>
                             <div className="space-y-2 text-sm">
                                 <div className="flex justify-between"><span className="text-muted-foreground">공연명</span> <span className="font-semibold line-clamp-1 flex-1 text-right ml-4">{event.title}</span></div>
                                 <div className="flex justify-between"><span className="text-muted-foreground">관람일</span> <span className="font-semibold">{event.date} {event.time}</span></div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">장소</span> 
+                                    <div className="text-right">
+                                        <span className="font-semibold block">{event.venue}</span>
+                                        <button 
+                                            onClick={() => setIsMapOpen(true)}
+                                            className="text-xs text-rose-500 font-medium hover:underline mt-1"
+                                        >
+                                            장소 보기 안내
+                                        </button>
+                                    </div>
+                                </div>
                                 <div className="flex justify-between"><span className="text-muted-foreground">매수</span> <span className="font-semibold">{ticketCount}매</span></div>
                             </div>
                         </div>
@@ -209,6 +326,40 @@ export default function UserBookingProcess() {
                         </div>
                     </div>
                 )}
+
+                {/* Map Modal */}
+                <Dialog open={isMapOpen} onOpenChange={setIsMapOpen}>
+                    <DialogContent className="sm:max-w-2xl p-0 overflow-hidden bg-white rounded-3xl border-none">
+                        <DialogHeader className="p-6 pb-2">
+                            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                                <MapPin className="text-rose-500" size={20} />
+                                공연장 위치 안내
+                            </DialogTitle>
+                        </DialogHeader>
+                        <div className="p-6 pt-0 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-bold text-foreground">{event.venue}</p>
+                                    <p className="text-xs text-muted-foreground">정확한 위치는 지도를 참조해주세요.</p>
+                                </div>
+                            </div>
+                            <div className="rounded-2xl overflow-hidden border border-rose-100 h-[400px]">
+                                <MapView 
+                                    className="h-full w-full"
+                                    onMapReady={handleMapReady}
+                                />
+                            </div>
+                            <div className="flex justify-end pt-2">
+                                <button 
+                                    onClick={() => setIsMapOpen(false)}
+                                    className="px-6 py-2 bg-rose-50 text-rose-600 font-bold rounded-xl text-sm hover:bg-rose-100 transition-colors"
+                                >
+                                    닫기
+                                </button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </div>
         </Layout>
     );

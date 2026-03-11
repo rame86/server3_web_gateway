@@ -70,7 +70,7 @@ const roleConfig = {
     userImage: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop'
   },
   artist: {
-    label: '아티스트',
+    label: '아티스트 계정',
     color: 'from-violet-400 to-purple-500',
     bgColor: 'bg-violet-50',
     textColor: 'text-violet-600',
@@ -98,6 +98,35 @@ export default function Layout({ children, role }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const config = roleConfig[role];
+  const userName = localStorage.getItem('userName') || config?.userName || '사용자';
+
+  // 로그아웃 로직 함수
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('TOKEN'); // 저장된 토큰 꺼내기
+
+      if (token) {
+        await fetch('http://localhost/msa/core/member/logout', { // 백엔드 로그아웃 주소
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`, // 헤더에 토큰 담기 (중요!)
+            'Content-Type': 'application/json'
+          }
+        });
+        console.log("백엔드 Redis 세션 삭제 성공");
+      }
+    } catch (error) {
+      console.error("백엔드 로그아웃 통신 실패:", error);
+      // 서버가 죽었어도 일단 내 브라우저는 로그아웃시켜야 하니까 멈추지 않음
+    }
+
+    // 2. 브라우저(LocalStorage) 데이터 싹 지우기
+    localStorage.clear(); 
+
+    // 3. 알림 및 메인 이동
+    toast.success('로그아웃 되었습니다.');
+    window.location.replace('/')
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -148,7 +177,7 @@ export default function Layout({ children, role }) {
               className="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
             
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm text-foreground truncate">{config.userName}</p>
+              <p className="font-semibold text-sm text-foreground truncate">{userName}</p>
               <p className={`text-xs ${config.textColor} font-medium`}>{config.label}</p>
             </div>
             <button
@@ -208,12 +237,12 @@ export default function Layout({ children, role }) {
             <Settings size={18} />
             <span className="text-sm font-medium">설정</span>
           </button>
-          <Link href="/">
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-rose-50/80 hover:text-foreground transition-all">
-              <LogOut size={18} />
-              <span className="text-sm font-medium">로그아웃</span>
-            </div>
-          </Link>
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-muted-foreground hover:bg-rose-50/80 hover:text-foreground transition-all">
+            <LogOut size={18} />
+            <span className="text-sm font-medium">로그아웃</span>
+          </button>
         </div>
       </aside>
 

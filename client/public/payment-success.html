@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>결제 성공</title>
+    <style>
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f9fafb; font-family: sans-serif; margin: 0; }
+        .card { text-align: center; padding: 40px; background: white; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; box-sizing: border-box; }
+        h2 { font-size: 24px; font-weight: bold; color: #111827; margin-top: 0; margin-bottom: 16px; }
+        p { font-size: 16px; color: #4b5563; margin-bottom: 24px; }
+        strong { color: #10b981; font-size: 20px; }
+        button { padding: 12px 24px; background-color: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: background-color 0.2s; }
+        button:hover { background-color: #059669; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>결제가 완료되었습니다 🎉</h2>
+        <p><strong id="countdown">3</strong>초 뒤에 창이 자동으로 닫힙니다.</p>
+        <button onclick="window.close()">지금 바로 닫기</button>
+    </div>
+    <script>
+        if (window.opener) {
+            window.opener.postMessage('PAYMENT_SUCCESS', '*');
+        }
+        localStorage.setItem('PAYMENT_STATUS_MSG', 'PAYMENT_SUCCESS_' + Date.now());
+        
+        let count = 3;
+        const timer = setInterval(() => {
+            count--;
+            if (count <= 0) {
+                clearInterval(timer);
+                window.close();
+            } else {
+                document.getElementById('countdown').innerText = count;
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
