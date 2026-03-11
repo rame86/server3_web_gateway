@@ -3,7 +3,7 @@ import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
 import { Mail, User, Phone, MapPin, Calendar, CheckCircle2, AlertCircle, Lock, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import axios from 'axios';
+import { coreApi } from '@/lib/api';
 
 export default function UserSignup() {
     const [locationPath, setLocation] = useLocation();
@@ -56,7 +56,8 @@ export default function UserSignup() {
         setIsSendingCode(true);
         toast.loading('인증번호를 발송 중입니다...');
         try {
-            await axios.post(`http://localhost:8080/msa/core/member/SendVerification?email=${formData.email}`);
+            await coreApi.post(`/member/SendVerification?email=${formData.email}`);
+
             toast.dismiss();
             toast.success('이메일로 인증번호가 발송되었습니다. 5분 내에 입력해주세요.');
         } catch (error) {
@@ -90,7 +91,8 @@ export default function UserSignup() {
                 provider: queryParams.provider || null,
                 providerId: queryParams.providerId || null
             };
-            await axios.post('http://localhost:8080/msa/core/member/signup', payload);
+
+            await coreApi.post('/member/signup', payload);
 
             toast.dismiss();
             toast.success('회원가입이 완료되었습니다! 환영합니다.');

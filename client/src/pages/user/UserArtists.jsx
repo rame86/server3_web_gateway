@@ -8,6 +8,7 @@ import Layout from '@/components/Layout';
 import { Star, Heart, Search, ChevronRight } from 'lucide-react';
 import { artists, formatNumber } from '@/lib/data';
 import { toast } from 'sonner';
+import { coreApi } from '@/lib/api';
 
 export default function UserArtists() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -105,13 +106,18 @@ export default function UserArtists() {
                   {/* Actions */}
                   <div className="flex gap-2">
                     <button
-                      onClick={() => {
-                        if (isFollowed) {
-                          setFollowed(followed.filter((id) => id !== artist.id));
-                          toast.info(`${artist.name} 팔로우를 취소했습니다`);
-                        } else {
-                          setFollowed([...followed, artist.id]);
-                          toast.success(`${artist.name}을(를) 팔로우했습니다!`);
+                      onClick={async () => {
+                        try {
+                          await coreApi.post(`/artist/follow/${artist.id}`);
+                          if (isFollowed) {
+                            setFollowed(followed.filter((id) => id !== artist.id));
+                            toast.info(`${artist.name} 팔로우를 취소했습니다`);
+                          } else {
+                            setFollowed([...followed, artist.id]);
+                            toast.success(`${artist.name}을(를) 팔로우했습니다!`);
+                          }
+                        } catch (error) {
+                          toast.error('팔로우 요청 처리에 실패했습니다.');
                         }
                       }}
                       className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold transition-all ${isFollowed ?

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import Layout from '@/components/Layout';
-import { ChevronLeft, CheckCircle2, Ticket, CreditCard, AlertCircle } from 'lucide-react';
 import { events, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
+import { resApi } from '@/lib/api';
 
 export default function UserBookingProcess() {
     const [, setLocation] = useLocation();
@@ -154,9 +154,16 @@ export default function UserBookingProcess() {
                         </div>
 
                         <button
-                            onClick={() => {
-                                toast.success('포인트 결제가 진행 중입니다...');
-                                setTimeout(handleNext, 800);
+                            onClick={async () => {
+                                toast.loading('포인트 결제가 진행 중입니다...');
+                                try {
+                                    await resApi.post('/reserve', { eventId: event.id, ticketCount });
+                                    toast.dismiss();
+                                    handleNext();
+                                } catch (error) {
+                                    toast.dismiss();
+                                    toast.error('예약 결제에 실패했습니다.');
+                                }
                             }}
                             disabled={!isEnoughPoints}
                             className="w-full py-4 btn-primary-gradient text-white rounded-2xl font-bold shadow-lg disabled:opacity-50 disabled:grayscale transition-all hover:scale-[1.02]"

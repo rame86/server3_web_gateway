@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
 import { Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell } from 'lucide-react';
 import { toast } from 'sonner';
+import { coreApi } from '@/lib/api';
 
 // 스타일 파일 임포트
 import { styles, typeConfig } from './UserCommunityStyles';
@@ -42,17 +43,24 @@ function PostCard({ post, onDetail }) {
           </div>
         </div>
       </div>
-      
-      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-rose-100 text-xs text-muted-foreground">
-        <button 
-          onClick={(e) => { 
-            e.stopPropagation(); // 카드 상세 이동 방지
-            setLiked(!liked); 
-          }} 
-          className="flex items-center gap-1 hover:text-rose-500 transition-colors"
-        >
-          <Heart size={13} className={liked ? 'text-rose-500' : ''} fill={liked ? 'currentColor' : 'none'} /> 
-          { (post.likeCount || 0) + (liked ? 1 : 0) }
+
+      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-rose-100">
+        <button
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              await coreApi.post(`/board/${post.id}/like`);
+              setLiked(!liked);
+              toast.success(liked ? '좋아요를 취소했습니다' : '좋아요!');
+            } catch (error) {
+              toast.error('요청 처리에 실패했습니다.');
+            }
+          }}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-rose-500 transition-colors">
+          
+          <Heart size={13} className={liked ? 'text-rose-500' : ''} fill={liked ? 'currentColor' : 'none'} />
+          {post.likes + (liked ? 1 : 0)}
+
         </button>
         <div className="flex items-center gap-1"><MessageCircle size={13} /> {post.commentCount || 0}</div>
         <div className="flex items-center gap-1"><Eye size={13} /> {(post.viewCount || 0).toLocaleString()}</div>
