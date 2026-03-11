@@ -59,10 +59,21 @@ export default function UserLogin() {
             if (response.data && response.data.token) {
 
                 localStorage.setItem('token', response.data.token);
+                localStorage.setItem('accessToken', response.data.token);
                 localStorage.setItem('memberId', response.data.member_id);
                 localStorage.setItem('role', response.data.role);
                 localStorage.setItem('userName', response.data.name);
 
+                toast.success('로그인 성공!');
+                
+                const userRole = response.data.role?.toLowerCase() || 'user';
+                if (userRole === 'admin') {
+                    window.location.href = '/admin';
+                } else if (userRole === 'artist') {
+                    window.location.href = '/artist';
+                } else {
+                    window.location.href = '/user';
+                }
             }
         } catch (error) {
             const errMsg = error.response?.data?.message || '로그인에 실패했습니다.';
