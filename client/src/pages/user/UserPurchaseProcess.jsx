@@ -1,25 +1,91 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
 import Layout from '@/components/Layout';
-import { goodsItems, formatPrice } from '@/lib/data';
+import { ChevronLeft, CheckCircle2, CreditCard, AlertCircle, Package, Loader2, ShoppingCart } from 'lucide-react';
+import { formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
-import { shopApi } from '@/lib/api';
+import { shopApi, payApi } from '@/lib/api';
 
 export default function UserPurchaseProcess() {
     const [, setLocation] = useLocation();
     const params = useParams();
-    const itemId = parseInt(params.id || '1', 10);
-    const item = goodsItems.find(i => i.id === itemId) || goodsItems[0];
-
+    const productId = params.id;
+    const [item, setItem] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [step, setStep] = useState(1);
-    const [quantity, setQuantity] = useState(1);
+    
+    // Extract quantity from URL query params
+    const queryParams = new URLSearchParams(window.location.search);
+    const initialQty = parseInt(queryParams.get('qty') || '1', 10);
+    const [quantity, setQuantity] = useState(initialQty);
+    
+    const [userPoints, setUserPoints] = useState(0);
     const deliveryFee = 3000;
 
-    // Mock point state
-    const mockUserPoints = 45200;
+    const fetchUserPoints = async () => {
+        try {
+            const { data } = await payApi.get('/payment/');
+            setUserPoints(data.currentBalance || 0);
+        } catch (error) {
+            console.error('Failed to fetch wallet info:', error);
+        }
+    };
+
+    useEffect(() => {
+        const fetchProduct = async () => {
+            try {
+                setLoading(true);
+                const response = await shopApi.get(`shop/${productId}`);
+                const data = response.data;
+                const mappedItem = {
+                    id: data.productId,
+                    name: data.title,
+                    artistId: data.sellerId,
+                    artistName: data.sellerType === 'ARTIST' ? '아티스트' : '유저',
+                    price: data.price,
+                    image: data.imageUrl,
+                    stock: 100, // Placeholder
+                };
+                setItem(mappedItem);
+            } catch (error) {
+                console.error('Failed to fetch product:', error);
+                toast.error('상품 정보를 가져오는 데 실패했습니다.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (productId) {
+            fetchProduct();
+            fetchUserPoints();
+        }
+    }, [productId]);
+
+    if (loading) {
+        return (
+            <Layout role="user">
+                <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                    <Loader2 size={40} className="text-rose-500 animate-spin" />
+                    <p className="text-muted-foreground font-medium">상품 정보를 불러오는 중입니다...</p>
+                </div>
+            </Layout>
+        );
+    }
+
+    if (!item) {
+        return (
+            <Layout role="user">
+                <div className="text-center py-20">
+                    <p className="text-muted-foreground">상품을 찾을 수 없습니다.</p>
+                    <button onClick={() => setLocation('/user/store')} className="mt-4 text-rose-500 font-medium">스토어로 돌아가기</button>
+                </div>
+            </Layout>
+        );
+    }
+
     const totalPrice = item.price * quantity;
-    const grandTotal = totalPrice + (totalPrice >= 50000 ? 0 : deliveryFee);
-    const isEnoughPoints = mockUserPoints >= grandTotal;
+    const grandTotal = totalPrice + (totalPrice >= 50000 || totalPrice === 0 ? 0 : deliveryFee);
+    const isEnoughPoints = userPoints >= grandTotal;
 
     const handleNext = () => {
         if (step === 1 && quantity > 0) setStep(2);
@@ -39,15 +105,15 @@ export default function UserPurchaseProcess() {
                         <ChevronLeft size={20} />
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold" style={{ fontFamily: "'Playfair Display', serif" }}>상품 구매</h1>
+                        <h1 className="text-xl font-bold" style={{ fontFamily: "'Playfair Display', serif" }}>주문 진행</h1>
                         <p className="text-sm text-muted-foreground line-clamp-1">{item.name}</p>
                     </div>
                 </div>
 
                 {/* Progress */}
-                <div className="flex items-center justify-between mb-8 px-4">
+                <div className="flex items-center justify-between mb-8 px-4 relative">
                     {[1, 2, 3].map((s) => (
-                        <div key={s} className="flex flex-col items-center gap-2">
+                        <div key={s} className="flex flex-col items-center gap-2 z-10">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all
                 ${step === s ? 'btn-primary-gradient text-white shadow-md' :
                                     step > s ? 'bg-rose-100 text-rose-500' : 'bg-gray-100 text-gray-400'}`}
@@ -55,12 +121,12 @@ export default function UserPurchaseProcess() {
                                 {step > s ? <CheckCircle2 size={16} /> : s}
                             </div>
                             <span className={`text-xs font-semibold ${step >= s ? 'text-rose-600' : 'text-muted-foreground'}`}>
-                                {s === 1 ? '주문 정보' : s === 2 ? '결제 (포인트)' : '주문 완료'}
+                                {s === 1 ? '주문 정보' : s === 2 ? '결제 수단' : '주문 완료'}
                             </span>
                         </div>
                     ))}
                     {/* Progress Lines */}
-                    <div className="absolute left-0 right-0 top-4 h-[2px] bg-gray-100 -z-10 px-8 mx-auto" style={{ width: 'calc(100% - 4rem)' }}>
+                    <div className="absolute left-8 right-8 top-4 h-[2px] bg-gray-100 -z-0">
                         <div
                             className="h-full bg-rose-300 transition-all duration-300"
                             style={{ width: step === 1 ? '0%' : step === 2 ? '50%' : '100%' }}
@@ -84,7 +150,7 @@ export default function UserPurchaseProcess() {
                             </div>
 
                             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                <span className="font-medium">수량</span>
+                                <span className="font-medium text-muted-foreground">수량</span>
                                 <div className="flex items-center gap-4 bg-white rounded-xl p-1 shadow-sm border border-gray-200">
                                     <button
                                         onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -94,12 +160,17 @@ export default function UserPurchaseProcess() {
                                     </button>
                                     <span className="font-bold w-6 text-center">{quantity}</span>
                                     <button
-                                        onClick={() => setQuantity(Math.min(10, Math.min(item.stock, quantity + 1)))}
+                                        onClick={() => setQuantity(Math.min(10, Math.min(item.stock || 100, quantity + 1)))}
                                         className="w-8 h-8 flex items-center justify-center bg-white rounded-lg hover:bg-gray-100 text-gray-600"
                                     >
                                         +
                                     </button>
                                 </div>
+                            </div>
+                            
+                            <div className="flex justify-between items-center p-4 bg-rose-50 rounded-2xl">
+                                <span className="font-medium text-muted-foreground">총 주문 금액 (배송비 제외)</span>
+                                <span className="text-xl font-bold text-rose-600">{formatPrice(totalPrice)}</span>
                             </div>
                         </div>
 
@@ -126,7 +197,7 @@ export default function UserPurchaseProcess() {
                                 <div>
                                     <p className="text-sm text-muted-foreground mb-1">보유 포인트</p>
                                     <p className="text-2xl font-bold text-foreground">
-                                        {formatPrice(mockUserPoints).replace('원', 'P')}
+                                        {formatPrice(userPoints).replace('원', 'P')}
                                     </p>
                                 </div>
                                 <button
