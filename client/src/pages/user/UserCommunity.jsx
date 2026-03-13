@@ -12,13 +12,13 @@ import { styles, typeConfig } from './UserCommunityStyles';
 function PostCard({ post, onDetail }) {
   const [liked, setLiked] = useState(false);
   const config = typeConfig[post.category] || typeConfig['자유게시판'];
-  
-  const isArtist = post.artistPost === true; 
+
+  const isArtist = post.artistPost === true;
   const authorName = post.authorName || `User_${post.memberId || '익명'}`;
 
   return (
     <div
-      className="glass-card rounded-2xl p-4 soft-shadow hover:bg-rose-50/30 transition-all cursor-pointer group mb-3 border border-rose-50/50" 
+      className="glass-card rounded-2xl p-4 soft-shadow hover:bg-rose-50/30 transition-all cursor-pointer group mb-3 border border-rose-50/50"
       onClick={() => onDetail(post.boardId)}
     >
       <div className="flex items-start gap-3">
@@ -49,7 +49,8 @@ function PostCard({ post, onDetail }) {
           onClick={async (e) => {
             e.stopPropagation();
             try {
-              await coreApi.post(`/board/${post.id}/like`);
+              // API 경로도 실제 boardId를 사용하도록 수정 (post.id -> post.boardId)
+              await coreApi.post(`/board/${post.boardId}/like`);
               setLiked(!liked);
               toast.success(liked ? '좋아요를 취소했습니다' : '좋아요!');
             } catch (error) {
@@ -57,9 +58,9 @@ function PostCard({ post, onDetail }) {
             }
           }}
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-rose-500 transition-colors">
-          
+
           <Heart size={13} className={liked ? 'text-rose-500' : ''} fill={liked ? 'currentColor' : 'none'} />
-          {post.likes + (liked ? 1 : 0)}
+          {(post.likeCount || 0) + (liked ? 1 : 0)}
 
         </button>
         <div className="flex items-center gap-1"><MessageCircle size={13} /> {post.commentCount || 0}</div>
@@ -85,7 +86,7 @@ export default function UserCommunity() {
   const [posts, setPosts] = useState([]);
   const [allPosts, setAllPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState(''); 
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchPosts = useCallback(async (category, isInitial = false) => {
     try {
@@ -93,7 +94,7 @@ export default function UserCommunity() {
       const token = localStorage.getItem('TOKEN');
       const categoryParam = category === 'all' ? '전체' : category;
       const url = `http://localhost/msa/core/board/list?category=${encodeURIComponent(categoryParam)}`;
-      
+
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -110,12 +111,21 @@ export default function UserCommunity() {
       }
 
       if (!response.ok) throw new Error("데이터 로드 실패");
-      
+
       const data = await response.json();
-      const result = Array.isArray(data) ? data : (data.content || []);
-      
+      const rawResult = Array.isArray(data) ? data : (data.content || []);
+
+      // 데이터 가공 로직 추가
+      const result = rawResult.map(post => ({
+        ...post,
+        // likeCount가 null, undefined, NaN이면 0으로 처리
+        likeCount: (post.likeCount === null || isNaN(post.likeCount)) ? 0 : Number(post.likeCount),
+        // 추가로 viewCount나 commentCount도 안전하게 처리
+        viewCount: post.viewCount || 0,
+        commentCount: post.commentCount || 0
+      }));
+
       setPosts(result);
-      // 전체 데이터를 사이드바용으로 저장
       if (isInitial || category === 'all') {
         setAllPosts(result);
       }
@@ -133,9 +143,9 @@ export default function UserCommunity() {
   }, [fetchPosts]);
 
   // 탭 변경 시 데이터 필터링 또는 fetch
-  useEffect(() => { 
+  useEffect(() => {
     if (activeBoard !== 'all') {
-      fetchPosts(activeBoard); 
+      fetchPosts(activeBoard);
     } else {
       setPosts(allPosts);
     }
@@ -152,14 +162,14 @@ export default function UserCommunity() {
   const filteredDisplayPosts = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
     if (!term) return posts;
-    return posts.filter(p => 
-      p.title?.toLowerCase().includes(term) || 
+    return posts.filter(p =>
+      p.title?.toLowerCase().includes(term) ||
       p.content?.toLowerCase().includes(term)
     );
   }, [posts, searchQuery]);
 
   const noticePosts = useMemo(() => allPosts.filter(p => p.category === '공지사항').slice(0, 3), [allPosts]);
-  const popularPosts = useMemo(() => [...allPosts].sort((a,b) => (b.likeCount || 0) - (a.likeCount || 0)).slice(0, 5), [allPosts]);
+  const popularPosts = useMemo(() => [...allPosts].sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0)).slice(0, 5), [allPosts]);
 
   return (
     <Layout role="user">
@@ -177,11 +187,11 @@ export default function UserCommunity() {
         <div className={styles.searchWrapper}>
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
-            type="text" 
-            placeholder="궁금한 게시글을 검색해보세요..." 
+            type="text"
+            placeholder="궁금한 게시글을 검색해보세요..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={styles.searchInput} 
+            className={styles.searchInput}
           />
         </div>
 
@@ -206,10 +216,10 @@ export default function UserCommunity() {
               </div>
             ) : filteredDisplayPosts.length > 0 ? (
               filteredDisplayPosts.map((post) => (
-                <PostCard 
-                  key={post.boardId} 
-                  post={post} 
-                  onDetail={handleDetail} 
+                <PostCard
+                  key={post.boardId}
+                  post={post}
+                  onDetail={handleDetail}
                 />
               ))
             ) : (
@@ -231,7 +241,7 @@ export default function UserCommunity() {
               <div className="flex items-center gap-2 mb-3"><TrendingUp size={16} className="text-rose-500" /><h3 className="font-bold text-sm">인기 포스트</h3></div>
               {popularPosts.length > 0 ? popularPosts.map((p, i) => (
                 <div key={p.boardId} className="flex gap-2 mb-2 cursor-pointer group" onClick={() => handleDetail(p.boardId)}>
-                  <span className={`text-xs font-bold ${i < 3 ? 'text-rose-500' : 'text-gray-300'}`}>{i+1}</span>
+                  <span className={`text-xs font-bold ${i < 3 ? 'text-rose-500' : 'text-gray-300'}`}>{i + 1}</span>
                   <p className="text-xs text-gray-600 truncate group-hover:text-rose-600 transition-colors">{p.title}</p>
                 </div>
               )) : <p className="text-[11px] text-gray-400">인기 글이 아직 없습니다.</p>}
