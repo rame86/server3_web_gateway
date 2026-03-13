@@ -3,7 +3,7 @@ import { useLocation, useParams } from 'wouter';
 import Layout from '@/components/Layout';
 import { formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
-import { resApi } from '@/lib/api';
+import { resApi, payApi } from '@/lib/api';
 import { ChevronLeft, CheckCircle2, CreditCard, AlertCircle, Ticket, MapPin } from 'lucide-react';
 import { MapView } from '@/components/Map';
 import {
@@ -24,7 +24,16 @@ export default function UserBookingProcess() {
     const [ticketCount, setTicketCount] = useState(1);
     const [reservationResult, setReservationResult] = useState(null);
     const [isMapOpen, setIsMapOpen] = useState(false);
-    const mockUserPoints = 45200; // Wallet 연동 전 하드코딩
+    const [userPoints, setUserPoints] = useState(0);
+
+    const fetchUserPoints = async () => {
+        try {
+            const { data } = await payApi.get('/payment/');
+            setUserPoints(data.currentBalance || 0);
+        } catch (error) {
+            console.error('Failed to fetch wallet info:', error);
+        }
+    };
 
     useEffect(() => {
         const fetchEventDetail = async () => {
@@ -52,6 +61,7 @@ export default function UserBookingProcess() {
 
         if (eventId) {
             fetchEventDetail();
+            fetchUserPoints();
         }
     }, [eventId]);
 
@@ -101,7 +111,7 @@ export default function UserBookingProcess() {
 
     const totalPrice = event.price * ticketCount;
     const grandTotal = totalPrice + (ticketCount * 1000);
-    const isEnoughPoints = mockUserPoints >= grandTotal;
+    const isEnoughPoints = userPoints >= grandTotal;
 
     const handleNext = () => {
         if (step === 1 && ticketCount > 0) setStep(2);
@@ -209,7 +219,7 @@ export default function UserBookingProcess() {
                                 <div>
                                     <p className="text-sm text-muted-foreground mb-1">보유 포인트</p>
                                     <p className="text-2xl font-bold text-foreground">
-                                        {formatPrice(mockUserPoints).replace('원', 'P')}
+                                        {formatPrice(userPoints).replace('원', 'P')}
                                     </p>
                                 </div>
                                 <button
@@ -241,7 +251,7 @@ export default function UserBookingProcess() {
                         <button
                             onClick={async () => {
                                 toast.loading('포인트 결제가 진행 중입니다...');
-                                const memberId = localStorage.getItem('userId') || '1';
+                                const memberId = localStorage.getItem('memberId') || '1';
                                 try {
                                     // Backend resController expects: { event_id, ticket_count, member_id }
                                     const { data } = await resApi.post('/reserve', { 
