@@ -13,6 +13,12 @@ const createApiInstance = (baseURL) => {
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+        
+        const memberId = localStorage.getItem('memberId');
+        if (memberId) {
+            config.headers['x-user-id'] = memberId;
+        }
+        
         return config;
     });
 
