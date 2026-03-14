@@ -352,20 +352,59 @@
   box-shadow: 0 0 20px rgba(255,255,255,0.2);
 }
 
-/* 좌석 그리드 레이아웃 */
-.seat-grid-wrapper, .grid {
-  width: 100%;
-  overflow-x: auto;
+/* 1. 최상위 컨테이너: 모든 자식을 가로 중앙으로 정렬 */
+.seat-selection-container {
   display: flex;
-  justify-content: center;
-  margin-bottom: 30px;
+  flex-direction: column;
+  align-items: center; /* 🌟 핵심: 모든 자식 요소를 가로축 중앙에 배치 */
+  padding: 40px 20px;
+  background-color: #121212;
+  color: white;
+  min-height: 100vh;
+  width: 100%;
 }
 
+/* 2. 무대 디자인: 마진 auto와 너비 제한으로 중앙 고정 */
+.stage {
+  width: 100%;
+  max-width: 450px; /* 🌟 좌석 10개 너비와 비슷하게 맞추면 훨씬 예뻐 */
+  height: 40px;
+  background: linear-gradient(to bottom, #fff, #ccc);
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  box-shadow: 0 0 20px rgba(255,255,255,0.2);
+  
+  /* 중앙 정렬 보정 */
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 60px;
+  border-radius: 4px;
+}
+
+
+/* 좌석 그리드 레이아웃 */
+/* .grid는 삭제하고 .seat-grid-wrapper만 남겨줘 */
+.seat-grid-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center; /* 가로 중앙 정렬의 핵심 */
+  align-items: center;
+  margin-bottom: 30px;
+  overflow-x: auto;        /* 화면 작아질 때 좌석 안 깨지게 스크롤 */
+  -webkit-overflow-scrolling: touch; /* 모바일 부드러운 스크롤 */
+}
+
+/* 좌석들을 감싸는 실제 박스 */
 .seat-grid {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 10px;
+  /* 만약 라벨 때문에 미세하게 쏠려 보이면 아래 padding-right를 살짝 줘봐 */
+  /* padding-right: 25px; */ 
 }
 
 .seat-row {
@@ -395,7 +434,11 @@
   transition: 0.2s;
 }
 
-.seat.selected { background-color: #6e44ff; color: white; }
+.seat.selected { 
+  background-color: #ff4757; /* 6e44ff 대신 루미나 핑크 */
+  color: white; 
+  box-shadow: 0 0 10px rgba(255, 71, 87, 0.4); 
+}
 .seat.reserved { background-color: #1a1a1a; color: #444; cursor: not-allowed; }
 
 /* 하단 범례(Legend) */

@@ -38,7 +38,7 @@ export default function UserEventDetail() {
                     type: (e.event_type || 'fanmeeting').toLowerCase(),
                     date: e.event_date ? new Date(e.event_date).toLocaleDateString() : 'TBD',
                     time: e.open_time ? new Date(e.open_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD',
-                    venue: e.venue || e.location_name || 'KSPO DOME',
+                    venue: e.event_locations?.venue || e.venue || e.location_name || '장소 미정',
                     capacity: e.total_capacity || 0,
                     remaining: e.available_seats || 0,
                     price: e.price || 0,
