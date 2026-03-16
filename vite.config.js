@@ -160,7 +160,7 @@ export default defineConfig({
       "@assets": path.resolve(import.meta.dirname, "attached_assets")
     }
   },
-  envDir: path.resolve(import.meta.dirname),
+  envDir: path.resolve(import.meta.dirname, "client"),
   root: path.resolve(import.meta.dirname, "client"),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
@@ -170,6 +170,26 @@ export default defineConfig({
     port: 3000,
     strictPort: false, // Will find next available port if 3000 is busy
     host: true,
+    proxy: {
+      // 모든 /msa/* 경로를 Nginx API Gateway (port 80)로 프록시
+      // 브라우저는 localhost:3001으로 요청 → Vite가 localhost:80으로 전달 → CORS 없음
+      '/msa/core': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+      '/msa/pay': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+      '/msa/shop': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+      '/msa/res': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+    },
     allowedHosts: [
     ".manuspre.computer",
     ".manus.computer",

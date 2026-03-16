@@ -3,12 +3,13 @@
  * Soft Bloom Design: Goods shop with filtering, product cards
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { ShoppingBag, Search, Filter, Star, Heart, ShoppingCart, Tag } from 'lucide-react';
-import { goodsItems, artists, formatPrice } from '@/lib/data';
+import { ShoppingBag, Search, Filter, Star, Heart, ShoppingCart, Tag, Loader2 } from 'lucide-react';
+import { artists, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
+import { shopApi } from '@/lib/api';
 
 const STORE_BANNER = 'https://private-us-east-1.manuscdn.com/sessionFile/umqDS2iCyxhwdKkQqabwQ5/sandbox/5OYI281mcXf2naQYMxZ8bN-img-3_1771469995000_na1fn_c3RvcmUtYmFubmVy.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvdW1xRFMyaUN5eGh3ZEtrUXFhYndRNS9zYW5kYm94LzVPWUkyODFtY1hmMm5hUVlNeFo4Yk4taW1nLTNfMTc3MTQ2OTk5NTAwMF9uYTFmbl9jM1J2Y21VdFltRnVibVZ5LnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=S6eW5vgVm6XszGBI~5NJLohyz1gX2utvIhf5xyaFfjZvUuZExvd8CLx0tJVpjHLF7Q1tJp0wjt~GQ49qIXhAgcEXp3LZtjSUkgdkfR0qoCnjkuhTT-mmw8pHSJm-ySJMVjSfZmWoazcNSMA3K~Ewpsb1Fvi~gBT~isRfg2fkElPpBALw1UmvyX4o-vfbw18vlBp-TRVokhS10GUSy-NL6I6Au0MQcnHCwRNa5hUpEeDN9aOlbPfIbh6LpN8f~OKUAMjE6aAJepBfbK8LoNCctsecUKk4aHsooodJ6nU5oudE8Z0PPw~TlPpnXBnkBwPYEjfZX2dRsaXlDetbd2bpFQ__';
 
@@ -43,9 +44,15 @@ function GoodsCard({ item }) {
           </div>
         }
         <button
-          onClick={() => {
-            setWishlisted(!wishlisted);
-            toast.success(wishlisted ? '위시리스트에서 제거했습니다' : '위시리스트에 추가했습니다');
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              await shopApi.post('/shop/wishlist', { productId: item.id });
+              setWishlisted(!wishlisted);
+              toast.success(wishlisted ? '위시리스트에서 제거했습니다' : '위시리스트에 추가했습니다');
+            } catch (error) {
+              toast.error('요청 처리에 실패했습니다.');
+            }
           }}
           className="absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm hover:scale-110 transition-transform">
 
@@ -74,7 +81,15 @@ function GoodsCard({ item }) {
             }
           </div>
           <button
-            onClick={() => toast.success(`${item.name}을(를) 장바구니에 담았습니다`)}
+            onClick={async (e) => {
+              e.stopPropagation();
+              try {
+                await shopApi.post('/shop/cart', { productId: item.id, quantity: 1 });
+                toast.success(`${item.name}을(를) 장바구니에 담았습니다`);
+              } catch (error) {
+                toast.error('장바구니 담기에 실패했습니다.');
+              }
+            }}
             className="p-2 rounded-xl btn-primary-gradient shadow-sm">
 
             <ShoppingCart size={14} className="text-white" />
@@ -88,13 +103,58 @@ function GoodsCard({ item }) {
 export default function UserStore() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredItems = goodsItems.filter((item) => {
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await shopApi.get('shop/');
+        // Map backend DTO to frontend format
+        const mappedProducts = response.data.map(item => ({
+          id: item.productId,
+          name: item.title,
+          artistId: item.sellerId,
+          artistName: item.sellerType === 'ARTIST' ? '아티스트' : '유저', // Generic name if specific name not in DTO
+          price: item.price,
+          image: item.imageUrl,
+          category: item.category === 'OFFICIAL' ? 'official' :
+            item.category === 'UNOFFICIAL' ? 'unofficial' : 'used',
+          stock: 100, // Placeholder
+          rating: 4.5, // Placeholder
+          reviews: 10, // Placeholder
+          badge: item.category === 'OFFICIAL' ? 'OFFICIAL' : null
+        }));
+        setProducts(mappedProducts);
+      } catch (error) {
+        console.error('Failed to fetch products:', error);
+        toast.error('상품 목록을 가져오는 데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  const filteredItems = products.filter((item) => {
     const matchCategory = activeCategory === 'all' || item.category === activeCategory;
     const matchSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.artistName.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCategory && matchSearch;
   });
+
+  if (loading) {
+    return (
+      <Layout role="user">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <Loader2 size={40} className="text-rose-500 animate-spin" />
+          <p className="text-muted-foreground font-medium">상품 목록을 불러오는 중입니다...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout role="user">
@@ -165,8 +225,8 @@ export default function UserStore() {
               key={tab.key}
               onClick={() => setActiveCategory(tab.key)}
               className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${activeCategory === tab.key ?
-                  'bg-white text-rose-600 shadow-sm' :
-                  'text-muted-foreground hover:text-foreground'}`
+                'bg-white text-rose-600 shadow-sm' :
+                'text-muted-foreground hover:text-foreground'}`
               }>
 
               {tab.label}

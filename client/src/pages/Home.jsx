@@ -8,7 +8,8 @@ import { Link } from 'wouter';
 import { Heart, Star, ShoppingBag, Calendar, MessageCircle, ArrowRight, Sparkles, Users } from 'lucide-react';
 import { artists, events, formatNumber, eventTypeLabel } from '@/lib/data';
 
-const HERO_IMAGE = 'https://private-us-east-1.manuscdn.com/sessionFile/umqDS2iCyxhwdKkQqabwQ5/sandbox/5OYI281mcXf2naQYMxZ8bN-img-1_1771469990000_na1fn_aGVyby1iYW5uZXI.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvdW1xRFMyaUN5eGh3ZEtrUXFhYndRNS9zYW5kYm94LzVPWUkyODFtY1hmMm5hUVlNeFo4Yk4taW1nLTFfMTc3MTQ2OTk5MDAwMF9uYTFmbl9hR1Z5YnkxaVlXNXVaWEkucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=Gk6-RcKA810q1mJj28u~YoJ5-RP4U1Lec3zElayno~iytpDKUX5LnCM~JW7yMDqF10WqXKJgZ39O8CPphID5LS3h42fyLEin20mcZvyuVqn-UnPHVSe5uKXGQcOf2a~bTVgZG5w3yfv34aJedVt5PGGEP7H~JwuW4752amkXtCgszaHsnDNMnWY9xzFU7N3qkY0LISQbeGCB~rmqaHiBz~0tV5NCbZfkYmEO61qJPHbMJtklgVyti~cKHIE6NZm-0YeUOsDnH~KKRxWw8-aDtQJP51leg8hOTk-pxUqbL8aWLnpHDEwJpLPlzJiIebRMLtkzo8jcKkng93aIOsIB1Q__';
+//const HERO_IMAGE = 'https://private-us-east-1.manuscdn.com/sessionFile/umqDS2iCyxhwdKkQqabwQ5/sandbox/5OYI281mcXf2naQYMxZ8bN-img-1_1771469990000_na1fn_aGVyby1iYW5uZXI.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvdW1xRFMyaUN5eGh3ZEtrUXFhYndRNS9zYW5kYm94LzVPWUkyODFtY1hmMm5hUVlNeFo4Yk4taW1nLTFfMTc3MTQ2OTk5MDAwMF9uYTFmbl9hR1Z5YnkxaVlXNXVaWEkucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=Gk6-RcKA810q1mJj28u~YoJ5-RP4U1Lec3zElayno~iytpDKUX5LnCM~JW7yMDqF10WqXKJgZ39O8CPphID5LS3h42fyLEin20mcZvyuVqn-UnPHVSe5uKXGQcOf2a~bTVgZG5w3yfv34aJedVt5PGGEP7H~JwuW4752amkXtCgszaHsnDNMnWY9xzFU7N3qkY0LISQbeGCB~rmqaHiBz~0tV5NCbZfkYmEO61qJPHbMJtklgVyti~cKHIE6NZm-0YeUOsDnH~KKRxWw8-aDtQJP51leg8hOTk-pxUqbL8aWLnpHDEwJpLPlzJiIebRMLtkzo8jcKkng93aIOsIB1Q__';
+const HERO_IMAGE = 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=1920&auto=format&fit=crop';
 
 const STORE_IMAGE = 'https://private-us-east-1.manuscdn.com/sessionFile/umqDS2iCyxhwdKkQqabwQ5/sandbox/5OYI281mcXf2naQYMxZ8bN-img-3_1771469995000_na1fn_c3RvcmUtYmFubmVy.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvdW1xRFMyaUN5eGh3ZEtrUXFhYndRNS9zYW5kYm94LzVPWUkyODFtY1hmMm5hUVlNeFo4Yk4taW1nLTNfMTc3MTQ2OTk5NTAwMF9uYTFmbl9jM1J2Y21VdFltRnVibVZ5LnBuZz94LW9zcy1wcm9jZXNzPWltYWdlL3Jlc2l6ZSx3XzE5MjAsaF8xOTIwL2Zvcm1hdCx3ZWJwL3F1YWxpdHkscV84MCIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTc5ODc2MTYwMH19fV19&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=S6eW5vgVm6XszGBI~5NJLohyz1gX2utvIhf5xyaFfjZvUuZExvd8CLx0tJVpjHLF7Q1tJp0wjt~GQ49qIXhAgcEXp3LZtjSUkgdkfR0qoCnjkuhTT-mmw8pHSJm-ySJMVjSfZmWoazcNSMA3K~Ewpsb1Fvi~gBT~isRfg2fkElPpBALw1UmvyX4o-vfbw18vlBp-TRVokhS10GUSy-NL6I6Au0MQcnHCwRNa5hUpEeDN9aOlbPfIbh6LpN8f~OKUAMjE6aAJepBfbK8LoNCctsecUKk4aHsooodJ6nU5oudE8Z0PPw~TlPpnXBnkBwPYEjfZX2dRsaXlDetbd2bpFQ__';
 
@@ -101,7 +102,7 @@ export default function Home() {
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-100 text-rose-600 text-sm font-semibold mb-6 fade-in-up">
               <Sparkles size={14} />
-              K-POP 팬덤 플랫폼 #1
+              팬덤 플랫폼 #1
             </div>
 
             <h1
@@ -116,8 +117,8 @@ export default function Home() {
             </h1>
 
             <p className="text-lg text-muted-foreground leading-relaxed mb-8 fade-in-up" style={{ animationDelay: '0.2s' }}>
-              좋아하는 아티스트와 더 가까워지세요. 굿즈 구매부터 팬미팅 예매,
-              AI 챗봇까지 — 팬덤 생활의 모든 것을 한 곳에서.
+              좋아하는 아티스트와 더 가까워지세요. <br />
+              굿즈 구매부터 팬미팅 예매, AI 챗봇까지 — 팬덤 생활의 모든 것을 한 곳에서.
             </p>
 
             <div className="flex flex-wrap gap-3 fade-in-up" style={{ animationDelay: '0.3s' }}>
@@ -333,7 +334,7 @@ export default function Home() {
       <section className="py-20 relative overflow-hidden">
         <div className="absolute inset-0">
           <img src={HERO_IMAGE} alt="" className="w-full h-full object-cover opacity-30" />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, oklch(0.60 0.20 10)/90%, oklch(0.55 0.18 290)/90%)' }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, oklch(0.60 0.20 10 / 90%), oklch(0.55 0.18 290 / 90%))' }} />
         </div>
         <div className="relative container mx-auto px-6 text-center">
           <h2 className="text-4xl font-bold text-white mb-4" style={{ fontFamily: "'Playfair Display', serif" }}>

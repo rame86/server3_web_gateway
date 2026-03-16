@@ -1,16 +1,78 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
 import Layout from '@/components/Layout';
-import { ChevronLeft, ShoppingCart, Heart, Share2, Star, Truck, Info, ShieldCheck } from 'lucide-react';
-import { goodsItems, formatPrice } from '@/lib/data';
+import { ChevronLeft, ShoppingCart, Heart, Share2, Star, Truck, Info, ShieldCheck, Loader2 } from 'lucide-react';
+import { formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
+import { shopApi } from '@/lib/api';
 
 export default function UserStoreDetail() {
     const [, setLocation] = useLocation();
     const params = useParams();
-    const itemId = parseInt(params.id || '1', 10);
-    const item = goodsItems.find(i => i.id === itemId) || goodsItems[0];
+    const productId = params.id;
+    const [item, setItem] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [wishlisted, setWishlisted] = useState(false);
+    const [quantity, setQuantity] = useState(1);
+
+    useEffect(() => {
+        const fetchProduct = async () => {
+            try {
+                setLoading(true);
+                // The backend likely has a detail endpoint at /{id}
+                // If not, we could fetch all and filter, but let's try /{id} first
+                const response = await shopApi.get(`shop/detail/${productId}`);
+                const data = response.data;
+                const mappedItem = {
+                    id: data.productId,
+                    name: data.title,
+                    artistId: data.sellerId,
+                    artistName: data.sellerType === 'ARTIST' ? '아티스트' : '유저',
+                    price: data.price,
+                    description: data.description,
+                    image: data.imageUrl,
+                    category: data.category === 'OFFICIAL' ? 'official' :
+                        data.category === 'UNOFFICIAL' ? 'unofficial' : 'used',
+                    stock: 100, // Placeholder
+                    rating: 4.5, // Placeholder
+                    reviews: 10, // Placeholder
+                    badge: data.category === 'OFFICIAL' ? 'OFFICIAL' : null
+                };
+                setItem(mappedItem);
+            } catch (error) {
+                console.error('Failed to fetch product:', error);
+                toast.error('상품 정보를 가져오는 데 실패했습니다.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (productId) {
+            fetchProduct();
+        }
+    }, [productId]);
+
+    if (loading) {
+        return (
+            <Layout role="user">
+                <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                    <Loader2 size={40} className="text-rose-500 animate-spin" />
+                    <p className="text-muted-foreground font-medium">상품 정보를 불러오는 중입니다...</p>
+                </div>
+            </Layout>
+        );
+    }
+
+    if (!item) {
+        return (
+            <Layout role="user">
+                <div className="text-center py-20">
+                    <p className="text-muted-foreground">상품을 찾을 수 없습니다.</p>
+                    <button onClick={() => setLocation('/user/store')} className="mt-4 text-rose-500 font-medium">스토어로 돌아가기</button>
+                </div>
+            </Layout>
+        );
+    }
 
     return (
         <Layout role="user">
@@ -70,6 +132,25 @@ export default function UserStoreDetail() {
                         </div>
 
                         <div className="space-y-4 text-sm border-b border-gray-100 pb-6">
+                            <div className="flex items-center justify-between p-4 bg-rose-50 rounded-2xl border border-rose-100 shadow-inner">
+                                <span className="font-semibold text-muted-foreground">수량 선택</span>
+                                <div className="flex items-center gap-4 bg-white rounded-xl p-1 shadow-sm border border-rose-100">
+                                    <button
+                                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                                        className="w-8 h-8 flex items-center justify-center bg-white rounded-lg text-rose-600 hover:bg-rose-50 shadow-sm border border-rose-50"
+                                    >
+                                        -
+                                    </button>
+                                    <span className="font-bold w-6 text-center">{quantity}</span>
+                                    <button
+                                        onClick={() => setQuantity(Math.min(10, Math.min(item.stock || 100, quantity + 1)))}
+                                        className="w-8 h-8 flex items-center justify-center bg-white rounded-lg text-rose-600 hover:bg-rose-50 shadow-sm border border-rose-50"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+                            
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
                                     <Truck size={18} />
@@ -92,9 +173,14 @@ export default function UserStoreDetail() {
 
                         <div className="flex gap-4">
                             <button
-                                onClick={() => {
-                                    setWishlisted(!wishlisted);
-                                    toast.success(wishlisted ? '위시리스트에서 제거했습니다' : '위시리스트에 담았습니다');
+                                onClick={async () => {
+                                    try {
+                                        await shopApi.post('/shop/wishlist', { productId: item.id });
+                                        setWishlisted(!wishlisted);
+                                        toast.success(wishlisted ? '위시리스트에서 제거했습니다' : '위시리스트에 담았습니다');
+                                    } catch (error) {
+                                        toast.error('요청 처리에 실패했습니다.');
+                                    }
                                 }}
                                 className="w-14 h-14 rounded-2xl border-2 border-gray-200 flex items-center justify-center hover:bg-gray-50 hover:border-rose-200 transition-colors"
                             >
@@ -102,14 +188,21 @@ export default function UserStoreDetail() {
                             </button>
 
                             <button
-                                onClick={() => toast.success('장바구니에 담았습니다')}
+                                onClick={async () => {
+                                    try {
+                                        await shopApi.post('/shop/cart', { productId: item.id, quantity });
+                                        toast.success(`${item.name} ${quantity}개를 장바구니에 담았습니다`);
+                                    } catch (error) {
+                                        toast.error('장바구니 담기에 실패했습니다.');
+                                    }
+                                }}
                                 className="w-14 h-14 rounded-2xl border-2 border-rose-200 bg-rose-50 flex items-center justify-center hover:border-rose-400 transition-colors"
                             >
                                 <ShoppingCart size={24} className="text-rose-500" />
                             </button>
-
+                            
                             <button
-                                onClick={() => setLocation(`/user/store/purchase/${item.id}`)}
+                                onClick={() => setLocation(`/user/store/purchase/${item.id}?qty=${quantity}`)}
                                 className="flex-1 rounded-2xl btn-primary-gradient text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"
                             >
                                 바로 구매하기
