@@ -1,32 +1,12 @@
 # /web /Dockerfile
-# Stage 1: Build stage
-FROM node:22-alpine AS build-stage
+FROM nginx:alpine
 
-# pnpm 설치
-RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
+# CI/CD에서 전송한 dist 폴더 복사
+COPY dist /usr/share/nginx/html
 
-WORKDIR /app
-
-# 의존성 파일 먼저 복사 (캐싱 최적화)
-COPY package.json pnpm-lock.yaml* ./
-
-# 의존성 설치 (CI 환경과 동일하게)
-RUN pnpm install --frozen-lockfile
-
-# 전체 소스 복사 및 빌드
-COPY . .
-RUN pnpm run build
-
-# Stage 2: Production stage
-FROM openresty/openresty:alpine-fat
-
-# 빌드 결과물(dist)을 OpenResty 정적 파일 경로로 복사
-COPY --from=build-stage /app/dist /usr/local/openresty/nginx/html
-
-# Nginx 설정 파일 복사 (필요 시)
-# COPY default.conf /etc/nginx/conf.d/default.conf
-# COPY auth.lua /usr/local/openresty/lualib/auth.lua
+# React SPA 라우팅을 위한 설정 덮어쓰기
+RUN rm /etc/nginx/conf.d/default.conf && \
+    echo "server { listen 80; location / { root /usr/share/nginx/html; index index.html; try_files \$uri \$uri/ /index.html; } }" > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
-
-CMD ["openresty", "-g", "daemon off;"]
+CMD ["nginx", "-g", "daemon off;"]
