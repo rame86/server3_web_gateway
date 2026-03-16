@@ -1,12 +1,13 @@
-# /web /Dockerfile
+# /frontend/Dockerfile
 FROM nginx:alpine
 
-# CI/CD에서 전송한 dist 폴더 복사
+# [설정] 기존 Nginx 기본 HTML 파일 제거
+RUN rm -rf /usr/share/nginx/html/*
+
+# [배포] CI/CD로 생성된 dist 폴더의 모든 파일을 Nginx 웹 루트로 복사
 COPY dist /usr/share/nginx/html
 
-# React SPA 라우팅을 위한 설정 덮어쓰기
-RUN rm /etc/nginx/conf.d/default.conf && \
-    echo "server { listen 80; location / { root /usr/share/nginx/html; index index.html; try_files \$uri \$uri/ /index.html; } }" > /etc/nginx/conf.d/default.conf
-
 EXPOSE 80
+
+# Nginx 백그라운드 실행 방지
 CMD ["nginx", "-g", "daemon off;"]
