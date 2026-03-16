@@ -1,4 +1,4 @@
-# .github/workflows/ci-cd.yml
+# /web/ .github/workflows/ci-cd.yml
 name: Frontend CI/CD Pipeline
 
 on:
@@ -52,7 +52,7 @@ jobs:
           target: "/home/${{ secrets.GCP_USER }}/nginx/frontend/"
           strip_components: 1 # deploy 폴더 제외하고 내부 파일만 전송
 
-      # 5. GCP 서버에서 압축 해제 (Nginx 설정은 건드리지 않음)
+      # 5. GCP 서버에서 압축 해제
       - name: Extract and Refresh
         uses: appleboy/ssh-action@master
         with:
@@ -68,6 +68,8 @@ jobs:
             tar -xzf frontend.tar.gz
             rm frontend.tar.gz
             
-            # 정적 파일만 교체하므로 Nginx 컨테이너 재시작은 선택사항입니다.
-            # 확실한 반영을 위해 컨테이너만 재시작합니다.
+            # Nginx(nobody)가 파일을 읽을 수 있도록 권한 강제 부여
+            chmod -R 755 dist
+            
+            # 컨테이너 재시작
             docker restart nginx-gateway

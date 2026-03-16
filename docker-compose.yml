@@ -1,3 +1,4 @@
+# /web/ docker-compose.yml
 services:
   nginx-gateway:
     build: .
