@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { ArrowLeft, Send } from 'lucide-react';
-import { toast } from 'sonner';
+import { ArrowLeft, Send, Paperclip, X } from 'lucide-react';
+import { toast } from 'sonner'
 
-export default function UserCommunityWrite() {
+  export default function UserCommunityWrite() {
   const [, setLocation] = useLocation();
   const [selectedFile, setSelectedFile] = useState(null); // 파일 상태 추가
   const [loading, setLoading] = useState(false);
@@ -45,7 +45,8 @@ export default function UserCommunityWrite() {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('TOKEN');
+      // 토큰 키 이름 확인 (accessToken으로 통일 권장)
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
 
       // 1. FormData 객체 생성
       const sendData = new FormData();
@@ -117,7 +118,7 @@ export default function UserCommunityWrite() {
                 <option value="팬덤게시판">🌟 팬덤게시판</option>
               </select>
             </div>
-
+            
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">제목</label>
               <input
