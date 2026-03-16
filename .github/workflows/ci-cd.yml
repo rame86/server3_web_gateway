@@ -57,8 +57,8 @@ jobs:
             
             # 1. 프론트엔드 컨테이너 빌드 및 재실행
             docker build -t lumina-frontend .
-            docker rm -f frontend-container || true
-            docker run -d --name frontend-container --network msa-network lumina-frontend
+            docker rm -f frontend || true
+            docker run -d --name frontend --network msa-network lumina-frontend
             
             # 2. 게이트웨이 재시작 (연결 갱신)
             docker restart nginx-gateway
