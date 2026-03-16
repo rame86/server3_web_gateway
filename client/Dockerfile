@@ -1,4 +1,4 @@
-# /web /Dockerfile
+# /frontend/client/Dockerfile
 
 # --- [Stage 1] Build Stage ---
 FROM node:20-alpine AS builder
