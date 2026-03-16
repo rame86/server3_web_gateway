@@ -91,7 +91,7 @@ export default function UserCommunity() {
   const fetchPosts = useCallback(async (category, isInitial = false) => {
     try {
       if (!isInitial) setLoading(true);
-      const token = localStorage.getItem('TOKEN');
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
       const categoryParam = category === 'all' ? '전체' : category;
       const url = `http://localhost/msa/core/board/list?category=${encodeURIComponent(categoryParam)}`;
 

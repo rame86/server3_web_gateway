@@ -17,6 +17,7 @@ import UserChat from "./pages/user/UserChat";
 import UserCommunity from "./pages/user/UserCommunity";
 import UserCommunityDetail from "./pages/user/UserCommunityDetail";
 import UserCommunityWrite from './pages/user/UserCommunityWrite';
+import UserCommunityUpdate from './pages/user/UserCommunityUpdate';
 import UserArtists from "./pages/user/UserArtists";
 import UserWallet from "./pages/user/UserWallet";
 import UserWalletSuccess from "./pages/user/UserWalletSuccess";
@@ -108,7 +109,10 @@ function Router() {
       {/* 커뮤니티 경로: 구체적인 경로(write)를 동적 파라미터(:id)보다 먼저 선언해야 합니다. */}
       <Route path="/user/community" component={UserCommunity} />
       <Route path="/user/community/write" component={UserCommunityWrite} />
+        <Route path="/user/community/update/:id" component={UserCommunityUpdate} />
       <Route path="/user/community/:id" component={UserCommunityDetail} />
+    
+      
 
       <Route path="/user/artists" component={UserArtists} />
       <Route path="/user/wallet" component={UserWallet} />
