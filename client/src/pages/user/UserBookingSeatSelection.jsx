@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import '../../SeatSelection.css'; // 👈 이 코드가 있는지 꼭 확인해!
 
 /**
  * 🌟 핵심 수정 사항: 
