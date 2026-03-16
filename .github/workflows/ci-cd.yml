@@ -23,15 +23,21 @@ jobs:
         run: corepack enable && corepack prepare pnpm@10.4.1 --activate
 
       - name: Install and Build
+        working-directory: ./client
         run: |
           pnpm install --no-frozen-lockfile
           pnpm run build
 
       - name: Package Dist and Dockerfile
         run: |
-          mkdir -p deploy
-          cp -r dist deploy/
-          cp Dockerfile deploy/
+          mkdir -p deploy          
+          cp -r client/dist deploy/
+          
+          
+          # (주의: Dockerfile과 nginx.conf가 client 폴더 안에 있어야 함. 루트에 있다면 cp Dockerfile deploy/ 로 변경할 것)
+          cp client/Dockerfile deploy/
+          cp client/nginx.conf deploy/
+          
           cd deploy && tar -czf frontend.tar.gz ./*
 
       - name: Copy to GCP
