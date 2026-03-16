@@ -1,0 +1,84 @@
+#web-frontend/ ci-cd.yml
+name: Frontend & Gateway CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. Node.js 설정 및 종속성 캐싱 (최신 트렌드인 v20 LTS 사용)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm' # npm 캐싱을 통해 빌드 속도 최적화
+
+      # 2. React 프로젝트 빌드
+      - name: Install Dependencies and Build
+        run: |
+          npm ci # package-lock.json 기반의 일관된 의존성 설치
+          npm run build # dist 폴더 생성 (프로젝트 설정에 따라 폴더명이 다를 경우 수정 필요)
+
+      # 3. 배포용 파일 패키징 (디렉토리 구조 유지 및 전송 안정성 확보)
+      - name: Package Deployment Files
+        run: |
+          mkdir -p deploy_package/frontend
+          mkdir -p deploy_package/conf.d
+          mkdir -p deploy_package/lua
+          
+          # 빌드된 React 정적 파일 복사 (default.conf의 root 경로 일치)
+          cp -r dist deploy_package/frontend/
+          
+          # Nginx 설정 및 Docker 파일 복사 (Repository 최상단에 있다고 가정)
+          cp docker-compose.yml deploy_package/
+          cp default.conf deploy_package/conf.d/
+          cp auth.lua deploy_package/lua/
+          
+          # 압축 생성
+          cd deploy_package
+          tar -czf deploy.tar.gz ./*
+
+      # 4. GCP 서버로 압축 파일 전송
+      - name: Copy Files to GCP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_KEY }}
+          source: "deploy_package/deploy.tar.gz"
+          target: "/home/${{ secrets.GCP_USER }}/nginx/"
+          strip_components: 1 # 서버에는 deploy_package 폴더 없이 내부 파일만 복사되도록 처리
+
+      # 5. GCP 서버 접속 및 서비스 재시작
+      - name: Deploy to GCP (Extract & Docker Compose)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_KEY }}                  
+          script: |            
+            WORK_DIR="/home/${{ secrets.GCP_USER }}/nginx"
+            mkdir -p $WORK_DIR
+            cd $WORK_DIR
+            
+            # 전송된 압축 파일 해제 (기존 덮어쓰기)
+            tar -xzf deploy.tar.gz
+            rm deploy.tar.gz # 용량 확보를 위해 압축 파일 삭제
+            
+            # 공통 네트워크(msa-network) 존재 여부 확인 및 생성
+            docker network inspect msa-network >/dev/null 2>&1 || docker network create msa-network
+            
+            # 컨테이너 실행 (OpenResty 및 Redis Commander)
+            # 변경된 conf나 lua 파일을 적용하기 위해 nginx-gateway 컨테이너 재시작
+            docker compose up -d --force-recreate
+            
+            # 사용하지 않는 댕글링(dangling) 이미지 삭제
+            docker image prune -f

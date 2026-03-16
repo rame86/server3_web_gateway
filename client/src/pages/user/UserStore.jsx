@@ -3,11 +3,11 @@
  * Soft Bloom Design: Goods shop with filtering, product cards
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { ShoppingBag, Search, Filter, Star, Heart, ShoppingCart, Tag } from 'lucide-react';
-import { goodsItems, artists, formatPrice } from '@/lib/data';
+import { ShoppingBag, Search, Filter, Star, Heart, ShoppingCart, Tag, Loader2 } from 'lucide-react';
+import { artists, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
 import { shopApi } from '@/lib/api';
 
@@ -103,13 +103,58 @@ function GoodsCard({ item }) {
 export default function UserStore() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredItems = goodsItems.filter((item) => {
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        const response = await shopApi.get('shop/');
+        // Map backend DTO to frontend format
+        const mappedProducts = response.data.map(item => ({
+          id: item.productId,
+          name: item.title,
+          artistId: item.sellerId,
+          artistName: item.sellerType === 'ARTIST' ? '아티스트' : '유저', // Generic name if specific name not in DTO
+          price: item.price,
+          image: item.imageUrl,
+          category: item.category === 'OFFICIAL' ? 'official' :
+            item.category === 'UNOFFICIAL' ? 'unofficial' : 'used',
+          stock: 100, // Placeholder
+          rating: 4.5, // Placeholder
+          reviews: 10, // Placeholder
+          badge: item.category === 'OFFICIAL' ? 'OFFICIAL' : null
+        }));
+        setProducts(mappedProducts);
+      } catch (error) {
+        console.error('Failed to fetch products:', error);
+        toast.error('상품 목록을 가져오는 데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  const filteredItems = products.filter((item) => {
     const matchCategory = activeCategory === 'all' || item.category === activeCategory;
     const matchSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.artistName.toLowerCase().includes(searchQuery.toLowerCase());
     return matchCategory && matchSearch;
   });
+
+  if (loading) {
+    return (
+      <Layout role="user">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <Loader2 size={40} className="text-rose-500 animate-spin" />
+          <p className="text-muted-foreground font-medium">상품 목록을 불러오는 중입니다...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout role="user">
@@ -180,8 +225,8 @@ export default function UserStore() {
               key={tab.key}
               onClick={() => setActiveCategory(tab.key)}
               className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${activeCategory === tab.key ?
-                  'bg-white text-rose-600 shadow-sm' :
-                  'text-muted-foreground hover:text-foreground'}`
+                'bg-white text-rose-600 shadow-sm' :
+                'text-muted-foreground hover:text-foreground'}`
               }>
 
               {tab.label}
