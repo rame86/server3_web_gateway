@@ -33,26 +33,53 @@ export default function ArtistBooking() {
   const [myEvents, setMyEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 🌟 추가: 백엔드에서 내 이벤트 목록 불러오기
+  // 🌟 추가: 통계 데이터를 담을 상태 (기본값 0)
+  const [stats, setStats] = useState({ totalReservations: 0 });
+
+  // 🌟 백엔드 응답 객체 구조에 맞게 수정된 버전
   const fetchMyEvents = async () => {
     try {
       setLoading(true);
-      const memberId = localStorage.getItem('memberId') || '3'; // 로그인한 아티스트 ID (기존 하드코딩 3번 유지)
+      const memberId = localStorage.getItem('memberId');
       
-      const { data } = await resApi.get('/events');
-      const rawEvents = Array.isArray(data) ? data : (data.events || []);
+      if (!memberId) {
+        toast.error("로그인이 필요합니다.");
+        return;
+      }
+
+      const response = await resApi.get(`/events?artistId=${memberId}`);
+      const data = response.data;
+
+      // 🚨 서버 응답 구조가 배열인지 객체인지에 따라 분기 처리
+      let rawEvents = [];
+      let totalResCount = 0;
+
+      if (Array.isArray(data)) {
+        // [케이스 1] 서버가 그냥 배열 [...]을 보냈을 때
+        rawEvents = data;
+        // 배열 안의 각 이벤트 객체에서 _count.reservations를 합산
+        totalResCount = data.reduce((acc, curr) => acc + (curr._count?.reservations || 0), 0);
+      } else if (data && data.events) {
+        // [케이스 2] 서버가 객체 { events: [...], totalReservations: X }를 보냈을 때
+        rawEvents = data.events;
+        totalResCount = data.totalReservations || 0;
+      }
+
+      // 🌟 내 공연만 필터링 (String 변환 비교)
+      const filtered = rawEvents.filter(e => String(e.artist_id) === String(memberId));
       
-      // 내 공연만 필터링 (BigInt 대응 String 변환)
-      const filtered = rawEvents.filter(e => String(e.artist_id) === memberId);
       setMyEvents(filtered);
+      setStats({
+        totalReservations: totalResCount
+      });
+
     } catch (error) {
-      console.error("데이터 로드 실패:", error);
+      console.error("❌ 데이터 로드 실패:", error);
       toast.error("이벤트 목록을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
   };
-
   // 🌟 추가: 컴포넌트 마운트 시 데이터 불러오기
   useEffect(() => {
     fetchMyEvents();
@@ -114,7 +141,7 @@ export default function ArtistBooking() {
             <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>
               예매 및 이벤트 관리
             </h1>
-            <p className="text-sm text-muted-foreground">개최 중인 이벤트와 신규 등록 제안 내역을 관리합니다 (DB Schema Sync)</p>
+            <p className="text-sm text-muted-foreground">개최 중인 이벤트와 신규 등록 제안 내역을 관리합니다.</p>
           </div>
           
           <Dialog open={isAdding} onOpenChange={setIsAdding}>
@@ -231,7 +258,9 @@ export default function ArtistBooking() {
                 <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-white/60 rounded-2xl border border-teal-50">
                         <p className="text-xs text-muted-foreground mb-1">총 예매 건수</p>
-                        <p className="text-2xl font-bold text-teal-600">328건</p>
+                        <p className="text-2xl font-bold text-teal-600">
+                          {stats.totalReservations.toLocaleString()}건
+                        </p>
                     </div>
                     <div className="p-4 bg-white/60 rounded-2xl border border-teal-50">
                         <p className="text-xs text-muted-foreground mb-1">예정된 오프라인 이벤트</p>
@@ -268,7 +297,7 @@ export default function ArtistBooking() {
               // 🌟 추가: 백엔드 필드명(total_capacity, available_seats)에 맞춰 변수 정리
               const capacity = event.total_capacity || 0;
               const remaining = event.available_seats || 0;
-              const imageUrl = event.event_images?.[0]?.image_url || event.image || 'https://via.placeholder.com/300x200';
+              const imageUrl = event.event_images?.[0]?.image_url || event.image || 'https://placehold.co/300x200?text=No+Image';
               const eventTypeStr = event.event_type?.toLowerCase() || event.type || 'concert';
               const venueName = event.event_locations?.venue || event.venue || '장소 미정';
               const eventDateStr = event.event_date ? new Date(event.event_date).toLocaleDateString() : 'TBD';

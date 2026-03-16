@@ -29,5 +29,6 @@ export const coreApi = createApiInstance(`${GATEWAY_URL}/msa/core`);
 export const payApi = createApiInstance(`${GATEWAY_URL}/msa/pay`);
 export const shopApi = createApiInstance(`${GATEWAY_URL}/msa/shop`);
 export const resApi = createApiInstance(`${GATEWAY_URL}/msa/res`);
+export const adminApi = createApiInstance(`${GATEWAY_URL}/msa/core`);
 
 export const getGatewayUrl = () => GATEWAY_URL;
