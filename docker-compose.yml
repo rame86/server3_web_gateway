@@ -1,0 +1,17 @@
+services:
+  nginx-gateway:
+    build: .
+    container_name: lumina-frontend
+    ports:
+      - "80:80"
+    volumes:
+      # 로컬의 설정 파일을 컨테이너에 연결 (Lua 인증 로직 포함)
+      - ./conf.d/default.conf:/etc/nginx/conf.d/default.conf
+      - ./lua/auth.lua:/usr/local/openresty/lualib/auth.lua
+    networks:
+      - msa-network
+    restart: always
+
+networks:
+  msa-network:
+    external: true
