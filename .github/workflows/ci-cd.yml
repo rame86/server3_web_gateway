@@ -18,15 +18,13 @@ jobs:
       - name: Package for Docker Build
         run: |
           mkdir -p deploy
-          cp -r client/src deploy/src
-          cp -r client/public deploy/public
-          cp client/package.json deploy/
-          cp client/pnpm-lock.yaml deploy/
-          cp client/index.html deploy/
+          cp -r client deploy/client
+          cp package.json deploy/
+          cp pnpm-lock.yaml deploy/
           cp vite.config.js deploy/
           cp nginx.conf deploy/
           cp client/Dockerfile deploy/
-          cd deploy && tar -czf frontend.tar.gz src/ public/ package.json pnpm-lock.yaml index.html vite.config.js nginx.conf Dockerfile
+          cd deploy && tar -czf frontend.tar.gz client/ package.json pnpm-lock.yaml vite.config.js nginx.conf Dockerfile
 
       - name: Copy to GCP
         uses: appleboy/scp-action@master
