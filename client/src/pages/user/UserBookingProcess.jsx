@@ -73,7 +73,7 @@ export default function UserBookingProcess() {
                     date: e.event_date ? new Date(e.event_date).toLocaleDateString() : 'TBD',
                     time: e.open_time ? new Date(e.open_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD',
                     // 🌟 백엔드에서 주는 예약석 배열 (없으면 빈 배열 처리)
-                    reserved_seats: data.reserved_seats || [] 
+                    reserved_seats: data.reservedSeats || e.reservedSeats || [] 
                 });
             } catch (error) {
                 toast.error('공연 정보를 가져오는데 실패했어.');
@@ -156,6 +156,20 @@ export default function UserBookingProcess() {
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="glass-card p-6 rounded-3xl soft-shadow space-y-4">
                             <h2 className="font-bold text-lg mb-2">예매 매수 선택</h2>
+                            {/* 🌟 루미나 공연장일 때 (좌석 지정 가능) */}
+                            {isSeatSelectionMode && (
+                                <div className="p-3 bg-rose-50 text-rose-600 rounded-xl text-xs font-medium flex items-start gap-2 border border-rose-100">
+                                    <CheckCircle2 size={14} className="mt-0.5" />
+                                    <span>이 공연은 **좌석 지정이 가능한** 루미나 전용 공연장입니다! 다음 단계에서 원하는 자리를 선택해주세요.</span>
+                                </div>
+                            )}
+                            {/* 🌟 외부 공연장일 때 (좌석 지정 불가) */}
+                            {!isSeatSelectionMode && (
+                                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl text-xs font-medium flex items-start gap-2 border border-blue-100">
+                                    <AlertCircle size={14} className="mt-0.5" />
+                                    <span>이 공연은 지정 좌석을 제공하지 않습니다. 결제 후 선착순 입장이 적용될 수 있으니 참고해주세요!</span>
+                                </div>
+                            )}
                             <p className="text-sm text-muted-foreground">인당 최대 {MAX_TICKETS}매까지 예매 가능합니다.</p>
                             
                             <div className="flex items-center justify-between p-4 bg-white border border-rose-100 rounded-2xl">
