@@ -145,7 +145,8 @@ export default function UserEvents() {
             seats: b.ticket_count || 0,
             totalPrice: b.pure_price || 0,
             status: (b.status || 'confirmed').toLowerCase(),
-            ticketCode: b.ticket_code
+            ticketCode: b.ticket_code,
+            selected_seats: Array.isArray(b.selected_seats) ? b.selected_seats : []
         }));
 
         setBookings(mappedBookings);
@@ -417,15 +418,17 @@ export default function UserEvents() {
                     <span className="text-[#888] font-medium">티켓 수량</span>
                     <span className="text-[#1A1A1A] font-bold">{selectedBooking.seats}매</span>
                   </div>
-                  {/* 🌟 여기에 좌석 정보 추가! (좌석 데이터가 있을 때만 렌더링) */}
-                  {selectedBooking.selected_seats && selectedBooking.selected_seats.length > 0 && (
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-[#888] font-medium">선택 좌석</span>
-                      <span className="text-[#1A1A1A] font-bold">
-                        {selectedBooking.selected_seats.join(', ')}
-                      </span>
-                    </div>
-                  )}
+                  {/* 🌟 변경된 좌석 정보 출력 로직: 루미나 공연장 체크 */}
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-[#888] font-medium">선택 좌석</span>
+                    <span className="text-[#1A1A1A] font-bold">
+                      {['루미나50', '루미나100', '루미나200'].includes(selectedBooking.venue) 
+                        ? (selectedBooking.selected_seats && selectedBooking.selected_seats.length > 0 
+                            ? selectedBooking.selected_seats.join(', ') 
+                            : '좌석 선택 안 됨')
+                        : '좌석정보 미제공'}
+                    </span>
+                  </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-[#888] font-medium">티켓 가격(순수)</span>
                     <span className="text-[#FF4D6D] font-bold text-base">
