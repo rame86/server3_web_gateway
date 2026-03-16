@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 export default function UserCommunityWrite() {
   const [, setLocation] = useLocation();
+  const [selectedFile, setSelectedFile] = useState(null); // 파일 상태 추가
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -18,6 +19,22 @@ export default function UserCommunityWrite() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // 파일 선택 핸들러
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) { // 10MB 제한 예시
+        toast.error("파일 크기는 10MB를 초과할 수 없습니다.");
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const removeFile = () => {
+    setSelectedFile(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -28,7 +45,7 @@ export default function UserCommunityWrite() {
 
     try {
       setLoading(true);
-      const token = localStorage.getItem('accessToken');
+      const token = localStorage.getItem('TOKEN');
 
       // 1. FormData 객체 생성
       const sendData = new FormData();
@@ -44,17 +61,18 @@ export default function UserCommunityWrite() {
       );
       sendData.append('request', requestBlob);
 
-      // 3. 파일이 있다면 추가 (선택 사항)
-      // if (selectedFile) { sendData.append('file', selectedFile); }
+      // 파일이 있으면 FormData에 추가
+      if (selectedFile) {
+        sendData.append('file', selectedFile);
+      }
 
       const response = await fetch('http://localhost/msa/core/board/write', {
         method: 'POST',
         headers: {
-          // 주의: Content-Type을 직접 설정하지 마세요! 
-          // FormData를 사용하면 브라우저가 자동으로 boundary를 포함한 multipart/form-data를 설정합니다.
+        // FormData 사용 시 Content-Type은 브라우저가 자동 설정함.
           ...(token && { 'Authorization': `Bearer ${token}` })
         },
-        body: sendData // JSON.stringify 대신 FormData를 보냄
+        body: sendData // FormData를 보냄
       });
 
       if (response.ok) {
