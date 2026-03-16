@@ -1,3 +1,4 @@
+# /web /Dockerfile
 # Stage 1: Build stage
 FROM node:22-alpine AS build-stage
 
