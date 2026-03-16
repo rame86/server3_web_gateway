@@ -1,32 +1,18 @@
-# /web /Dockerfile
-# Stage 1: Build stage
-FROM node:22-alpine AS build-stage
+# /frontend/Dockerfile
+FROM nginx:alpine
 
-# pnpm 설치
-RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
+# 기존 Nginx 기본 HTML 파일 및 기본 설정 제거
+RUN rm -rf /usr/share/nginx/html/*
+RUN rm /etc/nginx/conf.d/default.conf
 
-WORKDIR /app
+# dist 폴더 내부의 모든 파일을 html 디렉토리로 복사
+COPY dist/ /usr/share/nginx/html/
 
-# 의존성 파일 먼저 복사 (캐싱 최적화)
-COPY package.json pnpm-lock.yaml* ./
+# [수정됨] SPA 라우팅용 커스텀 Nginx 설정 파일 복사
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# 의존성 설치 (CI 환경과 동일하게)
-RUN pnpm install --frozen-lockfile
-
-# 전체 소스 복사 및 빌드
-COPY . .
-RUN pnpm run build
-
-# Stage 2: Production stage
-FROM openresty/openresty:alpine-fat
-
-# 빌드 결과물(dist)을 OpenResty 정적 파일 경로로 복사
-COPY --from=build-stage /app/dist /usr/local/openresty/nginx/html
-
-# Nginx 설정 파일 복사 (필요 시)
-# COPY default.conf /etc/nginx/conf.d/default.conf
-# COPY auth.lua /usr/local/openresty/lualib/auth.lua
+# Nginx가 파일을 정상적으로 읽을 수 있도록 디렉토리 권한 일괄 부여
+RUN chmod -R 755 /usr/share/nginx/html
 
 EXPOSE 80
-
-CMD ["openresty", "-g", "daemon off;"]
+CMD ["nginx", "-g", "daemon off;"]
