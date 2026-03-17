@@ -27,6 +27,7 @@ import UserEventDetail from "./pages/user/UserEventDetail";
 import UserBookingProcess from "./pages/user/UserBookingProcess";
 import UserStoreDetail from "./pages/user/UserStoreDetail";
 import UserPurchaseProcess from "./pages/user/UserPurchaseProcess";
+import UserProfile from "./pages/user/UserProfile";
 
 // Auth pages
 import UserLogin from "./pages/auth/UserLogin";
@@ -48,6 +49,7 @@ import AdminStore from "./pages/admin/AdminStore";
 import AdminBooking from "./pages/admin/AdminBooking";
 import AdminCommunity from "./pages/admin/AdminCommunity";
 import AdminSettlement from "./pages/admin/AdminSettlement";
+import AdminRefund from "./pages/admin/AdminRefund";
 
 function Router() {
   const [, setLocation] = useLocation();
@@ -119,6 +121,8 @@ function Router() {
       <Route path="/user/wallet/success" component={UserWalletSuccess} />
       <Route path="/user/wallet/fail" component={UserWalletFail} />
       <Route path="/user/wallet/cancel" component={UserWalletCancel} />
+      <Route path="/user/profile" component={UserProfile} />
+      <Route path="/artist/profile" component={UserProfile} />{/* 아티스트도 같은 컴포넌트 사용! */}
 
       {/* Artist Routes */}
       <Route path="/artist" component={ArtistDashboard} />
@@ -139,6 +143,7 @@ function Router() {
       <Route path="/admin/booking" component={AdminBooking} />
       <Route path="/admin/community" component={AdminCommunity} />
       <Route path="/admin/settlement" component={AdminSettlement} />
+      <Route path="/admin/refunds" component={AdminRefund} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

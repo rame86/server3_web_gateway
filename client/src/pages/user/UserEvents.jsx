@@ -33,6 +33,12 @@ const statusConfig = {
 };
 
 export default function UserEvents() {
+  // 🌟 [추가] URL 파라미터(?tab=...)를 읽어오는 헬퍼 함수
+  const getTabFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    return tabs.some(t => t.key === tab) ? tab : 'events';
+  };
   const [activeTab, setActiveTab] = useState('events');
   const [, setLocation] = useLocation();
   const [events, setEvents] = useState([]);
@@ -83,6 +89,11 @@ export default function UserEvents() {
 };
 
   useEffect(() => {
+    // URL 파라미터가 바뀌면 activeTab 상태도 업데이트
+    const currentTab = getTabFromUrl();
+    if (activeTab !== currentTab) {
+      setActiveTab(currentTab);
+    }
     const mapBackendEvent = (e) => ({
       id: e.event_id,
       title: e.title,
@@ -165,7 +176,7 @@ export default function UserEvents() {
     } else if (activeTab === 'my-bookings') {
         fetchBookings();
     }
-  }, [activeTab]);
+  }, [activeTab, window.location.search]);
 
   const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -197,18 +208,23 @@ export default function UserEvents() {
 
         {/* Tabs */}
         <div className="flex gap-2 bg-rose-50 p-1 rounded-2xl">
-          {tabs.map((tab) =>
+          {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeTab === tab.key ?
-                  'bg-white text-rose-600 shadow-sm' :
-                  'text-muted-foreground hover:text-foreground'}`
-              }>
-
+              onClick={() => {
+                // 🌟 핵심: 탭을 클릭할 때 URL 파라미터도 해당 탭에 맞게 변경해줌
+                setLocation(`/user/events?tab=${tab.key}`);
+                setActiveTab(tab.key);
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === tab.key
+                  ? 'bg-white text-rose-600 shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
               {tab.label}
             </button>
-          )}
+          ))}
         </div>
 
         {activeTab === 'events' &&

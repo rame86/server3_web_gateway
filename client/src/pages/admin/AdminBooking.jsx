@@ -137,7 +137,7 @@ export default function AdminBooking() {
                         {/* 이미지: event.image 필드 사용 */}
                         <div className="relative sm:w-48 h-36 sm:h-auto flex-shrink-0 bg-gray-100">
                           <img 
-                              src={event.image || 'https://placehold.co/400x200?text=Lumina+Pulse'} 
+                              src={event.imageUrl || 'https://placehold.co/400x200?text=Lumina+Pulse'} 
                               alt={event.eventTitle || event.title} 
                               className="w-full h-full object-cover" 
                           />
@@ -216,7 +216,7 @@ export default function AdminBooking() {
                   <div key={event.approvalId || event.eventId} className="glass-card rounded-2xl p-4 soft-shadow flex items-center gap-4 bg-white border">
                     {/* 1. 이미지 */}
                     <img 
-                      src={event.image || event.imageUrl || 'https://placehold.co/100x100?text=No+Img'} 
+                      src={event.imageUrl || event.imageURL || event.image || 'https://placehold.co/100x100?text=No+Img'} 
                       alt={event.eventTitle || event.title} 
                       className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-gray-50" 
                     />
