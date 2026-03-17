@@ -26,6 +26,7 @@ import UserEventDetail from "./pages/user/UserEventDetail";
 import UserBookingProcess from "./pages/user/UserBookingProcess";
 import UserStoreDetail from "./pages/user/UserStoreDetail";
 import UserPurchaseProcess from "./pages/user/UserPurchaseProcess";
+import UserProfile from "./pages/user/UserProfile";
 
 // Auth pages
 import UserLogin from "./pages/auth/UserLogin";
@@ -116,6 +117,8 @@ function Router() {
       <Route path="/user/wallet/success" component={UserWalletSuccess} />
       <Route path="/user/wallet/fail" component={UserWalletFail} />
       <Route path="/user/wallet/cancel" component={UserWalletCancel} />
+      <Route path="/user/profile" component={UserProfile} />
+      <Route path="/artist/profile" component={UserProfile} />{/* 아티스트도 같은 컴포넌트 사용! */}
 
       {/* Artist Routes */}
       <Route path="/artist" component={ArtistDashboard} />

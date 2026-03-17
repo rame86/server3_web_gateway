@@ -96,7 +96,7 @@ const roleConfig = {
 
 
 export default function Layout({ children, role }) {
-  const [location] = useLocation();
+  const [location,setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const config = roleConfig[role];
   const userName = localStorage.getItem('userName') || config?.userName || '사용자';
@@ -232,7 +232,7 @@ export default function Layout({ children, role }) {
         {/* Bottom actions */}
         <div className="p-3 border-t border-rose-100">
           <button
-            onClick={() => toast.info('설정 기능 준비 중입니다')}
+            onClick={() => setLocation('/user/profile')}
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-muted-foreground hover:bg-rose-50/80 hover:text-foreground transition-all">
             
             <Settings size={18} />

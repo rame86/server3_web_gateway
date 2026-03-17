@@ -133,6 +133,46 @@ export default function ArtistBooking() {
     }
   };
 
+  // 🌟 추가: 예매 명단 CSV(엑셀) 다운로드 함수
+  const handleDownloadCSV = async (eventId, eventTitle) => {
+    try {
+      toast.loading('명단 추출 중...');
+
+      // 🚨 임시 데이터 (나중에 백엔드 API /events/${eventId}/reservations 연동 시 수정!)
+      const response = await resApi.get(`/events/${eventId}/reservations`);
+      const attendees = response.data;
+      // const attendees = [
+      //   { reserveId: 'RES-001', name: '김수민', phone: '010-1234-5678', status: '결제완료', date: '2026-03-17' },
+      //   { reserveId: 'RES-002', name: '이하은', phone: '010-8765-4321', status: '결제완료', date: '2026-03-17' },
+      //   { reserveId: 'RES-003', name: '박지성', phone: '010-5555-5555', status: '결제취소', date: '2026-03-16' },
+      // ];
+
+      // CSV 헤더 및 데이터 생성
+      const header = "예매번호,예매자명,연락처,상태,예매일자\n";
+      const rows = attendees.map(user => `${user.reserveId},${user.name},${user.phone},${user.status},${user.date}`).join('\n');
+      
+      // "\uFEFF" -> 한글 깨짐 방지용 BOM 추가
+      const csvContent = "\uFEFF" + header + rows;
+
+      // 파일 다운로드 트리거
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `[루미나]${eventTitle}_예매명단.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.dismiss();
+      toast.success(`${eventTitle} 예매 명단 다운로드 완료!`);
+    } catch (error) {
+      toast.dismiss();
+      console.error('다운로드 에러:', error);
+      toast.error('명단 다운로드에 실패했습니다.');
+    }
+  };
+
   return (
     <Layout role="artist">
       <div className="p-4 lg:p-6 space-y-6">
@@ -150,6 +190,7 @@ export default function ArtistBooking() {
                 <Plus size={18} />
                 새 이벤트 등록
               </button>
+
             </DialogTrigger>
             <DialogContent className="sm:max-w-[550px] rounded-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
@@ -247,6 +288,13 @@ export default function ArtistBooking() {
             />
           </div>
         </div>
+        {/* 🌟 오른쪽: 버튼 바로 아래에 위치할 안내 문구 */}
+          <div className="text-right text-[11px] text-muted-foreground pr-2">
+            <p className="leading-relaxed">
+              <span className="font-bold text-teal-600">루미나50, 루미나100, 루미나200</span> 공연장을 이용할 아티스트는<br/>
+              관리자에게 문의 바랍니다. (📞 <span className="font-bold">02-1000-1000</span>)
+            </p>
+          </div>
 
         {/* Analytics Card */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-2">
@@ -366,7 +414,11 @@ export default function ArtistBooking() {
                           </div>
                           
                           <div className="flex gap-2">
-                              <button className="px-4 py-2 text-xs font-bold text-muted-foreground border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                              {/* 🌟 수정: 내역 내려받기 버튼에 onClick 이벤트 추가 */}
+                              <button 
+                                onClick={() => handleDownloadCSV(event.event_id || event.id, event.title)}
+                                className="px-4 py-2 text-xs font-bold text-muted-foreground border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                              >
                                   내역 내려받기
                               </button>
                               <button className="px-4 py-2 text-xs font-bold text-white bg-teal-600 rounded-xl hover:bg-teal-700 shadow-sm transition-colors">
