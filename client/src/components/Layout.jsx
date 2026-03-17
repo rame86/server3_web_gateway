@@ -32,7 +32,7 @@ const userNavItems = [
 { label: '채팅', icon: <MessageCircle size={18} />, href: '/user/chat', badge: 3 },
 { label: '예매', icon: <Calendar size={18} />, href: '/user/booking' },
 { label: '커뮤니티', icon: <BookOpen size={18} />, href: '/user/community' },
-{ label: '이벤트', icon: <Music size={18} />, href: '/user/events' },
+// { label: '이벤트', icon: <Music size={18} />, href: '/user/events' },
 { label: '아티스트', icon: <Star size={18} />, href: '/user/artists' },
 { label: '포인트 월렛', icon: <Wallet size={18} />, href: '/user/wallet' }];
 
@@ -44,7 +44,7 @@ const artistNavItems = [
 { label: '팬 채팅', icon: <MessageCircle size={18} />, href: '/artist/chat', badge: 12 },
 { label: '예매 관리', icon: <Calendar size={18} />, href: '/artist/booking' },
 { label: '커뮤니티', icon: <BookOpen size={18} />, href: '/artist/community' },
-{ label: '이벤트', icon: <Map size={18} />, href: '/artist/events' },
+// { label: '이벤트', icon: <Map size={18} />, href: '/artist/events' },
 { label: '후원 내역', icon: <Sparkles size={18} />, href: '/artist/donations' },
 { label: '정산 내역', icon: <BarChart3 size={18} />, href: '/artist/settlement' }];
 
@@ -56,8 +56,9 @@ const adminNavItems = [
 { label: '굿즈 승인', icon: <Package size={18} />, href: '/admin/store', badge: 5 },
 { label: '예매 승인', icon: <CheckSquare size={18} />, href: '/admin/booking', badge: 3 },
 { label: '게시판 관리', icon: <FileText size={18} />, href: '/admin/community' },
-{ label: '결제 정산', icon: <BarChart3 size={18} />, href: '/admin/settlement' }];
-
+{ label: '결제 정산', icon: <BarChart3 size={18} />, href: '/admin/settlement' },
+// Layout.jsx 내부 adminNavItems 수정
+{ label: '환불 관리', icon: <CheckSquare size={18} />, href: '/admin/refunds', badge: 12 }];
 
 const roleConfig = {
   user: {

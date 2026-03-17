@@ -47,6 +47,7 @@ import AdminStore from "./pages/admin/AdminStore";
 import AdminBooking from "./pages/admin/AdminBooking";
 import AdminCommunity from "./pages/admin/AdminCommunity";
 import AdminSettlement from "./pages/admin/AdminSettlement";
+import AdminRefund from "./pages/admin/AdminRefund";
 
 function Router() {
   const [, setLocation] = useLocation();
@@ -135,6 +136,7 @@ function Router() {
       <Route path="/admin/booking" component={AdminBooking} />
       <Route path="/admin/community" component={AdminCommunity} />
       <Route path="/admin/settlement" component={AdminSettlement} />
+      <Route path="/admin/refunds" component={AdminRefund} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />
