@@ -141,12 +141,7 @@ export default function ArtistBooking() {
       // 🚨 임시 데이터 (나중에 백엔드 API /events/${eventId}/reservations 연동 시 수정!)
       const response = await resApi.get(`/events/${eventId}/reservations`);
       const attendees = response.data;
-      // const attendees = [
-      //   { reserveId: 'RES-001', name: '김수민', phone: '010-1234-5678', status: '결제완료', date: '2026-03-17' },
-      //   { reserveId: 'RES-002', name: '이하은', phone: '010-8765-4321', status: '결제완료', date: '2026-03-17' },
-      //   { reserveId: 'RES-003', name: '박지성', phone: '010-5555-5555', status: '결제취소', date: '2026-03-16' },
-      // ];
-
+      
       // CSV 헤더 및 데이터 생성
       const header = "예매번호,예매자명,연락처,상태,예매일자\n";
       const rows = attendees.map(user => `${user.reserveId},${user.name},${user.phone},${user.status},${user.date}`).join('\n');
