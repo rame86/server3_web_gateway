@@ -12,9 +12,8 @@ import { styles, typeConfig } from './UserCommunityStyles';
 function PostCard({ post, onDetail }) {
   const [liked, setLiked] = useState(false);
   const config = typeConfig[post.category] || typeConfig['자유게시판'];
-
   const isArtist = post.artistPost === true;
-  const authorName = post.authorName || `User_${post.memberId || '익명'}`;
+  const authorName = post.authorName || post.name || `User_${post.memberId || '익명'}`;
 
   return (
     <div
@@ -88,11 +87,11 @@ export default function UserCommunity() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchPosts = useCallback(async (category, isInitial = false) => {
+  const fetchPosts = useCallback(async (category) => {
     try {
-      if (!isInitial) setLoading(true);
-      const token = localStorage.getItem('TOKEN');
-      const categoryParam = category === 'all' ? '전체' : category;
+      setLoading(true);
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
+      const categoryParam = category === 'all' ? '' : category;
       const url = `http://localhost/msa/core/board/list?category=${encodeURIComponent(categoryParam)}`;
 
       const response = await fetch(url, {
@@ -126,7 +125,7 @@ export default function UserCommunity() {
       }));
 
       setPosts(result);
-      if (isInitial || category === 'all') {
+      if (category === 'all') {
         setAllPosts(result);
       }
     } catch (error) {
