@@ -10,6 +10,9 @@ export default function AdminBooking() {
   const [pendingList, setPendingList] = useState([]); // 🌟 대기 목록 상태 관리
   const [allEvents, setAllEvents] = useState([]);     // 🌟 전체 목록 상태 관리
   const [loading, setLoading] = useState(true);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [bookingStart, setBookingStart] = useState('');
+  const [bookingEnd, setBookingEnd] = useState('');
 
   // 1️⃣ [GET] 데이터 불러오기 함수
   const fetchData = async () => {
@@ -47,28 +50,35 @@ export default function AdminBooking() {
   }, []);
 
   // 2️⃣ [POST] 승인/거절 처리 함수 (Spring: /admin/event/confirm 호출)
-  const handleProcessApproval = async (event, isApproved) => {
-    try {
-      const payload = {
-        // 🌟 자바 DTO의 @JsonProperty("eventId")에 맞춰서 전달
-        eventId: event.approvalId, 
-        status: isApproved ? 'CONFIRMED' : 'FAILED',
-        rejectionReason: isApproved ? "" : "관리자 거절 사유 입력",
-        // 필요하다면 DTO의 다른 필드들도 채워줄 수 있음
-        eventTitle: event.eventTitle,
-        price: event.price || 0
-      };
-
-      console.log("📤 백엔드로 보내는 데이터:", payload);
-      await adminApi.post('/admin/event/confirm', payload);
-      
-      toast.success(isApproved ? "승인 완료" : "거절 완료");
-      fetchData(); // 🌟 처리 후 목록 새로고침
-    } catch (error) {
-      console.error("처리 실패:", error);
-      toast.error("처리 도중 오류가 발생했습니다.");
+const handleProcessApproval = async (event, isApproved) => {
+  try {
+    // 승인일 때는 시간이 필수니까 체크!
+    if (isApproved && (!bookingStart || !bookingEnd)) {
+      return toast.error("예매 시작 및 종료 시간을 설정해주세요.");
     }
-  };
+
+    const payload = {
+      eventId: event.approvalId, 
+      status: isApproved ? 'CONFIRMED' : 'FAILED',
+      rejectionReason: isApproved ? "" : "관리자 거절 사유 입력",
+      eventTitle: event.eventTitle,
+      price: event.price || 0,
+      // 🌟 여기에 관리자가 설정한 시간 추가해서 보냄
+      bookingStartDate: bookingStart,
+      bookingEndDate: bookingEnd
+    };
+
+    console.log("📤 백엔드로 보내는 데이터:", payload);
+    await adminApi.post('/admin/event/confirm', payload);
+    
+    toast.success(isApproved ? "승인 완료" : "거절 완료");
+    setSelectedEvent(null); // 모달 닫기
+    fetchData(); 
+  } catch (error) {
+    console.error("처리 실패:", error);
+    toast.error("처리 도중 오류가 발생했습니다.");
+  }
+};
 
   return (
     <Layout role="admin">
@@ -151,11 +161,23 @@ export default function AdminBooking() {
                               {/* 🌟 아티스트: artistName */}
                               <p className="text-sm text-rose-500 font-medium">{event.artistName || '신청 아티스트'}</p>
                             </div>
+                            
                             <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
                               <Clock size={11} />
                               {/* 🌟 신청일: createdAt */}
                               {event.createdAt ? new Date(event.createdAt).toLocaleDateString() : 'N/A'}
                             </div>
+                            <button 
+                              onClick={() => {                               
+                                setBookingStart(''); 
+                                setBookingEnd('');
+                                setSelectedEvent(event);
+                              }}
+                              className="p-2 bg-slate-100 hover:bg-amber-100 text-amber-600 rounded-xl transition-all shadow-sm"
+                              title="상세보기 및 시간 설정"
+                            >
+                              <Eye size={18} />
+                            </button>
                           </div>
                           
                           <div className="grid grid-cols-2 gap-2 mb-4">
@@ -260,6 +282,100 @@ export default function AdminBooking() {
           </>
         )}
       </div>
+      {/* --- [상세 정보 모달] 예매 시간 설정 및 좌석 확인 --- */}
+      {selectedEvent && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-noto">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in duration-200">
+            {/* Header */}
+            <div className="p-6 border-b bg-amber-50 flex justify-between items-center">
+              <h2 className="text-xl font-bold flex items-center gap-2 text-amber-900">
+                <Ticket size={22} className="text-amber-600"/> 이벤트 최종 승인 검토
+              </h2>
+              <button onClick={() => setSelectedEvent(null)} className="p-2 hover:bg-black/5 rounded-full transition-colors"><X /></button>
+            </div>
+
+            {/* Content */}
+            <div className="p-8 overflow-y-auto space-y-8 custom-scrollbar">
+              {/* 이벤트 요약 섹션 */}
+              <div className="flex gap-5 p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                <img src={selectedEvent.imageUrl || 'https://placehold.co/200x200'} className="w-28 h-28 rounded-2xl object-cover shadow-md" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-xl text-slate-800">{selectedEvent.eventTitle || selectedEvent.title}</h3>
+                  <p className="text-sm text-rose-500 font-bold mb-2">{selectedEvent.artistName}</p>
+                  <div className="space-y-1 text-xs text-muted-foreground font-medium">
+                    <p className="flex items-center gap-1.5"><MapPin size={14} className="text-slate-400"/> {selectedEvent.location}</p>
+                    <p className="flex items-center gap-1.5"><Calendar size={14} className="text-slate-400"/> 공연: {new Date(selectedEvent.eventStartDate).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+              {/* 🌟 관리자 설정: 예매 시간 설정 */}
+              <div className="p-8 bg-amber-50/50 rounded-[2.5rem] border border-amber-100 space-y-5">
+                <h4 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                  <Clock size={18} className="text-amber-600"/> 예매 오픈/종료 일정 설정
+                </h4>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-amber-700/60 uppercase ml-1 tracking-widest">Open Time</label>
+                    <input 
+                      type="datetime-local" 
+                      value={bookingStart}
+                      onChange={(e) => setBookingStart(e.target.value)}
+                      className="w-full p-4 rounded-2xl border border-amber-200 focus:ring-4 focus:ring-amber-500/10 outline-none text-sm font-bold transition-all shadow-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-amber-700/60 uppercase ml-1 tracking-widest">Close Time</label>
+                    <input 
+                      type="datetime-local" 
+                      value={bookingEnd}
+                      onChange={(e) => setBookingEnd(e.target.value)}
+                      className="w-full p-4 rounded-2xl border border-amber-200 focus:ring-4 focus:ring-amber-500/10 outline-none text-sm font-bold transition-all shadow-sm"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-amber-600/70 font-medium ml-1">* 승인 즉시 설정된 시간에 맞춰 예매가 활성화됩니다.</p>
+              </div>
+
+              {/* 🌟 좌석표 확인 섹션 (루미나 50/100/200 전용) */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black text-primary uppercase tracking-[0.2em] ml-1">Seat Layout Plan</h4>
+                <div className="p-6 border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-slate-50/30">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-sm font-bold text-slate-600">공연장: {selectedEvent.location}</span>
+                    <span className="text-xs font-black px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">Total {selectedEvent.totalCapacity} Seats</span>
+                  </div>
+                  
+                  {/* 좌석 배치도 컴포넌트 들어갈 자리 */}
+                  <div className="aspect-[16/9] bg-white rounded-3xl border border-slate-100 shadow-inner flex items-center justify-center relative overflow-hidden">
+                    {/* 💡 여기에 UserBookingSeatSelect.jsx를 ReadOnly로 임포트해서 넣으면 돼! */}
+                    <div className="text-center space-y-2">
+                      <Users size={32} className="mx-auto text-slate-200" />
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Venue Map Visualized</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-8 border-t bg-white flex gap-4 items-center font-noto">
+              <button 
+                onClick={() => handleProcessApproval(selectedEvent, false)}
+                className="flex-1 py-4 bg-red-50 text-red-500 font-bold rounded-full border border-red-100 hover:bg-red-100 transition-all text-sm shadow-sm"
+              >
+                승인 반려
+              </button>
+              <button 
+                onClick={() => handleProcessApproval(selectedEvent, true)}
+                className="flex-[2.5] py-4 bg-teal-500 text-white font-bold rounded-full shadow-xl shadow-teal-100 hover:bg-teal-600 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm"
+              >
+                <Check size={18}/> 최종 승인 및 예매 오픈
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

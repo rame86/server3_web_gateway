@@ -252,8 +252,8 @@ export default function AdminStore() {
             ))}
           </div>
         )}
-
-        {/* [4] 상세 보기 모달 */}
+      </div>
+      {/* [4] 상세 보기 모달 */}
         {detailItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm fade-in-up">
             <div className="glass-card w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl bg-white border border-rose-100">
@@ -383,7 +383,6 @@ export default function AdminStore() {
             </div>
           </div>
         )}
-      </div>
     </Layout>
   );
 }
