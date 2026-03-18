@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { Heart, MessageCircle, Eye, ArrowLeft, AlertCircle, Send, Trash2, Edit } from 'lucide-react';
+import { ArrowLeft, Send, Heart, MessageCircle, Eye, AlertCircle, Trash2, Edit, Paperclip, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE_URL = 'http://localhost/msa/core/board';
@@ -14,12 +14,23 @@ export default function UserCommunityDetail() {
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // 공통 API 호출 함수
+  // 1. 로그인 유저 정보 가져오기
+  const loginUser = useMemo(() => {
+    try {
+      const userData = localStorage.getItem('user');
+      return userData ? JSON.parse(userData) : null;
+    } catch (e) { return null; }
+  }, []);
+
+  // 2. apiFetch 함수
   const apiFetch = async (url, method = 'GET', body = null) => {
-    const token = localStorage.getItem('accessToken');
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
     return fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json', ...(token && { 'Authorization': `Bearer ${token}` }) },
+      headers: { 
+        'Content-Type': 'application/json', 
+        ...(token && { 'Authorization': `Bearer ${token}` }) 
+      },
       ...(body && { body: JSON.stringify(body) })
     });
   };
@@ -27,85 +38,184 @@ export default function UserCommunityDetail() {
   const fetchData = useCallback(async () => {
     if (!params?.id) return;
     try {
+      setLoading(true);
       const [pRes, cRes] = await Promise.all([
         apiFetch(`${API_BASE_URL}/${params.id}`),
         apiFetch(`${API_BASE_URL}/${params.id}/comments`)
       ]);
-      setPost(await pRes.json());
-      setComments(await cRes.json() || []);
-    } catch {
+      
+      if (!pRes.ok) throw new Error();
+      
+      const postData = await pRes.json();
+      const commentData = await cRes.json();
+      
+      setPost(postData);
+      setComments(Array.isArray(commentData) ? commentData : []);
+    } catch (err) {
       toast.error("데이터 로드 실패");
       setLocation('/user/community');
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   }, [params?.id, setLocation]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { 
+    fetchData(); 
+  }, [fetchData]);
 
-  const canManage = post && (String(post.memberId) === String(localStorage.getItem('memberId')) || localStorage.getItem('role') === 'ADMIN');
-
+  // 게시글 삭제 핸들러
   const handleDelete = async () => {
-    if (window.confirm("정말 삭제하시겠습니까?") && (await apiFetch(`${API_BASE_URL}/${params.id}`, 'DELETE')).ok) {
-      toast.success("삭제 완료");
-      setLocation('/user/community');
+    if (window.confirm("정말 삭제하시겠습니까?")) {
+      const res = await apiFetch(`${API_BASE_URL}/${params.id}`, 'DELETE');
+      if (res.ok) {
+        toast.success("삭제되었습니다.");
+        setLocation('/user/community');
+      }
     }
   };
 
-  const handleReport = async (type, id) => {
-    const reason = window.prompt("신고 사유를 입력하세요:");
-    if (!reason) return;
-    const url = type === 'post' ? `${API_BASE_URL}/${id}/report` : `${API_BASE_URL}/comments/${id}/report`;
-    if ((await apiFetch(url, 'POST', { reason })).ok) toast.success("신고 완료");
-  };
-
+  // 댓글 등록 핸들러
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
-    if ((await apiFetch(`${API_BASE_URL}/${params.id}/comments`, 'POST', { content: newComment })).ok) {
-      setNewComment(""); fetchData();
+    const res = await apiFetch(`${API_BASE_URL}/${params.id}/comments`, 'POST', { content: newComment });
+    if (res.ok) {
+      setNewComment(""); 
+      fetchData();
     }
   };
 
-  if (loading || !post) return <Layout role="user"><div className="p-20 text-center text-rose-500 font-bold">로딩 중...</div></Layout>;
+  // --- 추가된 신고 핸들러 ---
+  const handleReport = async () => {
+    const reason = window.prompt("신고 사유를 입력해주세요 (최소 2자 이상)");
+    
+    if (!reason || !reason.trim()) return;
+    if (reason.trim().length < 2) {
+      toast.error("사유를 좀 더 상세히 입력해주세요.");
+      return;
+    }
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/${params.id}/report`, 'POST', { reason });
+      
+      if (res.ok) {
+        toast.success("신고가 정상적으로 접수되었습니다.");
+      } else {
+        const errorMsg = await res.text();
+        // 백엔드에서 보낸 "ALREADY_REPORTED" 등의 메시지 처리
+        toast.error(errorMsg === "ALREADY_REPORTED" ? "이미 신고한 게시글입니다." : errorMsg || "신고 처리에 실패했습니다.");
+      }
+    } catch (err) {
+      toast.error("서버와 통신 중 오류가 발생했습니다.");
+    }
+  };
+
+  // 권한 체크
+  const myId = Number(loginUser?.memberId || loginUser?.id || 0);
+  const writerId = Number(post?.memberId || post?.member_id || 0);
+  const isOwner = (myId !== 0 && myId === writerId) || loginUser?.role === 'ADMIN';
+
+  if (loading || !post) {
+    return <Layout role="user"><div className="p-20 text-center text-rose-500 font-bold">불러오는 중...</div></Layout>;
+  }
 
   return (
     <Layout role="user">
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
+      <div className="max-w-3xl mx-auto p-4 space-y-6">
         <div className="flex justify-between items-center">
-          <button onClick={() => setLocation('/user/community')} className="flex items-center gap-1 text-sm text-gray-400 font-bold"><ArrowLeft size={16}/> 목록</button>
-          {canManage && (
-            <div className="flex gap-4">
-              <button onClick={() => setLocation(`/user/community/update/${params.id}`)} className="text-gray-400 hover:text-blue-500 flex items-center gap-1 text-sm font-bold"><Edit size={16}/> 수정</button>
-              <button onClick={handleDelete} className="text-gray-400 hover:text-red-500 flex items-center gap-1 text-sm font-bold"><Trash2 size={16}/> 삭제</button>
-            </div>
-          )}
+          <button onClick={() => setLocation('/user/community')} className="flex items-center gap-1 text-sm text-gray-400 font-bold hover:text-rose-500 transition-colors">
+            <ArrowLeft size={16}/> 목록으로 돌아가기
+          </button>
+          
+          <div className="flex gap-2">
+            {/* --- 신고 버튼 추가 (작성자가 아닐 때만 표시) --- */}
+            {!isOwner && (
+              <button 
+                onClick={handleReport}
+                className="p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all flex items-center gap-1"
+                title="게시글 신고"
+              >
+                <AlertCircle size={20} />
+                <span className="text-xs font-bold">신고</span>
+              </button>
+            )}
+
+            {isOwner && (
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setLocation(`/user/community/update/${post.boardId || post.board_id}`)} 
+                  className="p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                >
+                  <Edit size={20} />
+                </button>
+                <button 
+                  onClick={handleDelete} 
+                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                >
+                  <Trash2 size={20} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-rose-50">
           <div className="flex justify-between items-start mb-4">
-            <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-500 text-xs font-black">{post.category}</span>
-            <button onClick={() => handleReport('post', params.id)} className="text-gray-200 hover:text-red-500"><AlertCircle size={20}/></button>
+            <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-500 text-xs font-black">
+              {post.category || '일반'}
+            </span>
           </div>
-          <h1 className="text-2xl font-black mb-6">{post.title}</h1>
-          <div className="text-gray-700 leading-relaxed min-h-[250px] mb-8 whitespace-pre-wrap font-medium">{post.content}</div>
+          
+          <h1 className="text-2xl font-black mb-6 text-gray-900">{post.title}</h1>
+          <div className="prose max-w-none text-gray-700 leading-relaxed mb-8 min-h-[150px] whitespace-pre-wrap">
+            {post.content}
+          </div>
+
+          {(post.storedFilePath || post.stored_file_path) && (
+            <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3 text-sm font-bold text-gray-600">
+                <Paperclip size={16} className="text-rose-500" />
+                <span className="truncate max-w-[200px]">{post.originalFileName || post.original_file_name || '첨부파일'}</span>
+              </div>
+              <button 
+                onClick={() => {
+                  const path = post.storedFilePath || post.stored_file_path;
+                  const fileId = path.split(/[\\/]/).pop();
+                  window.location.href = `${API_BASE_URL}/files/download/${fileId}`;
+                }}
+                className="text-xs font-black text-rose-500 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all"
+              >
+                <Download size={14} className="mr-1 inline" /> 다운로드
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-6 pt-6 border-t border-rose-50 text-gray-400 text-xs font-bold">
-            <button onClick={async () => (await apiFetch(`${API_BASE_URL}/${params.id}/like`, 'POST')).ok && fetchData()} className="flex items-center gap-1 hover:text-rose-500"><Heart size={18} fill={post.likeCount > 0 ? "#f43f5e" : "none"}/> {post.likeCount}</button>
-            <span><MessageCircle size={18} className="inline mr-1"/> {comments.length}</span>
-            <span><Eye size={18} className="inline mr-1"/> {post.viewCount}</span>
+            <button onClick={async () => (await apiFetch(`${API_BASE_URL}/${params.id}/like`, 'POST')).ok && fetchData()} className="flex items-center gap-1 hover:text-rose-500 transition-colors">
+              <Heart size={18} fill={Number(post.likeCount || post.like_count) > 0 ? "#f43f5e" : "none"} className={Number(post.likeCount || post.like_count) > 0 ? "text-rose-500" : ""}/> {post.likeCount || post.like_count || 0}
+            </button>
+            <span className="flex items-center gap-1"><MessageCircle size={18}/> {comments.length}</span>
+            <span className="flex items-center gap-1"><Eye size={18}/> {post.viewCount || post.view_count || 0}</span>
           </div>
         </div>
 
         <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-rose-50">
           <div className="relative mb-6">
-            <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} className="w-full bg-gray-50 rounded-xl p-4 pr-12 h-24 resize-none border-none text-sm" placeholder="댓글을 입력하세요." />
-            <button onClick={handleAddComment} className="absolute bottom-3 right-3 bg-rose-500 text-white p-2 rounded-lg"><Send size={18}/></button>
+            <textarea 
+              value={newComment} 
+              onChange={(e) => setNewComment(e.target.value)} 
+              className="w-full bg-gray-50 rounded-xl p-4 pr-12 h-24 resize-none border-none text-sm focus:ring-2 focus:ring-rose-100 transition-all" 
+              placeholder="따뜻한 댓글을 남겨주세요." 
+            />
+            <button onClick={handleAddComment} className="absolute bottom-3 right-3 bg-rose-500 text-white p-2 rounded-lg hover:bg-rose-600 transition-colors">
+              <Send size={18}/>
+            </button>
           </div>
+          
           <div className="space-y-3">
-            {comments.map(c => (
-              <div key={c.commentId} className="group p-4 bg-gray-50 rounded-xl flex justify-between items-start">
-                <div>
-                  <p className="text-[10px] font-black text-rose-400 mb-1">User_{c.memberId}</p>
-                  <p className="text-sm text-gray-700">{c.content}</p>
-                </div>
-                <button onClick={() => handleReport('comment', c.commentId)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500"><AlertCircle size={14}/></button>
+            {comments.map((c, index) => (
+              <div key={c.commentId || c.comment_id || `comment-${index}`} className="p-4 bg-gray-50 rounded-xl">
+                <p className="text-[10px] font-black text-rose-400 mb-1">User_{c.memberId || c.member_id}</p>
+                <p className="text-sm text-gray-700">{c.content}</p>
               </div>
             ))}
           </div>
