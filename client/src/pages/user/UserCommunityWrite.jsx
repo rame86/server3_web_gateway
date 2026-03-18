@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
 import { ArrowLeft, Send, Paperclip, X } from 'lucide-react';
 import { toast } from 'sonner'
 
-  export default function UserCommunityWrite() {
+const API_BASE_URL = 'http://localhost/msa/core/board';
+
+export default function UserCommunityWrite() {
   const [, setLocation] = useLocation();
-  const [selectedFile, setSelectedFile] = useState(null); // 파일 상태 추가
+  const fileInputRef = useRef(null); 
+  const [selectedFile, setSelectedFile] = useState(null); 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -23,7 +26,7 @@ import { toast } from 'sonner'
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) { // 10MB 제한 예시
+      if (file.size > 10 * 1024 * 1024) { 
         toast.error("파일 크기는 10MB를 초과할 수 없습니다.");
         return;
       }
@@ -33,6 +36,9 @@ import { toast } from 'sonner'
 
   const removeFile = () => {
     setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // input value 초기화
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -45,14 +51,11 @@ import { toast } from 'sonner'
 
     try {
       setLoading(true);
-      // 토큰 키 이름 확인 (accessToken으로 통일 권장)
       const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
-
-      // 1. FormData 객체 생성
+      
       const sendData = new FormData();
 
-      // 2. 게시글 데이터(JSON)를 Blob으로 만들어 추가
-      // 백엔드의 @RequestPart("request")와 이름을 맞춰야 합니다.
+      // 백엔드의 @RequestPart("request") 구조에 맞춤
       const requestBlob = new Blob(
         [JSON.stringify({
           ...formData,
@@ -62,18 +65,16 @@ import { toast } from 'sonner'
       );
       sendData.append('request', requestBlob);
 
-      // 파일이 있으면 FormData에 추가
       if (selectedFile) {
         sendData.append('file', selectedFile);
       }
 
-      const response = await fetch('http://localhost/msa/core/board/write', {
+      const response = await fetch(`${API_BASE_URL}/write`, {
         method: 'POST',
         headers: {
-        // FormData 사용 시 Content-Type은 브라우저가 자동 설정함.
           ...(token && { 'Authorization': `Bearer ${token}` })
         },
-        body: sendData // FormData를 보냄
+        body: sendData 
       });
 
       if (response.ok) {
@@ -143,6 +144,48 @@ import { toast } from 'sonner'
                 className="w-full p-4 rounded-2xl border border-gray-100 focus:outline-none focus:ring-2 focus:ring-rose-400 transition-all resize-none text-sm leading-relaxed"
                 required
               />
+            </div>
+
+            {/* 파일 첨부 섹션 추가 */}
+            <div>
+              <label className="block text-sm font-black text-gray-700 mb-2">파일 첨부</label>
+              <div className="flex flex-col gap-3">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                
+                {!selectedFile ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center justify-center gap-2 w-full md:w-max px-6 py-3 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:text-rose-400 hover:border-rose-200 transition-all font-bold text-sm"
+                  >
+                    <Paperclip size={18} /> 파일 선택하기 (최대 10MB)
+                  </button>
+                ) : (
+                  <div className="flex items-center justify-between p-4 bg-rose-50 rounded-2xl border border-rose-100">
+                    <div className="flex items-center gap-3 truncate">
+                      <Paperclip size={18} className="text-rose-500 shrink-0" />
+                      <span className="text-sm font-bold text-rose-700 truncate">
+                        {selectedFile.name}
+                      </span>
+                      <span className="text-xs text-rose-300 font-medium shrink-0">
+                        ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={removeFile}
+                      className="p-1 hover:bg-rose-200 rounded-full transition-colors text-rose-500"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="pt-4">

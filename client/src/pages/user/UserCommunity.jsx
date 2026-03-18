@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell } from 'lucide-react';
+import { Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell, Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
 import { coreApi } from '@/lib/api';
 
@@ -30,6 +30,7 @@ function PostCard({ post, onDetail }) {
           </div>
           <h3 className="font-semibold text-sm text-foreground mb-1 line-clamp-1 group-hover:text-rose-600 transition-colors">
             {post.title}
+            {post.storedFilePath && (<Paperclip size={14} className="inline-block ml-2 text-gray-400" />)}
           </h3>
           <p className="text-xs text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
             {post.content}
@@ -119,7 +120,6 @@ export default function UserCommunity() {
         ...post,
         // likeCount가 null, undefined, NaN이면 0으로 처리
         likeCount: (post.likeCount === null || isNaN(post.likeCount)) ? 0 : Number(post.likeCount),
-        // 추가로 viewCount나 commentCount도 안전하게 처리
         viewCount: post.viewCount || 0,
         commentCount: post.commentCount || 0
       }));
