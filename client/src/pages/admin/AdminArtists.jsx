@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 const pendingArtists = [
   { id: 101, name: '김민준', nickname: 'MJ', group: 'ECHO', genre: '발라드', appliedDate: '2026-02-18', status: 'pending', avatar: '🎤', email: 'mj@echo.com', phone: '010-1234-5678' },
   { id: 102, name: '박서연', nickname: 'SY', group: 'AURORA', genre: 'K-POP', appliedDate: '2026-02-17', status: 'pending', avatar: '🎵', email: 'sy@aurora.com', phone: '010-2345-6789' },
-  { id: 103, name: '최지훈', group: 'PRISM', genre: 'R&B', appliedDate: '2026-02-16', status: 'pending', avatar: '🎸', email: 'jh@prism.com', phone: '010-3456-7890' }
+  { id: 103, name: '최지훈', nickname: 'JH', group: 'PRISM', genre: 'R&B', appliedDate: '2026-02-16', status: 'pending', avatar: '🎸', email: 'jh@prism.com', phone: '010-3456-7890' }
 ];
 
 const approvedArtists = [
@@ -182,9 +182,15 @@ export default function AdminArtists() {
                         <p className="text-[11px] text-amber-500 font-bold mt-1 flex items-center gap-1"><Clock size={12}/> {artist.appliedDate} 신청</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setRejectArtist(artist)} className="px-6 py-3 rounded-2xl bg-red-50 text-red-500 font-bold text-sm hover:bg-red-100 transition-colors border border-red-100">거절</button>
-                      <button onClick={() => handleApprove(artist.id)} className="px-8 py-3 rounded-2xl btn-primary-gradient text-white font-bold text-sm shadow-lg">승인하기</button>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <button 
+                        onClick={() => setDetailArtist(artist)} 
+                        className="p-3 bg-slate-100 hover:bg-primary hover:text-white rounded-2xl text-primary transition-all shadow-sm"
+                      >
+                        <Eye size={20} />
+                      </button>
+                      <button onClick={() => setRejectArtist(artist)} className="px-5 py-2.5 rounded-2xl bg-red-50 text-red-500 font-bold text-sm border border-red-100 transition-colors">거절</button>
+                      <button onClick={() => handleApprove(artist.id)} className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-rose-400 to-primary text-white font-bold text-sm shadow-lg active:scale-95 transition-all">승인하기</button>
                     </div>
                   </div>
                 ))}
@@ -258,7 +264,7 @@ export default function AdminArtists() {
 
         {/* [1] 상세 정보 모달 */}
         {detailArtist && (
-          <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
             <div className="glass-card w-full max-w-4xl rounded-[3.1rem] overflow-hidden shadow-2xl bg-white flex flex-col max-h-[90vh]">
               {/* Header */}
               <div className="p-8 border-b bg-gradient-to-r from-primary to-rose-400 text-white shrink-0">
@@ -269,14 +275,15 @@ export default function AdminArtists() {
                     </div>
                     <div>
                       <h2 className="text-3xl font-bold font-playfair">{detailArtist.name}</h2>
-                      <p className="text-white/80 font-medium">@{detailArtist.nickname} · {detailArtist.group} · {detailArtist.genre}</p>
+                      <p className="text-white/80 font-medium">@{detailArtist.nickname || 'N/A'} · {detailArtist.group} · {detailArtist.genre}</p>
                       <div className="mt-2 flex gap-2">
-                        <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-bold border border-white/20">ID: {detailArtist.id}</span>
-                        <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-bold border border-white/20 uppercase tracking-tighter">Status: Active</span>
+                        <span className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-black border border-white/20 uppercase tracking-widest shadow-sm">
+                          {detailArtist.status === 'pending' ? '승인 대기 중' : '활동 아티스트'}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => setDetailArtist(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-all">
+                  <button onClick={() => setDetailArtist(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-all text-white">
                     <X size={24} />
                   </button>
                 </div>
@@ -321,22 +328,24 @@ export default function AdminArtists() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                         <p className="text-[10px] text-muted-foreground font-bold">FOLLOWERS</p>
-                        <p className="text-xl font-black text-foreground">{(detailArtist.followers/1000).toFixed(0)}K</p>
-                        <p className="text-[10px] text-emerald-500 font-bold mt-1">▲ {detailArtist.stats.followerTrend}</p>
+                        {/* followers가 없으면 0으로 처리 */}
+                        <p className="text-xl font-black text-foreground">{(detailArtist.followers / 1000 || 0).toFixed(0)}K</p>
+                        {/* stats가 없어도 뻗지 않게 ?. 처리 */}
+                        <p className="text-[10px] text-emerald-500 font-bold mt-1">▲ {detailArtist.stats?.followerTrend || '0%'}</p>
                       </div>
                       <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                         <p className="text-[10px] text-muted-foreground font-bold">POSTS</p>
-                        <p className="text-xl font-black text-foreground">{detailArtist.stats.posts}</p>
+                        <p className="text-xl font-black text-foreground">{detailArtist.stats?.posts}</p>
                         <p className="text-[10px] text-slate-400 font-bold mt-1">Total active</p>
                       </div>
                       <div className="col-span-2 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex justify-between items-center">
                         <div>
                           <p className="text-[10px] text-emerald-600 font-bold uppercase">Revenue</p>
-                          <p className="text-2xl font-black text-emerald-700">₩{detailArtist.stats.revenue.toLocaleString()}</p>
+                          <p className="text-2xl font-black text-emerald-700">₩{detailArtist.stats?.revenue.toLocaleString()}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">Withdrawable</p>
-                          <p className="text-lg font-bold text-foreground">₩{detailArtist.stats.balance.toLocaleString()}</p>
+                          <p className="text-lg font-bold text-foreground">₩{detailArtist.stats?.balance.toLocaleString()}</p>
                         </div>
                       </div>
                     </div>
