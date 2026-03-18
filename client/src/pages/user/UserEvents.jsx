@@ -106,7 +106,12 @@ export default function UserEvents() {
       capacity: e.total_capacity || 0,
       remaining: e.available_seats || 0,
       price: e.price || 0,
-      image: (e.images && e.images.length > 0) ? e.images[0] : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=300&fit=crop'
+      // 🌟 [핵심 수정] Prisma가 주는 event_images 배열에서 image_url을 확실하게 뽑아오기!
+      image: (e.event_images && e.event_images.length > 0 && e.event_images[0].image_url) 
+              ? e.event_images[0].image_url 
+              : (e.images && e.images.length > 0) ? e.images[0] 
+              : (e.imageUrl ? e.imageUrl 
+              : (e.image ? e.image : 'https://placehold.co/600x400?text=No+Image'))
     });
 
     const fetchEvents = async () => {
@@ -148,16 +153,14 @@ export default function UserEvents() {
             // 백엔드 include: { events: true } 결과에 맞춰서 참조
             eventTitle: b.events?.title || '공연명 없음',
             artistName: b.events?.artist_name || '아티스트',
-            date: b.events?.event_date ? new Date(b.events.event_date).toLocaleDateString() : 'TBD',
-            
+            date: b.events?.event_date ? new Date(b.events.event_date).toLocaleDateString() : 'TBD',           
             // 장소 정보 (events 테이블에 바로 venue가 있다면)
-            venue: b.events?.event_locations?.venue || b.events?.venue || '장소 미정',
-            
+            venue: b.events?.event_locations?.venue || b.events?.venue || '장소 미정',           
             seats: b.ticket_count || 0,
             totalPrice: b.pure_price || 0,
             status: (b.status || 'confirmed').toLowerCase(),
             ticketCode: b.ticket_code,
-            selected_seats: Array.isArray(b.selected_seats) ? b.selected_seats : []
+            selected_seats: Array.isArray(b.selected_seats) ? b.selected_seats : [],
         }));
 
         setBookings(mappedBookings);
@@ -278,8 +281,9 @@ export default function UserEvents() {
                         <img
                           src={event.image}
                           alt={event.title}
-                          className="w-full h-full object-cover" />
-
+                          className="w-full h-full object-cover" 
+                          onError={(e) => { e.target.src = 'https://placehold.co/400x200?text=No+Image'; }}
+                          />
                         <div className="absolute top-2 left-2">
                           <span className={`px-2 py-1 rounded-lg text-xs font-bold ${eventTypeBadgeClass[event.type]}`}>
                             {eventTypeLabel[event.type]}

@@ -20,10 +20,11 @@ const AdminRefund = () => {
     try {
       setLoading(true);
       // 🌟 TODO: 게이트웨이 주소나 백엔드 포트에 맞춰 수정!
-      const response = await axios.get(`${API_URL}/msa/admin/refund/list`, {
+      const response = await axios.get(`${API_URL}/msa/core/refund`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
       });
 
+      console.log("💰 환불 리스트 원본 데이터:", response.data);
       // 🌟 핵심: 서버에서 준 데이터가 진짜 배열(Array)일 때만 넣고, 아니면 빈 배열로 처리!
       if (Array.isArray(response.data)) {
         setRequests(response.data);
