@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, useLocation } from "wouter";
+import { Switch, useLocation, Route } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useEffect } from "react";
@@ -18,6 +18,7 @@ import UserCommunity from "./pages/user/UserCommunity";
 import UserCommunityDetail from "./pages/user/UserCommunityDetail";
 import UserCommunityWrite from './pages/user/UserCommunityWrite';
 import UserArtists from "./pages/user/UserArtists";
+import UserArtistDetail from "./pages/user/UserArtistDetail";
 import UserWallet from "./pages/user/UserWallet";
 import UserWalletSuccess from "./pages/user/UserWalletSuccess";
 import UserWalletFail from "./pages/user/UserWalletFail";
@@ -111,8 +112,9 @@ function Router() {
       <Route path="/user/community" component={UserCommunity} />
       <Route path="/user/community/write" component={UserCommunityWrite} />
       <Route path="/user/community/:id" component={UserCommunityDetail} />
-
       <Route path="/user/artists" component={UserArtists} />
+      {/* 아티스트 상세 페이지 - 동적 라우팅 적용 */}
+      <Route path="/artists/:id" component={UserArtistDetail} />
       <Route path="/user/wallet" component={UserWallet} />
       <Route path="/user/wallet/success" component={UserWalletSuccess} />
       <Route path="/user/wallet/fail" component={UserWalletFail} />

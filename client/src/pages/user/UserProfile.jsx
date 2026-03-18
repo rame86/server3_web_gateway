@@ -25,7 +25,7 @@ export default function UserProfile() {
 
   // 1. 회원가입 필드와 일치하도록 상태 보강
   const [formData, setFormData] = useState({
-    email: localStorage.getItem('userEmail') || '', // 이메일은 보통 readOnly
+    ememail: localStorage.getItem('userEmail') || localStorage.getItem('email') || '', 
     name: localStorage.getItem('userName') || '',
     phone: '',
     age: '',      // 🌟 추가
