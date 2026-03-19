@@ -13,7 +13,8 @@ function PostCard({ post, onDetail }) {
   const [liked, setLiked] = useState(false);
   const config = typeConfig[post.category] || typeConfig['자유게시판'];
   const isArtist = post.artistPost === true;
-  const authorName = post.authorName || `User_${post.memberId || '익명'}`;
+  
+ const authorName = post.authorName || (post.memberId ? `사용자(${post.memberId})` : '익명');
 
   return (
     <div

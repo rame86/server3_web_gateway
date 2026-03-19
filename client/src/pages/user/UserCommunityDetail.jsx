@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { ArrowLeft, Send, Heart, MessageCircle, Eye, AlertCircle, Trash2, Edit, Paperclip, Download } from 'lucide-react';
+import { ArrowLeft, Send, Heart, MessageCircle, Eye, AlertCircle, Trash2, Edit, Paperclip, Download, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE_URL = 'http://localhost/msa/core/board';
@@ -14,7 +14,11 @@ export default function UserCommunityDetail() {
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // UserLogin.jsx에서 개별 키로 저장하는 방식에 맞춰 데이터 로드
+  // 수정 관련 상태
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editContent, setEditContent] = useState("");
+  
+  // 로그인 정보 로드
   const [loginInfo] = useState(() => {
     return {
       memberId: localStorage.getItem('memberId'),
@@ -23,7 +27,7 @@ export default function UserCommunityDetail() {
     };
   });
 
-  // 공통 Fetch 함수 (토큰 주입 포함)
+  // 공통 Fetch 함수
   const apiFetch = useCallback(async (url, method = 'GET', body = null) => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
     const options = {
@@ -37,7 +41,7 @@ export default function UserCommunityDetail() {
     return fetch(url, options);
   }, []);
 
-  // 게시글 및 댓글 상세 데이터 가져오기
+  // 데이터 로드
   const fetchData = useCallback(async () => {
     if (!params?.id) return;
     try {
@@ -63,15 +67,12 @@ export default function UserCommunityDetail() {
 
   useEffect(() => {fetchData();}, [fetchData]);
 
-  // 권한 체크
+  // 게시글 작성자 권한 체크
   const isOwner = useMemo(() => {
     if (!post || !loginInfo.memberId) return false;
-    // BoardDTO는 memberId(Long) 필드를 사용함
     const myId = String(loginInfo.memberId);
     const writerId = String(post.memberId || "");
     const isAdmin = String(loginInfo.role || "").toUpperCase() === 'ADMIN';
-
-    // 작성자 본인이거나 관리자 권한인 경우 true
     return (myId !== "" && myId === writerId) || isAdmin;
   }, [loginInfo, post]);
 
@@ -96,6 +97,40 @@ export default function UserCommunityDetail() {
     }
   };
 
+  // 댓글 삭제 (오타 수정: ${API_BASE_URL})
+  const handleDeleteComment = async (commentId) => {
+    if(!window.confirm("댓글을 삭제하시겠습니까?")) return;
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/comments/${commentId}`, 'DELETE');
+      if (res.ok){
+        toast.success("댓글이 삭제되었습니다.");
+        fetchData();
+      } else {
+        toast.error("삭제 권한이 없거나 오류 발생");
+      }
+    } catch (err) {
+      toast.error("서버 통신 오류");
+    }
+  };
+
+  // 댓글 수정
+  const handleUpdateComment = async (commentId) => {
+    if(!editContent.trim()) return;
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/comments/${commentId}`, 'PUT', { content: editContent });
+      if(res.ok){
+        toast.success("댓글이 수정되었습니다.");
+        setEditingCommentId(null);
+        setEditContent("");
+        fetchData();
+      } else {
+        toast.error("수정 권한이 없습니다.");
+      }
+    } catch(err) {
+      toast.error("수정 실패");
+    }
+  };
+
   // 게시글 신고
   const handleReport = async () => {
     const reason = window.prompt("신고 사유를 입력해주세요 (최소 2자 이상)");
@@ -103,7 +138,6 @@ export default function UserCommunityDetail() {
       if (reason) toast.error("사유를 좀 더 상세히 입력해주세요.");
       return;
     }
-
     try {
       const res = await apiFetch(`${API_BASE_URL}/${params.id}/report`, 'POST', { reason });
       if (res.ok) {
@@ -136,22 +170,19 @@ export default function UserCommunityDetail() {
                   onClick={() => setLocation(`/user/community/update/${post.boardId}`)} 
                   className="flex items-center gap-1.5 px-3 py-1.5 text-gray-500 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all font-bold"
                 >
-                  <Edit size={16} />
-                  <span className="text-sm">수정</span>
+                  <Edit size={16} /> <span className="text-sm">수정</span>
                 </button>
                 <button 
                   onClick={handleDelete} 
                   className="flex items-center gap-1.5 px-3 py-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all font-bold"
                 >
-                  <Trash2 size={16} />
-                  <span className="text-sm">삭제</span>
+                  <Trash2 size={16} /> <span className="text-sm">삭제</span>
                 </button>
               </div>
             )}
             {!isOwner && (
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-gray-400 hover:text-rose-500 font-bold">
-                <AlertCircle size={18} />
-                <span className="text-xs">신고</span>
+              <button onClick={handleReport} className="flex items-center gap-1.5 px-3 py-1.5 text-gray-400 hover:text-rose-500 font-bold">
+                <AlertCircle size={18} /> <span className="text-xs">신고</span>
               </button>
             )}
           </div>
@@ -173,7 +204,6 @@ export default function UserCommunityDetail() {
             {post.content}
           </div>
 
-          {/* 첨부파일 노출 영역 */}
           {post.storedFilePath && (
             <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3 text-sm font-bold text-gray-600">
@@ -203,7 +233,6 @@ export default function UserCommunityDetail() {
           </div>
         </div>
 
-        {/* 댓글 영역 */}
         <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-rose-50">
           <div className="relative mb-6">
             <textarea 
@@ -218,15 +247,60 @@ export default function UserCommunityDetail() {
           </div>
           
           <div className="space-y-4">
-            {comments.map((c, index) => (
-              <div key={c.commentId || `comment-${index}`} className="p-4 bg-gray-50 rounded-xl">
-                <div className="flex justify-between items-center mb-1">
-                  <p className="text-[11px] font-black text-rose-400">{c.authorName || `User_${c.memberId}`}</p>
-                  <p className="text-[10px] text-gray-300 font-bold">{c.createdAt?.split('T')[0]}</p>
+            {comments.map((c, index) => {
+              const isCommentOwner = String(c.memberId) === String(loginInfo.memberId);
+              const isEditing = editingCommentId === c.commentId;
+
+              return (
+                <div key={c.commentId || `comment-${index}`} className="p-4 bg-gray-50 rounded-xl group transition-all">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[11px] font-black text-rose-400">{c.authorName || `User_${c.memberId}`}</p>
+                      {isCommentOwner && <span className="text-[9px] bg-rose-100 text-rose-500 px-1.5 py-0.5 rounded-md font-bold">내 댓글</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] text-gray-300 font-bold">{c.createdAt?.split('T')[0]}</p>
+                      {isCommentOwner && !isEditing && (
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => { setEditingCommentId(c.commentId); setEditContent(c.content); }}
+                            className="p-1 text-gray-400 hover:text-rose-500 transition-colors"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteComment(c.commentId)}
+                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <textarea 
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        className="w-full p-3 text-sm bg-white border border-rose-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-100"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => setEditingCommentId(null)} className="flex items-center gap-1 px-2 py-1 text-[10px] text-gray-400 font-bold hover:bg-gray-100 rounded-md">
+                          <X size={12}/> 취소
+                        </button>
+                        <button onClick={() => handleUpdateComment(c.commentId)} className="flex items-center gap-1 px-2 py-1 text-[10px] text-rose-500 font-black hover:bg-rose-50 rounded-md">
+                          <Check size={12}/> 수정완료
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-700 font-medium whitespace-pre-wrap">{c.content}</p>
+                  )}
                 </div>
-                <p className="text-sm text-gray-700 font-medium">{c.content}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
