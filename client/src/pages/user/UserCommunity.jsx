@@ -13,8 +13,10 @@ function PostCard({ post, onDetail }) {
   const [liked, setLiked] = useState(false);
   const config = typeConfig[post.category] || typeConfig['자유게시판'];
   const isArtist = post.artistPost === true;
-  
- const authorName = post.authorName || (post.memberId ? `사용자(${post.memberId})` : '익명');
+
+  // [수정] 서버에서 전달받은 authorName을 사용하고, 없을 때만 기본값 표시
+  const authorName = post.authorName || `사용자${post.memberId}`;
+
 
   return (
     <div
