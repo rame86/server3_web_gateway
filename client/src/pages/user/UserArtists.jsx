@@ -3,6 +3,7 @@
  * Soft Bloom Design: Artist discovery, fandom join
  */
 
+import { useLocation } from "wouter";
 import { useState } from 'react';
 import Layout from '@/components/Layout';
 import { Star, Heart, Search, ChevronRight } from 'lucide-react';
@@ -13,6 +14,7 @@ import { coreApi } from '@/lib/api';
 export default function UserArtists() {
   const [searchQuery, setSearchQuery] = useState('');
   const [followed, setFollowed] = useState([1, 3, 5]);
+  const [, setLocation] = useLocation();
 
   const filtered = artists.filter((a) =>
     a.name.includes(searchQuery) || a.group.includes(searchQuery) || a.fandom.includes(searchQuery)
@@ -129,9 +131,11 @@ export default function UserArtists() {
                       {isFollowed ? '팔로잉' : '팔로우'}
                     </button>
                     <button
-                      onClick={() => toast.info(`${artist.name} 아티스트 페이지로 이동합니다`)}
+                      onClick={() => {
+                        toast.info(`${artist.name} 아티스트 페이지로 이동합니다`);
+                        setLocation(`/artists/${artist.id}`); // 실제 페이지 이동 로직!
+                      }}
                       className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-muted-foreground hover:bg-gray-100 transition-colors">
-
                       페이지 <ChevronRight size={14} />
                     </button>
                   </div>

@@ -33,6 +33,12 @@ const statusConfig = {
 };
 
 export default function UserEvents() {
+  // 🌟 [추가] URL 파라미터(?tab=...)를 읽어오는 헬퍼 함수
+  const getTabFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    return tabs.some(t => t.key === tab) ? tab : 'events';
+  };
   const [activeTab, setActiveTab] = useState('events');
   const [, setLocation] = useLocation();
   const [events, setEvents] = useState([]);
@@ -83,6 +89,11 @@ export default function UserEvents() {
 };
 
   useEffect(() => {
+    // URL 파라미터가 바뀌면 activeTab 상태도 업데이트
+    const currentTab = getTabFromUrl();
+    if (activeTab !== currentTab) {
+      setActiveTab(currentTab);
+    }
     const mapBackendEvent = (e) => ({
       id: e.event_id,
       title: e.title,
@@ -95,7 +106,12 @@ export default function UserEvents() {
       capacity: e.total_capacity || 0,
       remaining: e.available_seats || 0,
       price: e.price || 0,
-      image: (e.images && e.images.length > 0) ? e.images[0] : 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=300&fit=crop'
+      // 🌟 [핵심 수정] Prisma가 주는 event_images 배열에서 image_url을 확실하게 뽑아오기!
+      image: (e.event_images && e.event_images.length > 0 && e.event_images[0].image_url) 
+              ? e.event_images[0].image_url 
+              : (e.images && e.images.length > 0) ? e.images[0] 
+              : (e.imageUrl ? e.imageUrl 
+              : (e.image ? e.image : 'https://placehold.co/600x400?text=No+Image'))
     });
 
     const fetchEvents = async () => {
@@ -137,16 +153,14 @@ export default function UserEvents() {
             // 백엔드 include: { events: true } 결과에 맞춰서 참조
             eventTitle: b.events?.title || '공연명 없음',
             artistName: b.events?.artist_name || '아티스트',
-            date: b.events?.event_date ? new Date(b.events.event_date).toLocaleDateString() : 'TBD',
-            
+            date: b.events?.event_date ? new Date(b.events.event_date).toLocaleDateString() : 'TBD',           
             // 장소 정보 (events 테이블에 바로 venue가 있다면)
-            venue: b.events?.event_locations?.venue || b.events?.venue || '장소 미정',
-            
+            venue: b.events?.event_locations?.venue || b.events?.venue || '장소 미정',           
             seats: b.ticket_count || 0,
             totalPrice: b.pure_price || 0,
             status: (b.status || 'confirmed').toLowerCase(),
             ticketCode: b.ticket_code,
-            selected_seats: Array.isArray(b.selected_seats) ? b.selected_seats : []
+            selected_seats: Array.isArray(b.selected_seats) ? b.selected_seats : [],
         }));
 
         setBookings(mappedBookings);
@@ -165,7 +179,7 @@ export default function UserEvents() {
     } else if (activeTab === 'my-bookings') {
         fetchBookings();
     }
-  }, [activeTab]);
+  }, [activeTab, window.location.search]);
 
   const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -197,18 +211,23 @@ export default function UserEvents() {
 
         {/* Tabs */}
         <div className="flex gap-2 bg-rose-50 p-1 rounded-2xl">
-          {tabs.map((tab) =>
+          {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeTab === tab.key ?
-                  'bg-white text-rose-600 shadow-sm' :
-                  'text-muted-foreground hover:text-foreground'}`
-              }>
-
+              onClick={() => {
+                // 🌟 핵심: 탭을 클릭할 때 URL 파라미터도 해당 탭에 맞게 변경해줌
+                setLocation(`/user/events?tab=${tab.key}`);
+                setActiveTab(tab.key);
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                activeTab === tab.key
+                  ? 'bg-white text-rose-600 shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
               {tab.label}
             </button>
-          )}
+          ))}
         </div>
 
         {activeTab === 'events' &&
@@ -262,8 +281,9 @@ export default function UserEvents() {
                         <img
                           src={event.image}
                           alt={event.title}
-                          className="w-full h-full object-cover" />
-
+                          className="w-full h-full object-cover" 
+                          onError={(e) => { e.target.src = 'https://placehold.co/400x200?text=No+Image'; }}
+                          />
                         <div className="absolute top-2 left-2">
                           <span className={`px-2 py-1 rounded-lg text-xs font-bold ${eventTypeBadgeClass[event.type]}`}>
                             {eventTypeLabel[event.type]}
