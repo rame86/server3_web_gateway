@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, useLocation } from "wouter";
+import { Switch, useLocation, Route } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useEffect } from "react";
@@ -17,7 +17,9 @@ import UserChat from "./pages/user/UserChat";
 import UserCommunity from "./pages/user/UserCommunity";
 import UserCommunityDetail from "./pages/user/UserCommunityDetail";
 import UserCommunityWrite from './pages/user/UserCommunityWrite';
+import UserCommunityUpdate from './pages/user/UserCommunityUpdate';
 import UserArtists from "./pages/user/UserArtists";
+import UserArtistDetail from "./pages/user/UserArtistDetail";
 import UserWallet from "./pages/user/UserWallet";
 import UserWalletSuccess from "./pages/user/UserWalletSuccess";
 import UserWalletFail from "./pages/user/UserWalletFail";
@@ -26,6 +28,7 @@ import UserEventDetail from "./pages/user/UserEventDetail";
 import UserBookingProcess from "./pages/user/UserBookingProcess";
 import UserStoreDetail from "./pages/user/UserStoreDetail";
 import UserPurchaseProcess from "./pages/user/UserPurchaseProcess";
+import UserProfile from "./pages/user/UserProfile";
 
 // Auth pages
 import UserLogin from "./pages/auth/UserLogin";
@@ -47,6 +50,7 @@ import AdminStore from "./pages/admin/AdminStore";
 import AdminBooking from "./pages/admin/AdminBooking";
 import AdminCommunity from "./pages/admin/AdminCommunity";
 import AdminSettlement from "./pages/admin/AdminSettlement";
+import AdminRefund from "./pages/admin/AdminRefund";
 
 function Router() {
   const [, setLocation] = useLocation();
@@ -108,13 +112,17 @@ function Router() {
       {/* 커뮤니티 경로: 구체적인 경로(write)를 동적 파라미터(:id)보다 먼저 선언해야 합니다. */}
       <Route path="/user/community" component={UserCommunity} />
       <Route path="/user/community/write" component={UserCommunityWrite} />
+        <Route path="/user/community/update/:id" component={UserCommunityUpdate} />
       <Route path="/user/community/:id" component={UserCommunityDetail} />
-
       <Route path="/user/artists" component={UserArtists} />
+      {/* 아티스트 상세 페이지 - 동적 라우팅 적용 */}
+      <Route path="/artists/:id" component={UserArtistDetail} />
       <Route path="/user/wallet" component={UserWallet} />
       <Route path="/user/wallet/success" component={UserWalletSuccess} />
       <Route path="/user/wallet/fail" component={UserWalletFail} />
       <Route path="/user/wallet/cancel" component={UserWalletCancel} />
+      <Route path="/user/profile" component={UserProfile} />
+      <Route path="/artist/profile" component={UserProfile} />{/* 아티스트도 같은 컴포넌트 사용! */}
 
       {/* Artist Routes */}
       <Route path="/artist" component={ArtistDashboard} />
@@ -135,6 +143,7 @@ function Router() {
       <Route path="/admin/booking" component={AdminBooking} />
       <Route path="/admin/community" component={AdminCommunity} />
       <Route path="/admin/settlement" component={AdminSettlement} />
+      <Route path="/admin/refunds" component={AdminRefund} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />

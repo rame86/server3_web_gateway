@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell } from 'lucide-react';
+import { Heart, MessageCircle, Eye, PenLine, Search, TrendingUp, Bell, Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
 import { coreApi } from '@/lib/api';
 
@@ -12,9 +12,8 @@ import { styles, typeConfig } from './UserCommunityStyles';
 function PostCard({ post, onDetail }) {
   const [liked, setLiked] = useState(false);
   const config = typeConfig[post.category] || typeConfig['자유게시판'];
-
   const isArtist = post.artistPost === true;
-  const authorName = post.authorName || `User_${post.memberId || '익명'}`;
+  const authorName = post.authorName || post.name || `User_${post.memberId || '익명'}`;
 
   return (
     <div
@@ -31,6 +30,7 @@ function PostCard({ post, onDetail }) {
           </div>
           <h3 className="font-semibold text-sm text-foreground mb-1 line-clamp-1 group-hover:text-rose-600 transition-colors">
             {post.title}
+            {post.storedFilePath && (<Paperclip size={14} className="inline-block ml-2 text-gray-400" />)}
           </h3>
           <p className="text-xs text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
             {post.content}
@@ -88,11 +88,11 @@ export default function UserCommunity() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchPosts = useCallback(async (category, isInitial = false) => {
+  const fetchPosts = useCallback(async (category) => {
     try {
-      if (!isInitial) setLoading(true);
-      const token = localStorage.getItem('TOKEN');
-      const categoryParam = category === 'all' ? '전체' : category;
+      setLoading(true);
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
+      const categoryParam = category === 'all' ? '' : category;
       const url = `http://localhost/msa/core/board/list?category=${encodeURIComponent(categoryParam)}`;
 
       const response = await fetch(url, {
@@ -120,13 +120,12 @@ export default function UserCommunity() {
         ...post,
         // likeCount가 null, undefined, NaN이면 0으로 처리
         likeCount: (post.likeCount === null || isNaN(post.likeCount)) ? 0 : Number(post.likeCount),
-        // 추가로 viewCount나 commentCount도 안전하게 처리
         viewCount: post.viewCount || 0,
         commentCount: post.commentCount || 0
       }));
 
       setPosts(result);
-      if (isInitial || category === 'all') {
+      if (category === 'all') {
         setAllPosts(result);
       }
     } catch (error) {

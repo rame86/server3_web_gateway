@@ -4,7 +4,7 @@
  */
 
 import { useLocation, Link } from 'wouter';
-import { Search, Bell } from 'lucide-react';
+import { Search, Bell, CheckSquare } from 'lucide-react';
 import { useState } from 'react';
 
 
@@ -41,8 +41,9 @@ const adminCategories = [
 { label: '굿즈', href: '/admin/store' },
 { label: '예매', href: '/admin/booking' },
 { label: '게시판', href: '/admin/community' },
-{ label: '정산', href: '/admin/settlement' }];
-
+{ label: '정산', href: '/admin/settlement' },
+// Layout.jsx 내부 adminNavItems 수정
+{ label: '환불 관리', icon: <CheckSquare size={18} />, href: '/admin/refunds', badge: 12 }];
 
 
 
