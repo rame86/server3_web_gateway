@@ -3,7 +3,7 @@
  * Soft Bloom Design: Goods approval queue (Full Version)
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { 
   Package, Check, X, Eye, Clock, User, 
@@ -11,63 +11,15 @@ import {
 } from 'lucide-react';
 import { goodsItems, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
-
-// [1] 데이터 구조 확장: 세부 카테고리, 유저 정보, 상세 이미지 추가
-const pendingGoods = [
-  { 
-    id: 201, name: 'NOVA 공식 포토카드 세트 (한정판)', artistName: 'NOVA', price: 35000, 
-    image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop', 
-    category: 'official', subCategory: '잡화', submittedDate: '2026-02-18', 
-    description: '공식 포토카드 12종 세트입니다. 멤버별 친필 사인이 포함된 스페셜 에디션입니다.', 
-    stock: 500,
-    user: { name: '노바엔터', email: 'nova_official@ent.com', role: 'ARTIST' },
-    detailImages: [
-      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&h=400&fit=crop',
-      'https://images.unsplash.com/photo-1554034483-04fac7d3b818?w=400&h=400&fit=crop'
-    ]
-  },
-  { 
-    id: 202, name: '이하은 팬메이드 아크릴 키링', artistName: '이하은', price: 8500, 
-    image: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=400&h=400&fit=crop', 
-    category: 'unofficial', subCategory: '잡화/인형', submittedDate: '2026-02-17', 
-    description: '팬이 직접 디자인한 귀여운 아크릴 키링입니다. 투명도가 높습니다.', 
-    stock: 50,
-    user: { name: '홍길동', email: 'gildong@example.com', role: 'USER' },
-    detailImages: ['https://images.unsplash.com/photo-1626197031107-c0903b21008a?w=400&h=400&fit=crop']
-  },
-  { 
-    id: 203, name: 'BLOSSOM 공식 응원봉', artistName: 'BLOSSOM', price: 45000, 
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=400&fit=crop', 
-    category: 'official', subCategory: '응원도구', submittedDate: '2026-02-16', 
-    description: 'BLOSSOM 공식 응원봉 2세대. 블루투스 연동 기능을 지원합니다.', 
-    stock: 1000,
-    user: { name: '블로썸즈', email: 'admin@blossom.com', role: 'ARTIST' },
-    detailImages: []
-  },
-  { 
-    id: 204, name: '김지수 팬아트 포스터', artistName: '김지수', price: 12000, 
-    image: 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=400&fit=crop', 
-    category: 'unofficial', subCategory: '의류/포스터', submittedDate: '2026-02-15', 
-    description: '김지수 아티스트의 팬아트 A3 포스터 세트입니다.', 
-    stock: 30,
-    user: { name: '아트러버', email: 'art@naver.com', role: 'USER' },
-    detailImages: []
-  },
-  { 
-    id: 205, name: 'NOVA 공식 후드티', artistName: 'NOVA', price: 89000, 
-    image: 'https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=400&h=400&fit=crop', 
-    category: 'official', subCategory: '의류', submittedDate: '2026-02-14', 
-    description: '고품질 면 소재의 NOVA 공식 후드티입니다. 사계절 착용 가능합니다.', 
-    stock: 200,
-    user: { name: '노바엔터', email: 'nova_official@ent.com', role: 'ARTIST' },
-    detailImages: ['https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&h=400&fit=crop']
-  }
-];
+import { coreApi } from '@/lib/api';
 
 const categoryLabel = {
   official: { label: '공식 굿즈', class: 'badge-rose' },
   unofficial: { label: '팬메이드', class: 'badge-lavender' },
-  used: { label: '중고거래', class: 'bg-gray-100 text-gray-600' }
+  used: { label: '중고거래', class: 'bg-gray-100 text-gray-600' },
+  // 백엔드에서 대문자나 다른 값으로 올 경우를 대비한 안전장치 추가
+  SHOP: { label: '스토어 굿즈', class: 'badge-rose' },
+  official_goods: { label: '공식 굿즈', class: 'badge-rose' } 
 };
 
 export default function AdminStore() {
@@ -80,22 +32,80 @@ export default function AdminStore() {
   const [rejectItem, setRejectItem] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  const handleApprove = (id, name) => {
-    setApprovedIds([...approvedIds, id]);
-    toast.success(`"${name}" 굿즈가 승인되었습니다`);
-    if (detailItem?.id === id) setDetailItem(null);
+  // --- [백엔드 API 연동 추가 부분] ---
+  const [pendingGoods, setPendingGoods] = useState([]);
+
+  const fetchPendingGoods = async () => {
+    try {
+      const response = await coreApi.get('/admin/shop/approvalList');
+      
+      // 화면이 깨지지 않게 백엔드 데이터를 네 기존 UI 변수명(id, name 등)에 강제로 맞춰줌
+      const mappedData = response.data.map(item => ({
+        ...item,
+        id: item.approvalId, // 백엔드의 approvalId를 UI의 id로
+        name: item.goodsName || '이름 없음', 
+        image: item.image || 'https://via.placeholder.com/400', 
+        category: item.category ? item.category.toLowerCase() : 'official',
+        subCategory: item.subCategory || '분류 없음',
+        submittedDate: item.createdAt ? item.createdAt.split('T')[0] : '날짜 없음',
+        description: item.description || '상세 설명이 없습니다.',
+        stock: item.stock || 0,
+        user: item.user || { name: item.artistName || '알 수 없음', email: '정보 없음', role: 'ARTIST' },
+        detailImages: item.detailImages || []
+      }));
+      setPendingGoods(mappedData);
+    } catch (error) {
+      toast.error('승인 대기 목록을 불러오지 못했습니다.');
+    }
   };
 
-  const handleRejectSubmit = () => {
+  // 처음 들어올 때 데이터 가져오기
+  useEffect(() => {
+    fetchPendingGoods();
+  }, []);
+
+  // 승인 버튼 눌렀을 때
+  const handleApprove = async (id, name, productId) => {
+    try {
+      await coreApi.post('/admin/shop/confirm', {
+        approvalId: id,
+        productId: productId,
+        status: 'CONFIRMED'
+      });
+      setApprovedIds([...approvedIds, id]);
+      toast.success(`"${name}" 굿즈가 승인되었습니다`);
+      if (detailItem?.id === id) setDetailItem(null);
+      
+      fetchPendingGoods(); // 승인 후 목록 새로고침
+    } catch (error) {
+      toast.error('승인 처리 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 거절 버튼 눌렀을 때
+  const handleRejectSubmit = async () => {
     if (!rejectReason.trim()) {
       toast.error('거절 사유를 입력해주세요');
       return;
     }
-    setRejectedIds([...rejectedIds, rejectItem.id]);
-    toast.warning(`"${rejectItem.name}" 거절되었습니다. 사유: ${rejectReason}`);
-    setRejectItem(null);
-    setRejectReason('');
+    try {
+      await coreApi.post('/admin/shop/confirm', {
+        approvalId: rejectItem.id,
+        productId: rejectItem.productId,
+        status: 'REJECTED',
+        reason: rejectReason
+      });
+      setRejectedIds([...rejectedIds, rejectItem.id]);
+      toast.warning(`"${rejectItem.name}" 거절되었습니다. 사유: ${rejectReason}`);
+      setRejectItem(null);
+      setRejectReason('');
+      
+      fetchPendingGoods(); // 거절 후 목록 새로고침
+    } catch (error) {
+      toast.error('거절 처리 중 오류가 발생했습니다.');
+    }
   };
+  // ------------------------------------
 
   const pendingList = pendingGoods.filter((g) => !approvedIds.includes(g.id) && !rejectedIds.includes(g.id));
 
@@ -159,8 +169,8 @@ export default function AdminStore() {
                     <div className="relative sm:w-44 h-44 sm:h-auto flex-shrink-0">
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                       <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold shadow-sm ${categoryLabel[item.category].class}`}>
-                          {categoryLabel[item.category].label}
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold shadow-sm ${categoryLabel[item.category]?.class || 'bg-slate-100'}`}>
+                          {categoryLabel[item.category]?.label || item.category}
                         </span>
                         <span className="bg-white/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-slate-600 shadow-sm">
                           {item.subCategory}
@@ -205,19 +215,19 @@ export default function AdminStore() {
                         </div>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => setDetailItem(item)} // 상세보기 모달 오픈
+                            onClick={() => setDetailItem(item)} 
                             className="p-3 rounded-2xl bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm"
                           >
                             <Eye size={18} />
                           </button>
                           <button
-                            onClick={() => setRejectItem(item)} // 거절 사유 모달 오픈
+                            onClick={() => setRejectItem(item)} 
                             className="px-6 py-3 text-sm font-bold text-red-500 rounded-2xl bg-red-50 hover:bg-red-100 transition-colors border border-red-100 shadow-sm"
                           >
                             <X size={18} className="inline mr-1" /> 거절
                           </button>
                           <button
-                            onClick={() => handleApprove(item.id, item.name)}
+                            onClick={() => handleApprove(item.id, item.name, item.productId)}
                             className="px-8 py-3 text-sm font-bold text-white rounded-2xl btn-primary-gradient shadow-md"
                           >
                             <Check size={18} className="inline mr-1" /> 승인
@@ -253,6 +263,7 @@ export default function AdminStore() {
           </div>
         )}
       </div>
+
       {/* [4] 상세 보기 모달 */}
         {detailItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm fade-in-up">
@@ -291,7 +302,7 @@ export default function AdminStore() {
                   </div>
                   <div className="bg-secondary/40 p-4 rounded-2xl border border-border/50">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Classification</p>
-                    <p className="font-bold text-foreground">{categoryLabel[detailItem.category].label} • {detailItem.subCategory}</p>
+                    <p className="font-bold text-foreground">{categoryLabel[detailItem.category]?.label || detailItem.category} • {detailItem.subCategory}</p>
                   </div>
                 </div>
 
@@ -332,7 +343,7 @@ export default function AdminStore() {
                   닫기
                 </button>
                 <button 
-                  onClick={() => handleApprove(detailItem.id, detailItem.name)}
+                  onClick={() => handleApprove(detailItem.id, detailItem.name, detailItem.productId)}
                   className="flex-[2] py-4 rounded-2xl btn-primary-gradient text-white font-bold shadow-lg"
                 >
                   해당 굿즈 승인 처리
