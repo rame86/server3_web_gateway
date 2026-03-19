@@ -4,7 +4,9 @@ import Layout from '@/components/Layout';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, FileUp, X, Paperclip } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost/msa/core/board';
+// 환경 변수에서 게이트웨이 URL을 가져옵니다.
+const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost';
+const API_BASE_URL = `${API_GATEWAY}/msa/core/board`;
 
 export default function UserCommunityUpdate() {
   const [match, params] = useRoute('/user/community/update/:id');
