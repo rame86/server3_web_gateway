@@ -12,6 +12,18 @@ import {
   DialogDescription, DialogFooter 
 } from "@/components/ui/dialog";
 
+// 핵심 주석: 하드코딩 지양을 위한 아티스트 카테고리 상수 분리 (팬덤 플랫폼 맞춤 추천)
+const ARTIST_CATEGORIES = [
+  { value: 'K-POP / 지하돌', label: 'K-POP / 지하돌' },
+  { value: '작가 / 웹툰', label: '작가 / 웹툰' },
+  { value: '작가 / 애니', label: '작가 / 애니' },
+  { value: '작가 / 소설', label: '작가 / 소설' },
+  { value: '힙합 / 랩', label: '힙합 / 랩' },
+  { value: '밴드 / 인디', label: '밴드 / 인디' },
+  { value: '배우 / 연기자', label: '배우 / 연기자' },
+  { value: '크리에이터 / 인플루언서', label: '크리에이터 / 인플루언서' },
+  { value: '기타', label: '기타 (직접 입력)' }
+];
 
 export default function UserProfile() {
   const [, setLocation] = useLocation();
@@ -32,46 +44,66 @@ export default function UserProfile() {
     address: '',
   });
 
-  // 🌟 아티스트 신청용 전용 상태 추가
+  // 🌟 핵심 주석: DB 컬럼 구조에 맞춰 신청 폼 상태값 최신화
   const [upgradeForm, setUpgradeForm] = useState({
-    artistName: '',
-    subCategory: '',
+    artistName: '',   // (stageName -> artistName)
+    subCategory: '', // (category -> subCategory)
     description: '',
-    imageUrl: ''
+    profileImageUrl: '', 
+    communityLink: ''
   });
+
+  // 🌟 핵심 주석: select 박스에서 선택한 값을 추적하기 위한 전용 상태
+  const [selectedCategory, setSelectedCategory] = useState('');
 
   const handleUpgradeChange = (e) => {
     setUpgradeForm({ ...upgradeForm, [e.target.name]: e.target.value });
   };
 
-  // 🌟 아티스트 전환 신청 API 호출 함수
-  const handleUpgradeSubmit = async () => {
-    // 필수값 체크
-    if (!upgradeForm.artistName || !upgradeForm.subCategory || !upgradeForm.description) {
-      toast.error('신청 정보를 모두 입력해 주세요!');
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      toast.loading('아티스트 전환 신청을 접수 중입니다...');
-
-      // 🌟 백엔드 API 호출 (DTO 구조에 맞춤)
-      await coreApi.post('/member/upgrade-artist', {
-        email: localStorage.getItem('userEmail'),
-        ...upgradeForm // artistName, subCategory, description, imageUrl 포함
-      });
-
-      toast.dismiss();
-      toast.success('신청이 완료되었습니다! 관리자 승인 후 메일로 알려드릴게요.');
-      setIsUpgradeModalOpen(false);
-    } catch (error) {
-      toast.dismiss();
-      toast.error('신청 중 오류가 발생했습니다.');
-    } finally {
-      setIsSubmitting(false);
+  const handleCategorySelect = (e) => {
+    const value = e.target.value;
+    setSelectedCategory(value);
+    
+    if (value !== '기타') {
+      setUpgradeForm({ ...upgradeForm, subCategory: value });
+    } else {
+      setUpgradeForm({ ...upgradeForm, subCategory: '' });
     }
   };
+  
+  // 🌟 아티스트 전환 신청 API 호출 함수
+  const handleUpgradeSubmit = async () => {
+  // 1. 유효성 검사 (프론트엔드 상태값 기준)
+  if (!upgradeForm.artistName || !upgradeForm.subCategory || !upgradeForm.description) {
+    toast.error('신청 정보를 모두 입력해 주세요!');
+    return;
+  }
+  try {
+    setIsSubmitting(true);
+    toast.loading('아티스트 전환 신청을 접수 중이야...');
+
+    // 🌟 핵심 주석: 자바 DTO 구조에 맞게 데이터 재구성 (Payload 생성)
+    const payload = {
+      artistName: upgradeForm.artistName,    // 그대로 매핑
+      subCategory: upgradeForm.subCategory,  // 그대로 매핑
+      description: upgradeForm.description,  // 그대로 매핑
+      // 🌟 핵심: profileImageUrl과 communityLink를 구분자(|)로 묶어서 'imageUrl' 하나에 담음
+      imageUrl: `${upgradeForm.profileImageUrl}|${upgradeForm.communityLink}`
+    };
+
+    // 🌟 가공된 payload를 서버로 전송
+    await coreApi.post('/artist/apply', payload);
+
+    toast.dismiss();
+    toast.success('신청 완료! 관리자 승인 후 알려줄게.');
+    setIsUpgradeModalOpen(false);
+  } catch (error) {
+    toast.dismiss();
+    toast.error('신청 중 오류가 발생했어.');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -259,13 +291,29 @@ export default function UserProfile() {
 
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Sub Category</label>
-                <input 
-                  name="subCategory" 
-                  value={upgradeForm.subCategory} 
-                  onChange={handleUpgradeChange}
-                  placeholder="예: ECHO · 발라드 / K-POP"
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none transition-all"
-                />
+                {/* 핵심 주석: 카테고리 선택 셀렉트 박스 */}
+                <select
+                  value={selectedCategory}
+                  onChange={handleCategorySelect}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none transition-all text-gray-700"
+                >
+                  <option value="" disabled>카테고리를 선택해주세요</option>
+                  {ARTIST_CATEGORIES.map(category => (
+                    <option key={category.value} value={category.value}>
+                      {category.label}
+                    </option>
+                  ))}
+                </select>
+                {/* 핵심 주석: '기타' 선택 시에만 렌더링되는 직접 입력 폼 */}
+                {selectedCategory === '기타' && (
+                  <input 
+                    name="subCategory" 
+                    value={upgradeForm.subCategory} 
+                    onChange={handleUpgradeChange}
+                    placeholder="활동 분야를 직접 입력해주세요"
+                    className="w-full px-4 py-3 mt-2 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none transition-all"
+                  />
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -280,16 +328,29 @@ export default function UserProfile() {
                 />
               </div>
 
+             {/* 🌟 핵심 주석: 새로 추가된 커뮤니티 링크 입력창 */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Community Link</label>
+                <input 
+                  name="communityLink" // 상태값의 키와 일치
+                  value={upgradeForm.communityLink} 
+                  onChange={handleUpgradeChange}
+                  placeholder="팬덤 커뮤니티나 공식 SNS 주소"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none"
+                />
+              </div>
+
+              {/* 🌟 프로필 이미지 URL 입력창 */}
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Profile Image URL</label>
                 <div className="relative">
                   <Camera size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input 
-                    name="imageUrl" 
-                    value={upgradeForm.imageUrl} 
+                    name="profileImageUrl" // 상태값의 키와 일치
+                    value={upgradeForm.profileImageUrl} 
                     onChange={handleUpgradeChange}
-                    placeholder="이미지 링크주소를 입력해 주세요"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none transition-all"
+                    placeholder="이미지 링크 주소"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none"
                   />
                 </div>
               </div>
