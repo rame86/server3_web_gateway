@@ -28,7 +28,8 @@ export default function AdminBooking() {
         ...item,
         eventTitle: item.eventTitle || item.title, // 둘 중 있는 걸로 사용
         location: item.location || item.venue,
-        eventStartDate: item.eventStartDate || item.eventDate
+        eventStartDate: item.eventStartDate || item.eventDate,
+        totalCapacity: item.totalCapacity || item.total_capacity || 0
       }));
       // 1. 전체 데이터 중 'EVENT' 카테고리만 먼저 걸러냄
       const eventOnlyData = data.filter(item => item.category === 'EVENT');
@@ -205,7 +206,7 @@ const handleProcessApproval = async (event, isApproved) => {
                             <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-600">
                               <Ticket size={12} />
                               {/* 🌟 가격: price */}
-                              {formatPrice(event.price || 0)}
+                              {/* {formatPrice(event.price || 0)} */}
                             </div>
                           </div>
 
