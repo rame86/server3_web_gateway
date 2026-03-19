@@ -9,8 +9,6 @@ const API_BASE_URL = 'http://localhost/msa/core/board';
 export default function UserCommunityUpdate() {
   const [match, params] = useRoute('/user/community/update/:id');
   const [, setLocation] = useLocation();
-  
-  // 백엔드 DTO 구조에 맞춰 category 추가
   const [form, setForm] = useState({ title: '', content: '', category: '자유' });
   const [loading, setLoading] = useState(true);
 

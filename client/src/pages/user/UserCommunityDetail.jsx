@@ -14,27 +14,30 @@ export default function UserCommunityDetail() {
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // 1. 로그인 유저 정보 가져오기
-  const loginUser = useMemo(() => {
-    try {
-      const userData = localStorage.getItem('user');
-      return userData ? JSON.parse(userData) : null;
-    } catch (e) { return null; }
-  }, []);
+  // UserLogin.jsx에서 개별 키로 저장하는 방식에 맞춰 데이터 로드
+  const [loginInfo] = useState(() => {
+    return {
+      memberId: localStorage.getItem('memberId'),
+      role: localStorage.getItem('role'),
+      userName: localStorage.getItem('userName')
+    };
+  });
 
-  // 2. apiFetch 함수
-  const apiFetch = async (url, method = 'GET', body = null) => {
+  // 공통 Fetch 함수 (토큰 주입 포함)
+  const apiFetch = useCallback(async (url, method = 'GET', body = null) => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
-    return fetch(url, {
+    const options = {
       method,
       headers: { 
         'Content-Type': 'application/json', 
         ...(token && { 'Authorization': `Bearer ${token}` }) 
-      },
-      ...(body && { body: JSON.stringify(body) })
-    });
-  };
+      }
+    };
+    if (body) options.body = JSON.stringify(body);
+    return fetch(url, options);
+  }, []);
 
+  // 게시글 및 댓글 상세 데이터 가져오기
   const fetchData = useCallback(async () => {
     if (!params?.id) return;
     try {
@@ -44,26 +47,35 @@ export default function UserCommunityDetail() {
         apiFetch(`${API_BASE_URL}/${params.id}/comments`)
       ]);
       
-      if (!pRes.ok) throw new Error();
-      
+      if (!pRes.ok) throw new Error("게시글을 찾을 수 없습니다.");
       const postData = await pRes.json();
       const commentData = await cRes.json();
       
       setPost(postData);
       setComments(Array.isArray(commentData) ? commentData : []);
     } catch (err) {
-      toast.error("데이터 로드 실패");
+      toast.error(err.message || "데이터 로드 실패");
       setLocation('/user/community');
     } finally { 
       setLoading(false); 
     }
-  }, [params?.id, setLocation]);
+  }, [params?.id, setLocation, apiFetch]);
 
-  useEffect(() => { 
-    fetchData(); 
-  }, [fetchData]);
+  useEffect(() => {fetchData();}, [fetchData]);
 
-  // 게시글 삭제 핸들러
+  // 권한 체크
+  const isOwner = useMemo(() => {
+    if (!post || !loginInfo.memberId) return false;
+    // BoardDTO는 memberId(Long) 필드를 사용함
+    const myId = String(loginInfo.memberId);
+    const writerId = String(post.memberId || "");
+    const isAdmin = String(loginInfo.role || "").toUpperCase() === 'ADMIN';
+
+    // 작성자 본인이거나 관리자 권한인 경우 true
+    return (myId !== "" && myId === writerId) || isAdmin;
+  }, [loginInfo, post]);
+
+  // 게시글 삭제
   const handleDelete = async () => {
     if (window.confirm("정말 삭제하시겠습니까?")) {
       const res = await apiFetch(`${API_BASE_URL}/${params.id}`, 'DELETE');
@@ -74,7 +86,7 @@ export default function UserCommunityDetail() {
     }
   };
 
-  // 댓글 등록 핸들러
+  // 댓글 등록
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
     const res = await apiFetch(`${API_BASE_URL}/${params.id}/comments`, 'POST', { content: newComment });
@@ -84,35 +96,26 @@ export default function UserCommunityDetail() {
     }
   };
 
-  // --- 추가된 신고 핸들러 ---
+  // 게시글 신고
   const handleReport = async () => {
     const reason = window.prompt("신고 사유를 입력해주세요 (최소 2자 이상)");
-    
-    if (!reason || !reason.trim()) return;
-    if (reason.trim().length < 2) {
-      toast.error("사유를 좀 더 상세히 입력해주세요.");
+    if (!reason || reason.trim().length < 2) {
+      if (reason) toast.error("사유를 좀 더 상세히 입력해주세요.");
       return;
     }
 
     try {
       const res = await apiFetch(`${API_BASE_URL}/${params.id}/report`, 'POST', { reason });
-      
       if (res.ok) {
         toast.success("신고가 정상적으로 접수되었습니다.");
       } else {
         const errorMsg = await res.text();
-        // 백엔드에서 보낸 "ALREADY_REPORTED" 등의 메시지 처리
-        toast.error(errorMsg === "ALREADY_REPORTED" ? "이미 신고한 게시글입니다." : errorMsg || "신고 처리에 실패했습니다.");
+        toast.error(errorMsg === "ALREADY_REPORTED" ? "이미 신고한 게시글입니다." : "신고 실패");
       }
     } catch (err) {
       toast.error("서버와 통신 중 오류가 발생했습니다.");
     }
   };
-
-  // 권한 체크
-  const myId = Number(loginUser?.memberId || loginUser?.id || 0);
-  const writerId = Number(post?.memberId || post?.member_id || 0);
-  const isOwner = (myId !== 0 && myId === writerId) || loginUser?.role === 'ADMIN';
 
   if (loading || !post) {
     return <Layout role="user"><div className="p-20 text-center text-rose-500 font-bold">불러오는 중...</div></Layout>;
@@ -122,63 +125,64 @@ export default function UserCommunityDetail() {
     <Layout role="user">
       <div className="max-w-3xl mx-auto p-4 space-y-6">
         <div className="flex justify-between items-center">
-          <button onClick={() => setLocation('/user/community')} className="flex items-center gap-1 text-sm text-gray-400 font-bold hover:text-rose-500 transition-colors">
+          <button onClick={() => setLocation('/user/community')} className="flex items-center gap-1.5 text-sm text-gray-400 font-bold hover:text-rose-500 transition-colors">
             <ArrowLeft size={16}/> 목록으로 돌아가기
           </button>
           
           <div className="flex gap-2">
-            {/* --- 신고 버튼 추가 (작성자가 아닐 때만 표시) --- */}
-            {!isOwner && (
-              <button 
-                onClick={handleReport}
-                className="p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all flex items-center gap-1"
-                title="게시글 신고"
-              >
-                <AlertCircle size={20} />
-                <span className="text-xs font-bold">신고</span>
-              </button>
-            )}
-
             {isOwner && (
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <button 
-                  onClick={() => setLocation(`/user/community/update/${post.boardId || post.board_id}`)} 
-                  className="p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                  onClick={() => setLocation(`/user/community/update/${post.boardId}`)} 
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-gray-500 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all font-bold"
                 >
-                  <Edit size={20} />
+                  <Edit size={16} />
+                  <span className="text-sm">수정</span>
                 </button>
                 <button 
                   onClick={handleDelete} 
-                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all font-bold"
                 >
-                  <Trash2 size={20} />
+                  <Trash2 size={16} />
+                  <span className="text-sm">삭제</span>
                 </button>
               </div>
+            )}
+            {!isOwner && (
+              <button className="flex items-center gap-1.5 px-3 py-1.5 text-gray-400 hover:text-rose-500 font-bold">
+                <AlertCircle size={18} />
+                <span className="text-xs">신고</span>
+              </button>
             )}
           </div>
         </div>
 
         <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-rose-50">
-          <div className="flex justify-between items-start mb-4">
+          <div className="flex justify-between items-start mb-6">
             <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-500 text-xs font-black">
               {post.category || '일반'}
             </span>
+            <div className="text-right">
+              <p className="text-sm font-black text-gray-900">{post.authorName || '익명 사용자'}</p>
+              <p className="text-[10px] text-gray-400 font-bold">{post.createdAt?.split('T')[0]}</p>
+            </div>
           </div>
           
-          <h1 className="text-2xl font-black mb-6 text-gray-900">{post.title}</h1>
-          <div className="prose max-w-none text-gray-700 leading-relaxed mb-8 min-h-[150px] whitespace-pre-wrap">
+          <h1 className="text-2xl font-black mb-6 text-gray-900 leading-tight">{post.title}</h1>
+          <div className="prose max-w-none text-gray-700 leading-relaxed mb-10 min-h-[150px] whitespace-pre-wrap font-medium">
             {post.content}
           </div>
 
-          {(post.storedFilePath || post.stored_file_path) && (
+          {/* 첨부파일 노출 영역 */}
+          {post.storedFilePath && (
             <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3 text-sm font-bold text-gray-600">
                 <Paperclip size={16} className="text-rose-500" />
-                <span className="truncate max-w-[200px]">{post.originalFileName || post.original_file_name || '첨부파일'}</span>
+                <span className="truncate max-w-[200px]">{post.originalFileName || '첨부파일'}</span>
               </div>
               <button 
                 onClick={() => {
-                  const path = post.storedFilePath || post.stored_file_path;
+                  const path = post.storedFilePath;
                   const fileId = path.split(/[\\/]/).pop();
                   window.location.href = `${API_BASE_URL}/files/download/${fileId}`;
                 }}
@@ -190,20 +194,22 @@ export default function UserCommunityDetail() {
           )}
 
           <div className="flex gap-6 pt-6 border-t border-rose-50 text-gray-400 text-xs font-bold">
-            <button onClick={async () => (await apiFetch(`${API_BASE_URL}/${params.id}/like`, 'POST')).ok && fetchData()} className="flex items-center gap-1 hover:text-rose-500 transition-colors">
-              <Heart size={18} fill={Number(post.likeCount || post.like_count) > 0 ? "#f43f5e" : "none"} className={Number(post.likeCount || post.like_count) > 0 ? "text-rose-500" : ""}/> {post.likeCount || post.like_count || 0}
+            <button onClick={async () => (await apiFetch(`${API_BASE_URL}/${params.id}/like`, 'POST')).ok && fetchData()} className="flex items-center gap-1.5 hover:text-rose-500 transition-colors">
+              <Heart size={18} fill={post.likeCount > 0 ? "#f43f5e" : "none"} className={post.likeCount > 0 ? "text-rose-500" : ""}/> 
+              <span>좋아요 {post.likeCount || 0}</span>
             </button>
-            <span className="flex items-center gap-1"><MessageCircle size={18}/> {comments.length}</span>
-            <span className="flex items-center gap-1"><Eye size={18}/> {post.viewCount || post.view_count || 0}</span>
+            <span className="flex items-center gap-1.5"><MessageCircle size={18}/> 댓글 {comments.length}</span>
+            <span className="flex items-center gap-1.5"><Eye size={18}/> 조회수 {post.viewCount || 0}</span>
           </div>
         </div>
 
+        {/* 댓글 영역 */}
         <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-rose-50">
           <div className="relative mb-6">
             <textarea 
               value={newComment} 
               onChange={(e) => setNewComment(e.target.value)} 
-              className="w-full bg-gray-50 rounded-xl p-4 pr-12 h-24 resize-none border-none text-sm focus:ring-2 focus:ring-rose-100 transition-all" 
+              className="w-full bg-gray-50 rounded-xl p-4 pr-12 h-24 resize-none border-none text-sm focus:ring-2 focus:ring-rose-100 transition-all font-medium" 
               placeholder="따뜻한 댓글을 남겨주세요." 
             />
             <button onClick={handleAddComment} className="absolute bottom-3 right-3 bg-rose-500 text-white p-2 rounded-lg hover:bg-rose-600 transition-colors">
@@ -211,11 +217,14 @@ export default function UserCommunityDetail() {
             </button>
           </div>
           
-          <div className="space-y-3">
+          <div className="space-y-4">
             {comments.map((c, index) => (
-              <div key={c.commentId || c.comment_id || `comment-${index}`} className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-[10px] font-black text-rose-400 mb-1">User_{c.memberId || c.member_id}</p>
-                <p className="text-sm text-gray-700">{c.content}</p>
+              <div key={c.commentId || `comment-${index}`} className="p-4 bg-gray-50 rounded-xl">
+                <div className="flex justify-between items-center mb-1">
+                  <p className="text-[11px] font-black text-rose-400">{c.authorName || `User_${c.memberId}`}</p>
+                  <p className="text-[10px] text-gray-300 font-bold">{c.createdAt?.split('T')[0]}</p>
+                </div>
+                <p className="text-sm text-gray-700 font-medium">{c.content}</p>
               </div>
             ))}
           </div>
