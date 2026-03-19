@@ -299,20 +299,51 @@ export default function UserBookingProcess() {
                     <div className="space-y-6 text-center animate-in zoom-in-95 duration-500">
                         <CheckCircle2 size={40} className="mx-auto text-green-500 mb-4" />
                         <h2 className="text-2xl font-bold">예약 완료!</h2>
+                        
                         <div className="glass-card p-4 rounded-2xl text-left inline-block w-full max-w-sm bg-white">
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between"><span>공연명</span><span className="font-semibold">{event.title}</span></div>
+                            <div className="space-y-3 text-sm">
+                                {/* 🌟 추가된 티켓(예매) 번호 영역 */}
+                                {reservationResult?.ticket_code && (
+                                    <div className="flex justify-between pb-3 border-b border-rose-50">
+                                        <span className="text-muted-foreground">예매 번호</span>
+                                        <span className="font-bold tracking-wider text-rose-600">
+                                            {reservationResult.ticket_code}
+                                        </span>
+                                    </div>
+                                )}
+                                
+                                <div className="flex justify-between pt-1">
+                                    <span className="text-muted-foreground">공연명</span>
+                                    <span className="font-semibold">{event.title}</span>
+                                </div>
+                                
                                 <div className="flex justify-between">
-                                    <span>장소</span>
+                                    <span className="text-muted-foreground">장소</span>
                                     <div className="text-right">
                                         <span className="font-semibold block">{event.venue}</span>
-                                        <button onClick={() => setIsMapOpen(true)} className="text-xs text-rose-500 font-medium hover:underline">장소 보기</button>
+                                        <button onClick={() => setIsMapOpen(true)} className="text-xs text-rose-500 font-medium hover:underline">
+                                            장소 보기
+                                        </button>
                                     </div>
                                 </div>
+                                
                                 {isSeatSelectionMode && (
-                                    <div className="flex justify-between"><span>좌석</span><span className="font-semibold text-rose-600">{selectedSeats.join(', ')}</span></div>
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">좌석</span>
+                                        <span className="font-semibold text-rose-600">{selectedSeats.join(', ')}</span>
+                                    </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* 🌟 추가: 예약 완료 후 다음 행동 유도 버튼 */}
+                        <div className="pt-4">
+                            <button 
+                                onClick={() => setLocation('/user/events?tab=my-bookings')} 
+                                className="px-6 py-3 bg-rose-50 text-rose-600 font-bold rounded-xl hover:bg-rose-100 transition-colors shadow-sm"
+                            >
+                                내 예매 내역 확인하기
+                            </button>
                         </div>
                     </div>
                 )}
