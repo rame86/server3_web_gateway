@@ -9,7 +9,8 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # 의존성 설치 (client 폴더 내부 기준)
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+COPY patches/ ./patches/
+RUN pnpm install --no-frozen-lockfile
 
 # 소스 전체 복사 후 Vite 빌드
 COPY . .
