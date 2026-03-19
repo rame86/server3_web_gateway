@@ -17,6 +17,7 @@ function PostCard({ post, onDetail }) {
   // [수정] 서버에서 전달받은 authorName을 사용하고, 없을 때만 기본값 표시
   const authorName = post.authorName || `사용자${post.memberId}`;
 
+
   return (
     <div
       className="glass-card rounded-2xl p-4 soft-shadow hover:bg-rose-50/30 transition-all cursor-pointer group mb-3 border border-rose-50/50"
