@@ -26,7 +26,7 @@ export default function UserDashboard() {
       try {
         // [핵심] 환경변수에서 API Gateway 공통 주소 가져오기 (하드코딩 방지)
         const gatewayUrl = import.meta.env.VITE_API_GATEWAY_URL || '';
-        const apiUrl = `${gatewayUrl}/msa/res/dashboard/dashboard-queue`;
+        const apiUrl = `${gatewayUrl}/msa/core/dashboard/dashboard-queue`;
 
         const response = await fetch(apiUrl, {
           method: 'POST',

@@ -46,7 +46,11 @@ export default function AdminUsers() {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      const response = await coreApi.get(`/admin/user?page=${page}&size=10`);
+      const response = await coreApi.get(`/admin/user?page=${page}&size=10`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
       const { summary, userList } = response.data;
       
       setCounts(summary);
