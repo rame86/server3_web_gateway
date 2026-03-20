@@ -30,23 +30,16 @@ import { toast } from 'sonner';
 // Vite 환경변수: 개발 시 .env.development, 배포 시 .env.production 자동 적용
 // .env.development → VITE_API_GATEWAY_URL=http://localhost
 // .env.production  → VITE_API_GATEWAY_URL=https://your-gateway.com
+// ─────────────────────────────────────────────
+// API 유틸 (토큰 제거 버전)
+// ─────────────────────────────────────────────
 const API_BASE = import.meta.env.VITE_API_GATEWAY_URL ?? '';
 
 async function apiFetch(path, options = {}) {
-  // ── 인증 헤더 구성 ────────────────────────────────────────────────────
-  // JWT 방식: localStorage 또는 sessionStorage에서 토큰을 꺼내 Authorization 헤더 전송
-  // 쿠키 세션 방식: 아래 authHeader 분기 없애고 credentials: 'include'만 남겨도 됨
-  const token =
-    typeof window !== 'undefined'
-      ? (localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken'))
-      : null;
-  const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
-
   const res = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',          // 쿠키 방식 병행 지원
+    credentials: 'include', // 세션 쿠키 방식 사용 시 유지
     headers: {
       'Content-Type': 'application/json',
-      ...authHeader,                 // JWT 있으면 추가
       ...options.headers,
     },
     ...options,
@@ -56,6 +49,7 @@ async function apiFetch(path, options = {}) {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(text || `HTTP ${res.status}`);
   }
+  
   // 204 No Content 등 body 없는 경우 처리
   const contentType = res.headers.get('content-type') || '';
   return contentType.includes('application/json') ? res.json() : res.text();
