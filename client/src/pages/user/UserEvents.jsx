@@ -114,44 +114,27 @@ export default function UserEvents() {
               : (e.image ? e.image : 'https://placehold.co/600x400?text=No+Image'))
     });
 
+// UserEvents.jsx 내 fetchEvents 함수 수정
 const fetchEvents = async () => {
   try {
     setLoading(true);
-    
-    // 1. 로컬 스토리지에서 토큰과 유저 정보 가져오기
     const token = localStorage.getItem('token');
-    const memberId = localStorage.getItem('memberId'); // 혹은 로그인 시 저장한 artistId
 
-    // 2. API 호출 (조건부 헤더 및 파라미터 추가)
-    // 로그에 찍힌 것처럼 특정 아티스트의 이벤트만 가져와야 한다면 params에 추가
+    // 🚨 params에서 artistId를 제거하여 전체 CONFIRMED 목록을 요청합니다.
     const { data } = await resApi.get('/events', {
-        params: { artistId: memberId }, // 👈 에러 로그의 artistId=10 처럼 동적으로 세팅
         headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
 
-    // 3. 데이터 가공 (백엔드 응답 구조에 맞춰 유연하게 처리)
     const rawEvents = data.events || data;
     const eventsArray = Array.isArray(rawEvents) ? rawEvents : [];
-    
-    // mapBackendEvent 함수가 정의되어 있는지 확인 필수!
     setEvents(eventsArray.map(mapBackendEvent));
-
   } catch (error) {
-    // 401 에러가 나면 콘솔에 더 자세히 찍히도록 함
     console.error('❌ Fetch events error:', error.response?.status, error.message);
-    
-    if (error.response?.status === 401) {
-        toast.error('인증이 만료되었습니다. 다시 로그인해주세요.');
-        // 필요하다면 여기서 로그아웃 처리나 로그인 페이지 이동 로직 추가
-    } else {
-        toast.error('이벤트 목록을 가져오는데 실패했습니다.');
-    }
-    
-    setEvents([]);
   } finally {
     setLoading(false);
   }
 };
+
 
  // UserEvents.jsx 내부의 fetchBookings 함수만 이 내용으로 교체!
     const fetchBookings = async () => {
