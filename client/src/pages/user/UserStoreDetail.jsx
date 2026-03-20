@@ -150,7 +150,7 @@ export default function UserStoreDetail() {
                                     </button>
                                 </div>
                             </div>
-                            
+
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
                                     <Truck size={18} />
@@ -200,7 +200,7 @@ export default function UserStoreDetail() {
                             >
                                 <ShoppingCart size={24} className="text-rose-500" />
                             </button>
-                            
+
                             <button
                                 onClick={() => setLocation(`/user/store/purchase/${item.id}?qty=${quantity}`)}
                                 className="flex-1 rounded-2xl btn-primary-gradient text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"

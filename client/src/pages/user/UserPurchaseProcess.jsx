@@ -42,7 +42,7 @@ export default function UserPurchaseProcess() {
                     name: data.title,
                     artistId: data.sellerId,
                     artistName: data.sellerType === 'ARTIST' ? '아티스트' : '유저',
-                    price: data.price,
+                    price: data.basePrice,
                     image: data.imageUrl,
                     stock: 100, // Placeholder
                 };
