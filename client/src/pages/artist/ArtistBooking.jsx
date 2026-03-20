@@ -37,7 +37,8 @@ export default function ArtistBooking() {
   const [stats, setStats] = useState({ totalReservations: 0 });
 
   // 🌟 백엔드 응답 객체 구조에 맞게 수정된 버전
-  const fetchMyEvents = async () => {
+  // ArtistBooking.jsx 내 fetchMyEvents 함수 수정
+const fetchMyEvents = async () => {
     try {
         setLoading(true);
         const memberId = localStorage.getItem('memberId');
@@ -47,28 +48,18 @@ export default function ArtistBooking() {
             return;
         }
 
-        // 1. 서버에서 해당 아티스트의 이벤트를 가져옴
-        const response = await resApi.get(`/events?artistId=${memberId}`);
+        // 🚨 호출 주소를 /events에서 /events/my로 변경합니다.
+        const response = await resApi.get(`/events/my?artistId=${memberId}`);
         const data = response.data;
 
-        // 2. 데이터 구조에 따라 rawEvents 추출
         let rawEvents = Array.isArray(data) ? data : (data.events || []);
-        
-        // 3. 🚨 [수정 핵심] 불필요한 필터링 제거
-        // 콘솔 로그를 보면 이미 해당 아티스트의 데이터들만 들어있어.
-        // 데이터에 'artist_id' 필드가 없어서 필터링을 돌리면 결과가 0이 됨.
-        // 그냥 서버에서 받은 데이터를 그대로 넣어주면 돼.
         setMyEvents(rawEvents);
 
-        // 4. 통계 데이터 설정
         const totalResCount = Array.isArray(data) 
           ? data.reduce((acc, curr) => acc + (curr.reservationsCount || curr._count?.reservations || 0), 0)
           : (data.totalReservations || 0);
 
-        setStats({
-            totalReservations: totalResCount
-        });
-
+        setStats({ totalReservations: totalResCount });
     } catch (error) {
         console.error("❌ 데이터 로드 실패:", error);
         toast.error("이벤트 목록을 불러오지 못했습니다.");
@@ -76,6 +67,7 @@ export default function ArtistBooking() {
         setLoading(false);
     }
 };
+
   // 🌟 추가: 컴포넌트 마운트 시 데이터 불러오기
   useEffect(() => {
     fetchMyEvents();
