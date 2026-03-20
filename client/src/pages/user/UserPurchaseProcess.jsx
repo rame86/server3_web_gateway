@@ -35,7 +35,7 @@ export default function UserPurchaseProcess() {
         const fetchProduct = async () => {
             try {
                 setLoading(true);
-                const response = await shopApi.get(`shop/${productId}`);
+                const response = await shopApi.get(`shop/detail/${productId}`);
                 const data = response.data;
                 const mappedItem = {
                     id: data.productId,
