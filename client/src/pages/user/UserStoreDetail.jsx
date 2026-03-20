@@ -28,7 +28,7 @@ export default function UserStoreDetail() {
                     name: data.title,
                     artistId: data.sellerId,
                     artistName: data.sellerType === 'ARTIST' ? '아티스트' : '유저',
-                    price: data.price,
+                    price: data.basePrice,
                     description: data.description,
                     image: data.imageUrl,
                     category: data.category === 'OFFICIAL' ? 'official' :
