@@ -67,7 +67,9 @@ export default function AdminUsers() {
   const handleViewDetail = async (memberId) => {
     try {
       toast.loading('상세 정보를 불러오는 중...');
-      const response = await coreApi.get(`/admin/user/${memberId}`);
+      const response = await coreApi.get(`/admin/user`, {
+        params: { page, size: 10 }
+      });
       setSelectedUser(response.data); 
       toast.dismiss();
     } catch (error) {
