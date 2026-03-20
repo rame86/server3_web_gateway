@@ -269,8 +269,14 @@ export default function UserBookingProcess() {
 
                          <button
                             onClick={async () => {
-                                toast.loading('결제 중...');
-                                const memberId = localStorage.getItem('memberId') || '1';
+                                const memberId = localStorage.getItem('memberId');
+                                if (!memberId) {
+                                    toast.error('로그인이 필요한 서비스야.');
+                                    return;
+                                }
+
+                                toast.loading('예약 요청 중...', { id: 'pay-toast' });
+                                
                                 try {
                                     const { data } = await resApi.post('/reserve', { 
                                         event_id: event.id, 
@@ -278,12 +284,50 @@ export default function UserBookingProcess() {
                                         member_id: memberId,
                                         selected_seats: isSeatSelectionMode ? selectedSeats : null
                                     });
-                                    toast.dismiss();
-                                    setReservationResult({ ticket_code: data.ticket_id || data.ticketCode });
-                                    handleNext();
+                                    
+                                    const currentTicketCode = data.ticket_id || data.ticketCode;
+                                    setReservationResult({ ticket_code: currentTicketCode });
+                                    
+                                    // [폴링 시작] 응답(202)을 받으면 바로 넘어가지 않고 2초 간격으로 상태를 찔러봄
+                                    toast.loading('결제 확인 중... 잠시만 기다려줘.', { id: 'pay-toast' });
+                                    
+                                    let attempts = 0;
+                                    const maxAttempts = 10; // 무한 루프 방지 (최대 20초 대기)
+                                    
+                                    const checkStatus = async () => {
+                                        if (attempts >= maxAttempts) {
+                                            toast.dismiss('pay-toast');
+                                            toast.error('결제 확인이 지연되고 있어. 나중에 예매 내역을 확인해줘.');
+                                            return;
+                                        }
+                                        attempts++;
+                                        
+                                        try {
+                                            // 백엔드 상태 조회 API 호출 (URL은 백엔드 라우터 설정에 맞춰 수정 필요)
+                                            const statusRes = await resApi.get(`/reservations/status/${currentTicketCode}`);
+                                            const { status } = statusRes.data;
+                                            
+                                            if (status === 'CONFIRMED') {
+                                                toast.success('결제 완료!', { id: 'pay-toast' });
+                                                // 🌟 결제가 확정된 이 시점에만 Step 4로 넘김
+                                                handleNext(); 
+                                            } else if (status === 'FAILED') {
+                                                toast.error('결제 실패. 포인트를 확인해줘.', { id: 'pay-toast' });
+                                            } else {
+                                                // PENDING 상태면 2초 뒤 재귀 호출로 다시 확인
+                                                setTimeout(checkStatus, 2000); 
+                                            }
+                                        } catch (err) {
+                                            // 상태 조회 실패 시에도 다음 턴에 다시 시도
+                                            setTimeout(checkStatus, 2000);
+                                        }
+                                    };
+                                    
+                                    checkStatus(); // 폴링 최초 실행
+
                                 } catch (error) {
-                                    toast.dismiss();
-                                    toast.error('결제에 실패했어.');
+                                    toast.dismiss('pay-toast');
+                                    toast.error('결제 요청에 실패했어.');
                                 }
                             }}
                             disabled={!isEnoughPoints}
