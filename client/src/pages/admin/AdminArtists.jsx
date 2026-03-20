@@ -40,6 +40,8 @@ async function apiFetch(path, options = {}) {
     credentials: 'include', // 세션 쿠키 방식 사용 시 유지
     headers: {
       'Content-Type': 'application/json',
+      // 🌟 루아가 '검증'을 시작할 수 있게 '재료'를 넘겨주는 유일한 통로!
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...options.headers,
     },
     ...options,
