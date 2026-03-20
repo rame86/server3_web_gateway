@@ -8,6 +8,9 @@ import { coreApi } from '@/lib/api';
 // 스타일 파일 임포트
 import { styles, typeConfig } from './UserCommunityStyles';
 
+// 환경 변수에서 게이트웨이 URL을 가져옵니다. (기본값 설정)
+const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL;
+
 // 1. PostCard 컴포넌트
 function PostCard({ post, onDetail }) {
   const [liked, setLiked] = useState(false);
@@ -96,7 +99,8 @@ export default function UserCommunity() {
       setLoading(true);
       const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
       const categoryParam = category === 'all' ? '' : category;
-      const url = `http://localhost/msa/core/board/list?category=${encodeURIComponent(categoryParam)}`;
+      // 주소를 환경 변수 기반으로 변경
+      const url = `${API_BASE_URL}/msa/core/board/list?category=${encodeURIComponent(categoryParam)}`;
 
       const response = await fetch(url, {
         method: 'GET',
