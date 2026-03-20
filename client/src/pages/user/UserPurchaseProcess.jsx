@@ -35,15 +35,17 @@ export default function UserPurchaseProcess() {
         const fetchProduct = async () => {
             try {
                 setLoading(true);
-                const response = await shopApi.get(`shop/${productId}`);
-                const data = response.data;
+                const response = await shopApi.get(`shop/detail/${productId}`);
+                let data = response.data;
+                if (data && data.data) data = data.data; // Handle potential API wrappers
+                
                 const mappedItem = {
-                    id: data.productId,
-                    name: data.title,
+                    id: data.productId || data.id,
+                    name: data.title || data.name || '알 수 없는 상품',
                     artistId: data.sellerId,
-                    artistName: data.sellerType === 'ARTIST' ? '아티스트' : '유저',
-                    price: data.price,
-                    image: data.imageUrl,
+                    artistName: data.sellerType === 'ARTIST' ? '아티스트' : (data.artistName || '유저'),
+                    price: data.basePrice || data.price || 0,
+                    image: data.imageUrl || '',
                     stock: 100, // Placeholder
                 };
                 setItem(mappedItem);
