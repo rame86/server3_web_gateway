@@ -114,21 +114,32 @@ export default function UserEvents() {
               : (e.image ? e.image : 'https://placehold.co/600x400?text=No+Image'))
     });
 
-    const fetchEvents = async () => {
-      try {
-        setLoading(true);
-        const { data } = await resApi.get('/events');
-        const rawEvents = data.events || data;
-        const eventsArray = Array.isArray(rawEvents) ? rawEvents : [];
-        setEvents(eventsArray.map(mapBackendEvent));
-      } catch (error) {
-        toast.error('이벤트 목록을 가져오는데 실패했습니다.');
-        setEvents([]);
-        console.error('Fetch events error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+const fetchEvents = async () => {
+  try {
+    setLoading(true); // 로딩 시작을 맨 위로!
+    
+    // 1. 토큰 가져오기
+    const token = localStorage.getItem('token');
+    
+    // 2. API 호출 (딱 한 번만, 토큰을 담아서!)
+    const { data } = await resApi.get('/events', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+
+    // 3. 데이터 가공
+    const rawEvents = data.events || data;
+    const eventsArray = Array.isArray(rawEvents) ? rawEvents : [];
+    
+    setEvents(eventsArray.map(mapBackendEvent));
+
+  } catch (error) {
+    toast.error('이벤트 목록을 가져오는데 실패했습니다.');
+    setEvents([]);
+    console.error('Fetch events error:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
  // UserEvents.jsx 내부의 fetchBookings 함수만 이 내용으로 교체!
     const fetchBookings = async () => {
