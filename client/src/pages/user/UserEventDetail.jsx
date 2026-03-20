@@ -26,9 +26,16 @@ export default function UserEventDetail() {
         const fetchEventDetail = async () => {
             try {
                 setLoading(true);
-                const { data } = await resApi.get(`/events/${eventId}`);
+                
+                // 🌟 수정: memberId를 함께 보내서 찜 여부를 확인하게 함
+                const memberId = localStorage.getItem('memberId');
+                const { data } = await resApi.get(`/events/${eventId}?memberId=${memberId || ''}`);
+
                 const e = data.event || data;
                 
+                // 🌟 추가: 백엔드에서 준 isWishlisted 값을 상태에 저장
+                setWishlisted(data.isWishlisted || false);
+
                 // Map backend snake_case to frontend camelCase
                 setEvent({
                     id: e.event_id,
@@ -57,6 +64,22 @@ export default function UserEventDetail() {
             fetchEventDetail();
         }
     }, [eventId]);
+
+    const handleWishlistToggle = async () => {
+        const memberId = localStorage.getItem('memberId');
+        if (!memberId) return toast.error('로그인이 필요해!');
+
+        try {
+            const { data } = await resApi.post('/wishlist/toggle', {
+                member_id: memberId,
+                event_id: eventId
+            });
+            setWishlisted(data.isWishlisted);
+            toast.success(data.message);
+        } catch (error) {
+            toast.error('위시리스트 처리에 실패했어.');
+        }
+    };
 
     const handleMapReady = async (map) => {
         try {
@@ -136,13 +159,16 @@ export default function UserEventDetail() {
                         </div>
                         <div className="flex gap-2">
                             <button
-                                onClick={() => {
-                                    setWishlisted(!wishlisted);
-                                    toast.success(wishlisted ? '위시리스트에서 뺐습니다' : '위시리스트에 담았습니다');
-                                }}
+                                // 🌟 기존 onClick 로직을 지우고 방금 만든 함수로 교체!
+                                onClick={handleWishlistToggle} 
                                 className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/30 transition-colors"
                             >
-                                <Heart size={18} className={wishlisted ? "text-rose-400" : "text-white"} fill={wishlisted ? "currentColor" : "none"} />
+                                {/* wishlisted 상태값에 따라 하트 색깔이 변하는 로직은 그대로 유지 */}
+                                <Heart 
+                                    size={18} 
+                                    className={wishlisted ? "text-rose-400" : "text-white"} 
+                                    fill={wishlisted ? "currentColor" : "none"} 
+                                />
                             </button>
                             <button onClick={() => toast.info('링크가 복사되었습니다')} className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/30 transition-colors">
                                 <Share2 size={18} className="text-white" />
