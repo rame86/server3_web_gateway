@@ -117,7 +117,7 @@ export default function UserStore() {
           name: item.title,
           artistId: item.sellerId,
           artistName: item.sellerType === 'ARTIST' ? '아티스트' : '유저', // Generic name if specific name not in DTO
-          price: item.price,
+          price: item.basePrice,
           image: item.imageUrl,
           category: item.category === 'OFFICIAL' ? 'official' :
             item.category === 'UNOFFICIAL' ? 'unofficial' : 'used',

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Package, Plus, Search, Filter, Clock, Check, X, MoreVertical, Image as ImageIcon, Tag, DollarSign, Archive } from 'lucide-react';
 import { goodsItems, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
+import { shopApi } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,12 +34,31 @@ export default function ArtistStore() {
     return matchesSearch && (item.category === activeTab || item.category === categoryMap[activeTab]);
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // FormData mapping to DB Schema:
-    // title, product_category, price, description, image_url, seller_id, seller_type
-    toast.success('굿즈 등록 요청이 완료되었습니다. 관리자 승인 후 게시됩니다.');
-    setIsAdding(false);
+    
+    const title = e.target.title.value;
+    const category = e.target.category.value;
+    const price = e.target.price.value;
+    const description = e.target.description.value;
+    
+    try {
+      const endpoint = category === 'OFFICIAL' || category === 'ALBUM' ? '/product/official' : '/product/unofficial';
+      
+      await shopApi.post(endpoint, {
+        goodsName: title,
+        price: parseFloat(price),
+        description: description,
+        goodsType: category,
+        requesterName: '아티스트' // placeholder
+      });
+
+      toast.success('굿즈 등록 요청이 완료되었습니다. 관리자 승인 후 게시됩니다.');
+      setIsAdding(false);
+    } catch (error) {
+      console.error(error);
+      toast.error('등록 요청에 실패했습니다.');
+    }
   };
 
   return (

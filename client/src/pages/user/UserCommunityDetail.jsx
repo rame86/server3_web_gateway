@@ -4,7 +4,7 @@ import Layout from '@/components/Layout';
 import { ArrowLeft, Send, Heart, MessageCircle, Eye, AlertCircle, Trash2, Edit, Paperclip, Download, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
-// 환경 변수에서 게이트웨이 URL을 가져옵니다. (기본값 설정)
+// 환경 변수에서 게이트웨이 URL을 가져옵니다.
 const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL;
 const API_BASE_URL = `${API_GATEWAY}/msa/core/board`;
 
@@ -21,13 +21,11 @@ export default function UserCommunityDetail() {
   const [editContent, setEditContent] = useState("");
   
   // 로그인 정보 로드
-  const [loginInfo] = useState(() => {
-    return {
-      memberId: localStorage.getItem('memberId'),
-      role: localStorage.getItem('role'),
-      userName: localStorage.getItem('userName')
-    };
-  });
+  const [loginInfo] = useState(() => ({
+    memberId: localStorage.getItem('memberId'),
+    role: localStorage.getItem('role'),
+    userName: localStorage.getItem('userName')
+  }));
 
   // 공통 Fetch 함수
   const apiFetch = useCallback(async (url, method = 'GET', body = null) => {
@@ -43,7 +41,7 @@ export default function UserCommunityDetail() {
     return fetch(url, options);
   }, []);
 
-  // 데이터 로드
+  // 데이터 로드 (게시글 + 댓글)
   const fetchData = useCallback(async () => {
     if (!params?.id) return;
     try {
@@ -67,90 +65,55 @@ export default function UserCommunityDetail() {
     }
   }, [params?.id, setLocation, apiFetch]);
 
-  useEffect(() => {fetchData();}, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 게시글 작성자 권한 체크
-  const isOwner = useMemo(() => {
+  // 권한 체크
+  const isPostOwner = useMemo(() => {
     if (!post || !loginInfo.memberId) return false;
-    const myId = String(loginInfo.memberId);
-    const writerId = String(post.memberId || "");
-    const isAdmin = String(loginInfo.role || "").toUpperCase() === 'ADMIN';
-    return (myId !== "" && myId === writerId) || isAdmin;
+    return String(loginInfo.memberId) === String(post.memberId) || loginInfo.role === 'ADMIN';
   }, [loginInfo, post]);
 
-  // 게시글 삭제
+  // --- [액션 함수들] ---
+
   const handleDelete = async () => {
     if (window.confirm("정말 삭제하시겠습니까?")) {
       const res = await apiFetch(`${API_BASE_URL}/${params.id}`, 'DELETE');
-      if (res.ok) {
-        toast.success("삭제되었습니다.");
-        setLocation('/user/community');
-      }
+      if (res.ok) { toast.success("삭제되었습니다."); setLocation('/user/community'); }
     }
   };
 
-  // 댓글 등록
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
     const res = await apiFetch(`${API_BASE_URL}/${params.id}/comments`, 'POST', { content: newComment });
-    if (res.ok) {
-      setNewComment(""); 
-      fetchData();
-    }
+    if (res.ok) { setNewComment(""); fetchData(); }
   };
 
-  // 댓글 삭제 (오타 수정: ${API_BASE_URL})
   const handleDeleteComment = async (commentId) => {
     if(!window.confirm("댓글을 삭제하시겠습니까?")) return;
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/comments/${commentId}`, 'DELETE');
-      if (res.ok){
-        toast.success("댓글이 삭제되었습니다.");
-        fetchData();
-      } else {
-        toast.error("삭제 권한이 없거나 오류 발생");
-      }
-    } catch (err) {
-      toast.error("서버 통신 오류");
-    }
+    const res = await apiFetch(`${API_BASE_URL}/comments/${commentId}`, 'DELETE');
+    if (res.ok) { toast.success("삭제되었습니다."); fetchData(); }
   };
 
-  // 댓글 수정
   const handleUpdateComment = async (commentId) => {
     if(!editContent.trim()) return;
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/comments/${commentId}`, 'PUT', { content: editContent });
-      if(res.ok){
-        toast.success("댓글이 수정되었습니다.");
-        setEditingCommentId(null);
-        setEditContent("");
-        fetchData();
-      } else {
-        toast.error("수정 권한이 없습니다.");
-      }
-    } catch(err) {
-      toast.error("수정 실패");
-    }
+    const res = await apiFetch(`${API_BASE_URL}/comments/${commentId}`, 'PUT', { content: editContent });
+    if(res.ok) { setEditingCommentId(null); fetchData(); }
   };
 
   // 게시글 신고
   const handleReport = async () => {
-    const reason = window.prompt("신고 사유를 입력해주세요 (최소 2자 이상)");
-    if (!reason || reason.trim().length < 2) {
-      if (reason) toast.error("사유를 좀 더 상세히 입력해주세요.");
-      return;
-    }
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/${params.id}/report`, 'POST', { reason });
-      if (res.ok) {
-        toast.success("신고가 정상적으로 접수되었습니다.");
-      } else {
-        const errorMsg = await res.text();
-        toast.error(errorMsg === "ALREADY_REPORTED" ? "이미 신고한 게시글입니다." : "신고 실패");
-      }
-    } catch (err) {
-      toast.error("서버와 통신 중 오류가 발생했습니다.");
-    }
+    const reason = window.prompt("게시글 신고 사유를 입력해주세요.");
+    if (!reason || reason.trim().length < 2) return;
+    const res = await apiFetch(`${API_BASE_URL}/${params.id}/report`, 'POST', { reason });
+    if (res.ok) toast.success("게시글 신고가 접수되었습니다.");
+  };
+
+  // 댓글 신고 (추가된 부분)
+  const handleCommentReport = async (commentId) => {
+    const reason = window.prompt("댓글 신고 사유를 입력해주세요.");
+    if (!reason || reason.trim().length < 2) return;
+    const res = await apiFetch(`${API_BASE_URL}/comments/${commentId}/report`, 'POST', { reason });
+    if (res.ok) toast.success("댓글 신고가 접수되었습니다.");
   };
 
   if (loading || !post) {
@@ -160,71 +123,48 @@ export default function UserCommunityDetail() {
   return (
     <Layout role="user">
       <div className="max-w-3xl mx-auto p-4 space-y-6">
+        {/* 상단 버튼바 */}
         <div className="flex justify-between items-center">
           <button onClick={() => setLocation('/user/community')} className="flex items-center gap-1.5 text-sm text-gray-400 font-bold hover:text-rose-500 transition-colors">
             <ArrowLeft size={16}/> 목록으로 돌아가기
           </button>
-          
           <div className="flex gap-2">
-            {isOwner && (
+            {isPostOwner && (
               <div className="flex gap-1.5">
-                <button 
-                  onClick={() => setLocation(`/user/community/update/${post.boardId}`)} 
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-gray-500 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all font-bold"
-                >
-                  <Edit size={16} /> <span className="text-sm">수정</span>
-                </button>
-                <button 
-                  onClick={handleDelete} 
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all font-bold"
-                >
-                  <Trash2 size={16} /> <span className="text-sm">삭제</span>
-                </button>
+                <button onClick={() => setLocation(`/user/community/update/${post.boardId}`)} className="flex items-center gap-1.5 px-3 py-1.5 text-gray-500 hover:text-rose-500 font-bold"><Edit size={16} /> 수정</button>
+                <button onClick={handleDelete} className="flex items-center gap-1.5 px-3 py-1.5 text-gray-500 hover:text-red-500 font-bold"><Trash2 size={16} /> 삭제</button>
               </div>
             )}
-            {!isOwner && (
-              <button onClick={handleReport} className="flex items-center gap-1.5 px-3 py-1.5 text-gray-400 hover:text-rose-500 font-bold">
-                <AlertCircle size={18} /> <span className="text-xs">신고</span>
-              </button>
+            {!isPostOwner && (
+              <button onClick={handleReport} className="flex items-center gap-1.5 px-3 py-1.5 text-gray-400 hover:text-rose-500 font-bold"><AlertCircle size={18} /> 신고</button>
             )}
           </div>
         </div>
 
+        {/* 게시글 본문 영역 */}
         <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-rose-50">
           <div className="flex justify-between items-start mb-6">
-            <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-500 text-xs font-black">
-              {post.category || '일반'}
-            </span>
+            <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-500 text-xs font-black">{post.category || '일반'}</span>
             <div className="text-right">
-              <p className="text-sm font-black text-gray-900">{post.authorName || '익명 사용자'}</p>
+              <p className="text-sm font-black text-gray-900">{post.authorName || '익명'}</p>
               <p className="text-[10px] text-gray-400 font-bold">{post.createdAt?.split('T')[0]}</p>
             </div>
           </div>
-          
-          <h1 className="text-2xl font-black mb-6 text-gray-900 leading-tight">{post.title}</h1>
-          <div className="prose max-w-none text-gray-700 leading-relaxed mb-10 min-h-[150px] whitespace-pre-wrap font-medium">
-            {post.content}
-          </div>
+          <h1 className="text-2xl font-black mb-6 text-gray-900">{post.title}</h1>
+          <div className="prose max-w-none text-gray-700 mb-10 min-h-[150px] whitespace-pre-wrap font-medium">{post.content}</div>
 
+          {/* 첨부파일 */}
           {post.storedFilePath && (
             <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3 text-sm font-bold text-gray-600">
                 <Paperclip size={16} className="text-rose-500" />
-                <span className="truncate max-w-[200px]">{post.originalFileName || '첨부파일'}</span>
+                <span className="truncate max-w-[200px]">{post.originalFileName}</span>
               </div>
-              <button 
-                onClick={() => {
-                  const path = post.storedFilePath;
-                  const fileId = path.split(/[\\/]/).pop();
-                  window.location.href = `${API_BASE_URL}/files/download/${fileId}`;
-                }}
-                className="text-xs font-black text-rose-500 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all"
-              >
-                <Download size={14} className="mr-1 inline" /> 다운로드
-              </button>
+              <button onClick={() => window.location.href = `${API_BASE_URL}/files/download/${post.storedFilePath.split('/').pop()}`} className="text-xs font-black text-rose-500 hover:bg-rose-50 px-3 py-2 rounded-xl"><Download size={14} className="mr-1 inline" /> 다운로드</button>
             </div>
           )}
 
+          {/* 하단 정보 (좋아요, 댓글수, 조회수) */}
           <div className="flex gap-6 pt-6 border-t border-rose-50 text-gray-400 text-xs font-bold">
             <button onClick={async () => (await apiFetch(`${API_BASE_URL}/${params.id}/like`, 'POST')).ok && fetchData()} className="flex items-center gap-1.5 hover:text-rose-500 transition-colors">
               <Heart size={18} fill={post.likeCount > 0 ? "#f43f5e" : "none"} className={post.likeCount > 0 ? "text-rose-500" : ""}/> 
@@ -235,17 +175,11 @@ export default function UserCommunityDetail() {
           </div>
         </div>
 
+        {/* 댓글 섹션 */}
         <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-rose-50">
           <div className="relative mb-6">
-            <textarea 
-              value={newComment} 
-              onChange={(e) => setNewComment(e.target.value)} 
-              className="w-full bg-gray-50 rounded-xl p-4 pr-12 h-24 resize-none border-none text-sm focus:ring-2 focus:ring-rose-100 transition-all font-medium" 
-              placeholder="따뜻한 댓글을 남겨주세요." 
-            />
-            <button onClick={handleAddComment} className="absolute bottom-3 right-3 bg-rose-500 text-white p-2 rounded-lg hover:bg-rose-600 transition-colors">
-              <Send size={18}/>
-            </button>
+            <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} className="w-full bg-gray-50 rounded-xl p-4 pr-12 h-24 resize-none border-none text-sm font-medium" placeholder="따뜻한 댓글을 남겨주세요." />
+            <button onClick={handleAddComment} className="absolute bottom-3 right-3 bg-rose-500 text-white p-2 rounded-lg hover:bg-rose-600"><Send size={18}/></button>
           </div>
           
           <div className="space-y-4">
@@ -262,39 +196,25 @@ export default function UserCommunityDetail() {
                     </div>
                     <div className="flex items-center gap-2">
                       <p className="text-[10px] text-gray-300 font-bold">{c.createdAt?.split('T')[0]}</p>
-                      {isCommentOwner && !isEditing && (
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
-                            onClick={() => { setEditingCommentId(c.commentId); setEditContent(c.content); }}
-                            className="p-1 text-gray-400 hover:text-rose-500 transition-colors"
-                          >
-                            <Edit size={14} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteComment(c.commentId)}
-                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {isCommentOwner ? (
+                          <>
+                            <button onClick={() => { setEditingCommentId(c.commentId); setEditContent(c.content); }} className="p-1 text-gray-400 hover:text-rose-500 transition-colors"><Edit size={14} /></button>
+                            <button onClick={() => handleDeleteComment(c.commentId)} className="p-1 text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                          </>
+                        ) : (
+                          /* 다른 사람 댓글일 때 나타나는 신고 버튼 */
+                          <button onClick={() => handleCommentReport(c.commentId)} className="p-1 text-gray-400 hover:text-rose-500 transition-colors" title="댓글 신고"><AlertCircle size={14} /></button>
+                        )}
+                      </div>
                     </div>
                   </div>
-
                   {isEditing ? (
                     <div className="space-y-2">
-                      <textarea 
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full p-3 text-sm bg-white border border-rose-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-100"
-                      />
+                      <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full p-3 text-sm bg-white border border-rose-200 rounded-lg focus:ring-2 focus:ring-rose-100 outline-none" />
                       <div className="flex justify-end gap-2">
-                        <button onClick={() => setEditingCommentId(null)} className="flex items-center gap-1 px-2 py-1 text-[10px] text-gray-400 font-bold hover:bg-gray-100 rounded-md">
-                          <X size={12}/> 취소
-                        </button>
-                        <button onClick={() => handleUpdateComment(c.commentId)} className="flex items-center gap-1 px-2 py-1 text-[10px] text-rose-500 font-black hover:bg-rose-50 rounded-md">
-                          <Check size={12}/> 수정완료
-                        </button>
+                        <button onClick={() => setEditingCommentId(null)} className="text-[10px] text-gray-400 font-bold">취소</button>
+                        <button onClick={() => handleUpdateComment(c.commentId)} className="text-[10px] text-rose-500 font-black">수정완료</button>
                       </div>
                     </div>
                   ) : (

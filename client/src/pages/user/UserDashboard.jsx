@@ -3,6 +3,7 @@
  * Soft Bloom Design: Activity summary, artist cards, recent posts
  */
 
+import { useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Heart, ShoppingBag, Calendar, MessageCircle, Sparkles, ArrowRight, Bell } from 'lucide-react';
 import { Link } from 'wouter';
@@ -19,6 +20,34 @@ const quickStats = [
 
 
 export default function UserDashboard() {
+  // 2️⃣ 컴포넌트 시작 부분에 화면 로드 시 실행될 API 호출 로직 추가
+  useEffect(() => {
+    const triggerDashboardQueue = async () => {
+      try {
+        // [핵심] 환경변수에서 API Gateway 공통 주소 가져오기 (하드코딩 방지)
+        const gatewayUrl = import.meta.env.VITE_API_GATEWAY_URL || '';
+        const apiUrl = `${gatewayUrl}/msa/res/dashboard/dashboard-queue`;
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // 👇 주석 풀고 토큰을 실어서 보내줘!
+            'Authorization': `Bearer ${localStorage.getItem('token')}` 
+          }
+        });
+
+        if (response.ok) {
+          console.log("✅ 대시보드 큐 발송 요청 성공");
+        }
+      } catch (err) {
+        console.error("❌ 대시보드 큐 발송 트리거 에러:", err);
+      }
+    };
+
+    triggerDashboardQueue();
+  }, []); // 빈 배열([])을 넣어야 화면이 처음 열릴 때 딱 한 번만 실행됨
+
   return (
     <Layout role="user">
       <div className="p-4 lg:p-6 space-y-6">
