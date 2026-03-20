@@ -39,57 +39,60 @@ export default function ArtistBooking() {
   // 🌟 백엔드 응답 객체 구조에 맞게 수정된 버전
   const fetchMyEvents = async () => {
     try {
-      setLoading(true);
-      const memberId = localStorage.getItem('memberId');
-      
-      if (!memberId) {
-        toast.error("로그인이 필요합니다.");
-        return;
-      }
+        setLoading(true);
+        const memberId = localStorage.getItem('memberId');
+        
+        if (!memberId) {
+            toast.error("로그인이 필요합니다.");
+            return;
+        }
 
-      const response = await resApi.get(`/events?artistId=${memberId}`);
-      const data = response.data;
+        // 1. 서버에서 해당 아티스트의 이벤트를 가져옴
+        const response = await resApi.get(`/events?artistId=${memberId}`);
+        const data = response.data;
 
-      // 🚨 서버 응답 구조가 배열인지 객체인지에 따라 분기 처리
-      let rawEvents = [];
-      let totalResCount = 0;
+        // 2. 데이터 구조에 따라 rawEvents 추출
+        let rawEvents = Array.isArray(data) ? data : (data.events || []);
+        
+        // 3. 🚨 [수정 핵심] 불필요한 필터링 제거
+        // 콘솔 로그를 보면 이미 해당 아티스트의 데이터들만 들어있어.
+        // 데이터에 'artist_id' 필드가 없어서 필터링을 돌리면 결과가 0이 됨.
+        // 그냥 서버에서 받은 데이터를 그대로 넣어주면 돼.
+        setMyEvents(rawEvents);
 
-      if (Array.isArray(data)) {
-        // [케이스 1] 서버가 그냥 배열 [...]을 보냈을 때
-        rawEvents = data;
-        // 배열 안의 각 이벤트 객체에서 _count.reservations를 합산
-        totalResCount = data.reduce((acc, curr) => acc + (curr._count?.reservations || 0), 0);
-      } else if (data && data.events) {
-        // [케이스 2] 서버가 객체 { events: [...], totalReservations: X }를 보냈을 때
-        rawEvents = data.events;
-        totalResCount = data.totalReservations || 0;
-      }
+        // 4. 통계 데이터 설정
+        const totalResCount = Array.isArray(data) 
+          ? data.reduce((acc, curr) => acc + (curr.reservationsCount || curr._count?.reservations || 0), 0)
+          : (data.totalReservations || 0);
 
-      // 🌟 내 공연만 필터링 (String 변환 비교)
-      const filtered = rawEvents.filter(e => String(e.artist_id) === String(memberId));
-      
-      setMyEvents(filtered);
-      setStats({
-        totalReservations: totalResCount
-      });
+        setStats({
+            totalReservations: totalResCount
+        });
 
     } catch (error) {
-      console.error("❌ 데이터 로드 실패:", error);
-      toast.error("이벤트 목록을 불러오지 못했습니다.");
+        console.error("❌ 데이터 로드 실패:", error);
+        toast.error("이벤트 목록을 불러오지 못했습니다.");
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
   // 🌟 추가: 컴포넌트 마운트 시 데이터 불러오기
   useEffect(() => {
     fetchMyEvents();
   }, []);
 
   // 🌟 수정: 기존 더미 데이터 대신 백엔드에서 가져온 myEvents 사용
-  const filteredEvents = myEvents.filter(event =>
-    event.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (event.venue || event.event_locations?.venue || "").toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEvents = myEvents.filter(event => {
+  //   event.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //   (event.venue || event.event_locations?.venue || "").toLowerCase().includes(searchTerm.toLowerCase())
+  // );
+  // 콘솔 데이터 구조에 따라 eventTitle 또는 title 선택
+  const title = event.eventTitle || event.title || "";
+  const venue = event.venue || "";
+
+  return title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         venue.toLowerCase().includes(searchTerm.toLowerCase());
+});
 
   // 🌟 수정: FormData를 추출해 백엔드로 전송하는 로직으로 변경
   const handleSubmit = async (e) => {
@@ -337,22 +340,25 @@ export default function ArtistBooking() {
              <div className="py-20 text-center glass-card rounded-3xl text-muted-foreground">데이터를 불러오는 중입니다...</div>
           ) : filteredEvents.length > 0 ? (
             filteredEvents.map((event) => {
-              // 🌟 추가: 백엔드 필드명(total_capacity, available_seats)에 맞춰 변수 정리
-              const capacity = event.total_capacity || 0;
-              const remaining = event.available_seats || 0;
+              // 1. 사용할 변수들을 상단에 안전하게 선언
+              const capacity = event.total_capacity || event.totalCapacity || 0;
+              const remaining = event.available_seats || event.availableSeats || 0;
               const imageUrl = event.event_images?.[0]?.image_url || event.image || 'https://placehold.co/300x200?text=No+Image';
-              const eventTypeStr = event.event_type?.toLowerCase() || event.type || 'concert';
-              const venueName = event.event_locations?.venue || event.venue || '장소 미정';
-              const eventDateStr = event.event_date ? new Date(event.event_date).toLocaleDateString() : 'TBD';
+              const eventTypeStr = event.event_type?.toLowerCase() || event.type?.toLowerCase() || 'concert';
+              const venueName = event.venue || event.event_locations?.venue || '장소 미정';
+              const eventDateStr = event.event_date || event.date ? new Date(event.event_date || event.date).toLocaleDateString() : 'TBD';
               
-              // 🌟 추가: 현재 상태를 가져와서 맵핑 객체에서 찾기
-              const currentStatus = event.approval_status?.toUpperCase() || 'PENDING';
+              // 🌟 이 변수가 실제 화면에 그려질 제목이야!
+              const displayTitle = event.eventTitle || event.title || "제목 없음"; 
+              const eventId = event.event_id || event.id;
+
+              const currentStatus = event.approval_status?.toUpperCase() || event.status?.toUpperCase() || 'PENDING';
               const mappedStatus = statusMap[currentStatus] || statusMap.PENDING;
 
               return (
-                <div key={event.event_id || event.id} className="glass-card rounded-3xl overflow-hidden soft-shadow hover-lift transition-all flex flex-col sm:flex-row">
+                <div key={eventId} className="glass-card rounded-3xl overflow-hidden soft-shadow hover-lift transition-all flex flex-col sm:flex-row">
                   <div className="sm:w-64 h-48 sm:h-auto relative bg-gray-100">
-                      <img src={imageUrl} alt={event.title} className="w-full h-full object-cover" />
+                      <img src={imageUrl} alt={displayTitle} className="w-full h-full object-cover" />
                       <div className="absolute top-3 left-3 flex gap-1">
                           <span className={cn("px-3 py-1 rounded-full text-xs font-bold shadow-md", eventTypeBadgeClass[eventTypeStr] || 'bg-gray-100 text-gray-800')}>
                               {eventTypeLabel[eventTypeStr] || event.event_type}
@@ -367,7 +373,7 @@ export default function ArtistBooking() {
                   <div className="p-6 flex-1 flex flex-col justify-between">
                       <div>
                           <div className="flex items-start justify-between mb-2">
-                              <h3 className="text-xl font-bold text-foreground leading-tight">{event.title}</h3>
+                              <h3 className="text-xl font-bold text-foreground leading-tight">{displayTitle}</h3>
                               <button className="p-1.5 text-muted-foreground hover:bg-teal-50 rounded-lg transition-colors">
                                   <MoreVertical size={18} />
                               </button>
