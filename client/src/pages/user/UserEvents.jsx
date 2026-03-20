@@ -88,104 +88,71 @@ export default function UserEvents() {
     }
 };
 
+  // UserEvents.jsx 내부 수정
+
   useEffect(() => {
-    // URL 파라미터가 바뀌면 activeTab 상태도 업데이트
-    const currentTab = getTabFromUrl();
-    if (activeTab !== currentTab) {
-      setActiveTab(currentTab);
-    }
+    // 1. 매핑 함수 정의
     const mapBackendEvent = (e) => ({
       id: e.event_id,
       title: e.title,
-      artistId: e.artist_id ? Number(e.artist_id) : null,
       artistName: e.artist_name || 'Artist',
       type: (e.event_type || 'fanmeeting').toLowerCase(),
       date: e.event_date ? new Date(e.event_date).toLocaleDateString() : 'TBD',
-      time: e.open_time ? new Date(e.open_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBD',
-      venue: e.event_locations?.venue || (Array.isArray(e.event_locations) ? e.event_locations[0]?.venue : null) || e.venue || '장소 미정',
-      capacity: e.total_capacity || 0,
+      venue: e.event_locations?.venue || e.venue || '장소 미정',
       remaining: e.available_seats || 0,
+      capacity: e.total_capacity || 0,
       price: e.price || 0,
-      // 🌟 [핵심 수정] Prisma가 주는 event_images 배열에서 image_url을 확실하게 뽑아오기!
-      image: (e.event_images && e.event_images.length > 0 && e.event_images[0].image_url) 
-              ? e.event_images[0].image_url 
-              : (e.images && e.images.length > 0) ? e.images[0] 
-              : (e.imageUrl ? e.imageUrl 
-              : (e.image ? e.image : 'https://placehold.co/600x400?text=No+Image'))
+      image: e.event_images?.[0]?.image_url || e.image || 'https://placehold.co/600x400?text=No+Image'
     });
 
-// UserEvents.jsx 내 fetchEvents 함수 수정
-const fetchEvents = async () => {
-  try {
-    setLoading(true);
-    const token = localStorage.getItem('token');
-
-    // 🚨 params에서 artistId를 제거하여 전체 CONFIRMED 목록을 요청합니다.
-    const { data } = await resApi.get('/events', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-    });
-
-    const rawEvents = data.events || data;
-    const eventsArray = Array.isArray(rawEvents) ? rawEvents : [];
-    setEvents(eventsArray.map(mapBackendEvent));
-  } catch (error) {
-    console.error('❌ Fetch events error:', error.response?.status, error.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-
- // UserEvents.jsx 내부의 fetchBookings 함수만 이 내용으로 교체!
-    const fetchBookings = async () => {
-      // 1. 현재 테스트 중인 16번 유저 ID를 우선적으로 가져오도록 설정
-      const memberId = localStorage.getItem('memberId');
-      
-      console.log("🛠️ fetchBookings 실행됨! 조회 ID:", memberId);
-      
+    // 2. 이벤트 목록 가져오기
+    const fetchEvents = async () => {
       try {
         setLoading(true);
-        // 2. 백엔드 라우트 /member/:memberId 호출 (이미 구현된 백엔드 경로)
+        // 🌟 이미 resApi에 인터셉터가 있다면 headers 설정은 지워도 돼!
+        const { data } = await resApi.get('/events');
+        const rawEvents = data.events || data;
+        setEvents(Array.isArray(rawEvents) ? rawEvents.map(mapBackendEvent) : []);
+      } catch (error) {
+        console.error('Fetch events error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // 3. 예매 내역 가져오기
+    const fetchBookings = async () => {
+      const memberId = localStorage.getItem('memberId');
+      if (!memberId) return;
+      try {
+        setLoading(true);
         const { data } = await resApi.get(`/member/${memberId}`);
-        
-        console.log("📡 서버에서 온 데이터:", data);
-        
-        // 3. Prisma 응답은 배열이므로 바로 rawBookings에 할당
         const rawBookings = Array.isArray(data.data) ? data.data : [];
-        
-        // 4. 데이터 매핑 (include된 events 객체 참조)
         const mappedBookings = rawBookings.map(b => ({
             id: b.reservation_id,
-            // 백엔드 include: { events: true } 결과에 맞춰서 참조
             eventTitle: b.events?.title || '공연명 없음',
             artistName: b.events?.artist_name || '아티스트',
-            date: b.events?.event_date ? new Date(b.events.event_date).toLocaleDateString() : 'TBD',           
-            // 장소 정보 (events 테이블에 바로 venue가 있다면)
-            venue: b.events?.event_locations?.venue || b.events?.venue || '장소 미정',           
+            date: b.events?.event_date ? new Date(b.events.event_date).toLocaleDateString() : 'TBD',
+            venue: b.events?.venue || '장소 미정',
             seats: b.ticket_count || 0,
             totalPrice: b.pure_price || 0,
             status: (b.status || 'confirmed').toLowerCase(),
             ticketCode: b.ticket_code,
             selected_seats: Array.isArray(b.selected_seats) ? b.selected_seats : [],
         }));
-
         setBookings(mappedBookings);
-        console.log("✅ 매핑된 예매 내역:", mappedBookings);
       } catch (error) {
-        console.error('Fetch bookings error:', error);
-        toast.error('내 예매 내역을 가져오는데 실패했습니다.');
-        setBookings([]);
+        toast.error('내 예매 내역 로드 실패');
       } finally {
         setLoading(false);
       }
     };
 
-    if (activeTab === 'events') {
-        fetchEvents();
-    } else if (activeTab === 'my-bookings') {
-        fetchBookings();
-    }
-  }, [activeTab, window.location.search]);
+    // 실행 분기
+    if (activeTab === 'events') fetchEvents();
+    else if (activeTab === 'my-bookings') fetchBookings();
+
+  }, [activeTab]); // 🌟 window.location.search 대신 activeTab만 감시해도 충분해!
 
   const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
