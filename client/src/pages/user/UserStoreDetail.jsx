@@ -22,14 +22,16 @@ export default function UserStoreDetail() {
                 // The backend likely has a detail endpoint at /{id}
                 // If not, we could fetch all and filter, but let's try /{id} first
                 const response = await shopApi.get(`shop/detail/${productId}`);
-                const data = response.data;
+                let data = response.data;
+                if (data && data.data) data = data.data; // Handle potential API wrappers
+                
                 const mappedItem = {
-                    id: data.productId,
-                    name: data.title,
+                    id: data.productId || data.id,
+                    name: data.title || data.name || '알 수 없는 상품',
                     artistId: data.sellerId,
-                    artistName: data.sellerType === 'ARTIST' ? '아티스트' : '유저',
-                    price: data.basePrice,
-                    description: data.description,
+                    artistName: data.sellerType === 'ARTIST' ? '아티스트' : (data.artistName || '유저'),
+                    price: data.basePrice || data.price || 0,
+                    description: data.description || '',
                     image: data.imageUrl,
                     category: data.category === 'OFFICIAL' ? 'official' :
                         data.category === 'UNOFFICIAL' ? 'unofficial' : 'used',
