@@ -9,7 +9,6 @@ import { Heart, ShoppingBag, Calendar, MessageCircle, Sparkles, ArrowRight, Bell
 import { Link } from 'wouter';
 import { payApi, getGatewayUrl } from '@/lib/api';
 import { toast } from 'sonner';
-import { toast } from 'sonner';
 
 export default function UserDashboard() {
   const [paymentData, setPaymentData] = useState(null);
