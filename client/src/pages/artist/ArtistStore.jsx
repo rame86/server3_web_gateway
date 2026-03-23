@@ -34,27 +34,45 @@ export default function ArtistStore() {
     return matchesSearch && (item.category === activeTab || item.category === categoryMap[activeTab]);
   });
 
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const title = e.target.title.value;
     const category = e.target.category.value;
     const price = e.target.price.value;
     const description = e.target.description.value;
-    
+
     try {
       const endpoint = category === 'OFFICIAL' || category === 'ALBUM' ? '/product/official' : '/product/unofficial';
-      
-      await shopApi.post(endpoint, {
-        goodsName: title,
-        price: parseFloat(price),
-        description: description,
-        goodsType: category,
-        requesterName: '아티스트' // placeholder
+
+      const formData = new FormData();
+      formData.append('goodsName', title);
+      formData.append('price', parseFloat(price));
+      formData.append('description', description);
+      formData.append('goodsType', category);
+      formData.append('requesterName', '아티스트');
+      if (imageFile) {
+        formData.append('imageFile', imageFile);
+      }
+
+      await shopApi.post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       toast.success('굿즈 등록 요청이 완료되었습니다. 관리자 승인 후 게시됩니다.');
       setIsAdding(false);
+      setImageFile(null);
+      setImagePreview(null);
     } catch (error) {
       console.error(error);
       toast.error('등록 요청에 실패했습니다.');
@@ -107,13 +125,33 @@ export default function ArtistStore() {
                   <Textarea id="description" placeholder="상세 설명을 적어주세요 (Text)" className="rounded-xl border-violet-100 min-h-[100px]" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="image_url">이미지 URL (Image URL)</Label>
-                  <div className="flex gap-2">
-                    <Input id="image_url" placeholder="https://..." className="rounded-xl border-violet-100" />
-                    <Button type="button" variant="outline" className="rounded-xl border-violet-200">
-                      <ImageIcon size={18} />
-                    </Button>
-                  </div>
+                  <Label>상품 이미지</Label>
+                  <label
+                    htmlFor="imageFile"
+                    className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-violet-200 rounded-2xl cursor-pointer bg-violet-50 hover:bg-violet-100 transition-colors relative overflow-hidden"
+                  >
+                    {imagePreview ? (
+                      <>
+                        <img src={imagePreview} alt="미리보기" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                          <p className="text-white text-xs font-semibold">클릭하여 변경</p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-violet-400">
+                        <ImageIcon size={28} />
+                        <span className="text-xs font-semibold">클릭하여 이미지 선택</span>
+                        <span className="text-[10px] text-muted-foreground">JPG, PNG, WEBP (최대 10MB)</span>
+                      </div>
+                    )}
+                    <input
+                      id="imageFile"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageChange}
+                    />
+                  </label>
                 </div>
                 <div className="grid grid-cols-2 gap-4 opacity-70">
                    <div className="space-y-1">
