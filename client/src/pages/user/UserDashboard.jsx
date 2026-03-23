@@ -3,7 +3,9 @@
  * Soft Bloom Design: Activity summary, artist cards, recent posts
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import SockJS from 'sockjs-client';
+import { Client } from '@stomp/stompjs';
 import Layout from '@/components/Layout';
 import { Heart, ShoppingBag, Calendar, MessageCircle, Sparkles, ArrowRight, Bell } from 'lucide-react';
 import { Link } from 'wouter';
@@ -22,38 +24,71 @@ const quickStats = [
 export default function UserDashboard() {
   // 2️⃣ 컴포넌트 시작 부분에 화면 로드 시 실행될 API 호출 로직 추가
   useEffect(() => {
+    const gatewayUrl = import.meta.env.VITE_API_GATEWAY_URL || '';
+    const token = localStorage.getItem('token');
+    const memberId = localStorage.getItem('memberId');
+
+    // 1. WebSocket 설정
+    const client = new Client({
+      // Vite 등 번들러 환경에서는 웹소켓 프로토콜 변경 문제로 SockJS factory 필요
+      webSocketFactory: () => new SockJS(`${gatewayUrl}/msa/core/ws-admin`),
+      connectHeaders: {
+        Authorization: `Bearer ${token}`
+      },
+      debug: (str) => console.log('STOMP: ' + str),
+      reconnectDelay: 5000,
+    });
+
     const triggerDashboardQueue = async () => {
       try {
-        // [핵심] 환경변수에서 API Gateway 공통 주소 가져오기 (하드코딩 방지)
-        const gatewayUrl = import.meta.env.VITE_API_GATEWAY_URL || '';
-        const token = localStorage.getItem('token');
-        const memberId = localStorage.getItem('memberId');
-
-        // 🌟 [핵심] 3개의 서비스로 각각 보낼 주소 정의
         const coreApi = `${gatewayUrl}/msa/core/dashboard/dashboard-queue`;
-
         const headers = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         };
-
         const bodyData = JSON.stringify({ memberId });
 
-        // 🌟 [방법] Core API 하나만 호출 (Core가 MQ를 통해 타 서비스로 전파)
         const response = await fetch(coreApi, { 
             method: 'POST', 
             headers: headers,
             body: bodyData
         });
         console.log("✅ Res, Pay, Shop 3개 서비스에 큐 발송 신호 완료!");
-        
       } catch (err) {
         console.error("❌ 큐 발송 중 에러 발생:", err);
       }
     };
 
-    triggerDashboardQueue();
-  }, []); // 빈 배열([])을 넣어야 화면이 처음 열릴 때 딱 한 번만 실행됨
+    client.onConnect = () => {
+      console.log('✅ WebSocket Connected');
+      // 2. 해당 유저 전용 토픽 구독
+      client.subscribe(`/topic/dashboard/${memberId}`, (msg) => {
+        if (msg.body) {
+          const data = JSON.parse(msg.body);
+          console.log('📥 STOMP RECEIVED:', data);
+          toast.success("대시보드 실시간 데이터를 수신했습니다!");
+        }
+      });
+      
+      // 3. 웹소켓 연결 성공 후 HTTP POST 신호 전송 (MQ 발송 트리거)
+      triggerDashboardQueue();
+    };
+
+    client.onStompError = (frame) => {
+      console.error('❌ Broker reported error: ' + frame.headers['message']);
+      console.error('❌ Additional details: ' + frame.body);
+    };
+
+    // 4. WebSocket 연결 시작
+    client.activate();
+
+    // 5. 컴포넌트 언마운트 시 연결 해제
+    return () => {
+      if (client) {
+        client.deactivate();
+      }
+    };
+  }, []);
 
   return (
     <Layout role="user">
