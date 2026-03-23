@@ -53,6 +53,20 @@ import AdminCommunity from "./pages/admin/AdminCommunity";
 import AdminSettlement from "./pages/admin/AdminSettlement";
 import AdminRefund from "./pages/admin/AdminRefund";
 
+function AdminProtectedRoute({ children }) {
+  const [, setLocation] = useLocation();
+  const role = localStorage.getItem("role");
+
+  useEffect(() => {
+    if (role !== "ADMIN") {
+      setLocation("/unauthorized");
+    }
+  }, [role, setLocation]);
+
+  if (role !== "ADMIN") return null;
+  return <>{children}</>;
+}
+
 function Router() {
   const [, setLocation] = useLocation();
 
@@ -142,14 +156,14 @@ function Router() {
       <Route path="/artist/settlement" component={ArtistSettlement} />
 
       {/* Admin Routes */}
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/users" component={AdminUsers} />
-      <Route path="/admin/artists" component={AdminArtists} />
-      <Route path="/admin/store" component={AdminStore} />
-      <Route path="/admin/booking" component={AdminBooking} />
-      <Route path="/admin/community" component={AdminCommunity} />
-      <Route path="/admin/settlement" component={AdminSettlement} />
-      <Route path="/admin/refunds" component={AdminRefund} />
+      <Route path="/admin" component={() => <AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
+      <Route path="/admin/users" component={() => <AdminProtectedRoute><AdminUsers /></AdminProtectedRoute>} />
+      <Route path="/admin/artists" component={() => <AdminProtectedRoute><AdminArtists /></AdminProtectedRoute>} />
+      <Route path="/admin/store" component={() => <AdminProtectedRoute><AdminStore /></AdminProtectedRoute>} />
+      <Route path="/admin/booking" component={() => <AdminProtectedRoute><AdminBooking /></AdminProtectedRoute>} />
+      <Route path="/admin/community" component={() => <AdminProtectedRoute><AdminCommunity /></AdminProtectedRoute>} />
+      <Route path="/admin/settlement" component={() => <AdminProtectedRoute><AdminSettlement /></AdminProtectedRoute>} />
+      <Route path="/admin/refunds" component={() => <AdminProtectedRoute><AdminRefund /></AdminProtectedRoute>} />
 
       {/* Fallback */}
       <Route path="/404" component={NotFound} />
