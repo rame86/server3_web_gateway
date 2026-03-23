@@ -383,7 +383,28 @@ const fetchMyEvents = async () => {
               // 1. 사용할 변수들을 상단에 안전하게 선언
               const capacity = event.total_capacity || event.totalCapacity || 0;
               const remaining = event.available_seats || event.availableSeats || 0;
-              const imageUrl = event.event_images?.[0]?.image_url || event.image || 'https://placehold.co/300x200?text=No+Image';
+             
+              // 1. 일단 환경변수를 가져온다 (http://localhost 가 담기겠지?)
+              const rawUrl = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost';
+
+              // 2. 만약 주소가 localhost인데 포트(:8082)가 없다면 강제로 붙여버림
+              const gatewayUrl = (rawUrl === 'http://localhost') 
+                  ? 'http://localhost:8082' 
+                  : rawUrl.replace(/\/$/, '');
+
+              // 3. 이미지 주소 조립 (나머지 로직은 그대로!)
+              const rawImageUrl = event.event_images?.[0]?.image_url || event.imageUrl || event.image;
+              let imageUrl = 'https://placehold.co/300x200?text=No+Image';
+
+              if (rawImageUrl) {
+                  if (rawImageUrl.startsWith('http')) {
+                      imageUrl = rawImageUrl;
+                  } else {
+                      const imagePath = rawImageUrl.startsWith('/') ? rawImageUrl : `/images/res/${rawImageUrl}`;
+                      imageUrl = `${gatewayUrl}${imagePath}`;
+                  }
+              }
+             
               const eventTypeStr = event.event_type?.toLowerCase() || event.type?.toLowerCase() || 'concert';
               const venueName = event.venue || event.event_locations?.venue || '장소 미정';
               const eventDateStr = event.event_date || event.date ? new Date(event.event_date || event.date).toLocaleDateString() : 'TBD';
