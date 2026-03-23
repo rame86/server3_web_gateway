@@ -90,57 +90,52 @@ export default function UserWishlist() {
           </div>
         ) : (
           <div className="space-y-3">
-            {wishlist.map((item) => {
-              const productId = item.productId;
-              const name = item.goodsName || item.title || '상품명 없음';
-              const price = item.price || item.basePrice || 0;
-              const imageUrl = item.imageUrl;
+            {wishlist.map((item) => (
+              <div key={item.wishlistId}
+                className="glass-card rounded-2xl p-4 flex gap-4 items-center soft-shadow">
 
-              return (
-                <div key={item.wishlistId || productId}
-                  className="glass-card rounded-2xl p-4 flex gap-4 items-center soft-shadow">
-                  
-                  {/* Product Image */}
-                  <div
-                    onClick={() => setLocation(`/user/store/${productId}`)}
-                    className="cursor-pointer flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-rose-50 border border-rose-100"
-                  >
-                    {imageUrl ? (
-                      <img src={imageUrl} alt={name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ShoppingBag size={24} className="text-rose-300" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div
-                    className="flex-1 cursor-pointer"
-                    onClick={() => setLocation(`/user/store/${productId}`)}
-                  >
-                    <p className="font-semibold text-sm text-foreground line-clamp-2">{name}</p>
-                    <p className="text-rose-600 font-bold mt-1">{formatPrice(price)}</p>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => handleAddToCart(productId, name)}
-                      className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center hover:bg-rose-100 transition-colors"
-                    >
-                      <ShoppingCart size={16} className="text-rose-500" />
-                    </button>
-                    <button
-                      onClick={() => handleRemove(productId)}
-                      className="w-9 h-9 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-red-50 hover:border-red-200 transition-colors"
-                    >
-                      <Trash2 size={16} className="text-gray-400 hover:text-red-500" />
-                    </button>
-                  </div>
+                {/* Product Image */}
+                <div
+                  onClick={() => setLocation(`/user/store/${item.productId}`)}
+                  className="cursor-pointer flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-rose-50 border border-rose-100"
+                >
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ShoppingBag size={24} className="text-rose-300" />
+                    </div>
+                  )}
                 </div>
-              );
-            })}
+
+                {/* Info */}
+                <div
+                  className="flex-1 cursor-pointer"
+                  onClick={() => setLocation(`/user/store/${item.productId}`)}
+                >
+                  <p className="font-semibold text-sm text-foreground line-clamp-2">{item.title}</p>
+                  <p className="text-rose-600 font-bold mt-1">{formatPrice(item.basePrice)}</p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => handleAddToCart(item.productId, item.title)}
+                    className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center hover:bg-rose-100 transition-colors"
+                    title="장바구니 담기"
+                  >
+                    <ShoppingCart size={16} className="text-rose-500" />
+                  </button>
+                  <button
+                    onClick={() => handleRemove(item.productId)}
+                    className="w-9 h-9 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-red-50 hover:border-red-200 transition-colors"
+                    title="위시리스트 제거"
+                  >
+                    <Trash2 size={16} className="text-gray-400" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
