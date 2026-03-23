@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { ShoppingBag, Search, Filter, Star, Heart, ShoppingCart, Tag, Loader2 } from 'lucide-react';
+import { ShoppingBag, Search, Filter, Star, Heart, ShoppingCart, Tag, Loader2, Package } from 'lucide-react';
 import { artists, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
 import { shopApi } from '@/lib/api';
@@ -178,6 +178,13 @@ export default function UserStore() {
           </div>
           {/* 우상단 - 위시리스트 / 장바구니 바로가기 */}
           <div className="absolute top-3 right-3 flex gap-2">
+            <button
+              onClick={() => setLocation('/user/store/orders')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-xl text-xs font-semibold text-rose-600 shadow hover:bg-white transition-colors"
+            >
+              <Package size={13} />
+              주문 내역
+            </button>
             <button
               onClick={() => setLocation('/user/store/wishlist')}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-xl text-xs font-semibold text-rose-600 shadow hover:bg-white transition-colors"
