@@ -101,6 +101,7 @@ function GoodsCard({ item }) {
 }
 
 export default function UserStore() {
+  const [, setLocation] = useLocation();
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [products, setProducts] = useState([]);

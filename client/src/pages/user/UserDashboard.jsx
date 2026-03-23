@@ -27,18 +27,23 @@ export default function UserDashboard() {
         // [핵심] 환경변수에서 API Gateway 공통 주소 가져오기 (하드코딩 방지)
         const gatewayUrl = import.meta.env.VITE_API_GATEWAY_URL || '';
         const token = localStorage.getItem('token');
+        const memberId = localStorage.getItem('memberId');
 
         // 🌟 [핵심] 3개의 서비스로 각각 보낼 주소 정의
         const coreApi = `${gatewayUrl}/msa/core/dashboard/dashboard-queue`;
 
         const headers = {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         };
+
+        const bodyData = JSON.stringify({ memberId });
 
         // 🌟 [방법] Core API 하나만 호출 (Core가 MQ를 통해 타 서비스로 전파)
         const response = await fetch(coreApi, { 
             method: 'POST', 
-            headers: headers 
+            headers: headers,
+            body: bodyData
         });
         console.log("✅ Res, Pay, Shop 3개 서비스에 큐 발송 신호 완료!");
         
