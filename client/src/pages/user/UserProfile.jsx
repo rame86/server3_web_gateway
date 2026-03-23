@@ -35,14 +35,36 @@ export default function UserProfile() {
   const isArtist = userRole === 'artist';
   const themeText = isArtist ? 'text-violet-600' : 'text-rose-600';
 
-  // 1. 회원가입 필드와 일치하도록 상태 보강
   const [formData, setFormData] = useState({
-    ememail: localStorage.getItem('userEmail') || localStorage.getItem('email') || '', 
-    name: localStorage.getItem('userName') || '',
+    email: '', 
+    name: '',
     phone: '',
-    age: '',      // 🌟 추가
+    age: '',      
     address: '',
+    profileImageUrl: ''
   });
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    newPasswordConfirm: ''
+  });
+
+  // 회원 정보 불러오기
+  useEffect(() => {
+    const fetchMyInfo = async () => {
+      try {
+        const res = await coreApi.get('/member/my-info');
+        setFormData(prev => ({
+          ...prev,
+          ...res.data
+        }));
+      } catch (e) {
+        console.error('Failed to fetch user info', e);
+      }
+    };
+    fetchMyInfo();
+  }, []);
 
   // 🌟 핵심 주석: DB 컬럼 구조에 맞춰 신청 폼 상태값 최신화
   const [upgradeForm, setUpgradeForm] = useState({
@@ -113,13 +135,44 @@ export default function UserProfile() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handlePasswordChange = (e) => {
+    setPasswordForm({ ...passwordForm, [e.target.name]: e.target.value });
+  };
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     try {
-      // await coreApi.put('/member/update', formData);
+      await coreApi.post('/member/update', formData);
       toast.success('회원 정보가 안전하게 변경되었습니다.');
+      // Update local storage name if changed
+      if (formData.name) localStorage.setItem('userName', formData.name);
     } catch (error) {
       toast.error('정보 수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.newPasswordConfirm) {
+      toast.error('새 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    try {
+      await coreApi.post('/member/password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      });
+      toast.success('비밀번호가 성공적으로 변경되었습니다.');
+      setPasswordForm({ currentPassword: '', newPassword: '', newPasswordConfirm: '' });
+    } catch (error) {
+      toast.error(error.response?.data?.message || '비밀번호 변경 중 오류가 발생했습니다.');
+    }
+  };
+
+  const handleImageClick = () => {
+    const url = prompt("새로운 프로필 이미지의 URL을 입력하세요:", formData.profileImageUrl || "");
+    if (url !== null) {
+      setFormData(prev => ({ ...prev, profileImageUrl: url }));
     }
   };
 
@@ -140,14 +193,15 @@ export default function UserProfile() {
           <div className="md:col-span-1 space-y-6">
             <div className={cn("glass-card p-6 rounded-[32px] text-center space-y-4 shadow-sm border", 
               isArtist ? "border-violet-100" : "border-rose-100")}>
-              <div className="relative inline-block">
+              <div className="relative inline-block cursor-pointer" onClick={handleImageClick}>
                 <img 
-                  src={isArtist 
+                  src={formData.profileImageUrl || (isArtist 
                     ? "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop" 
-                    : "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop"} 
+                    : "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop")} 
                   className="w-24 h-24 rounded-full border-4 border-white shadow-md object-cover"
+                  alt="Profile"
                 />
-                <button className={cn("absolute bottom-0 right-0 p-2 bg-white rounded-full shadow-lg border transition-all", 
+                <button type="button" className={cn("absolute bottom-0 right-0 p-2 bg-white rounded-full shadow-lg border transition-all", 
                   isArtist ? "text-violet-500 border-violet-100" : "text-rose-500 border-rose-100")}>
                   <Camera size={14} />
                 </button>
@@ -246,19 +300,19 @@ export default function UserProfile() {
                 <Lock size={20} className={themeText} />
                 비밀번호 변경
               </h3>
-              <div className="space-y-4">
-                <input type="password" placeholder="현재 비밀번호 확인" 
-                  className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-gray-200" />
+              <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <input type="password" name="currentPassword" value={passwordForm.currentPassword} onChange={handlePasswordChange} placeholder="현재 비밀번호 확인" 
+                  className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-gray-200" required />
                 <div className="grid grid-cols-2 gap-4">
-                  <input type="password" placeholder="새 비밀번호" 
-                    className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-gray-200" />
-                  <input type="password" placeholder="새 비밀번호 다시 입력" 
-                    className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-gray-200" />
+                  <input type="password" name="newPassword" value={passwordForm.newPassword} onChange={handlePasswordChange} placeholder="새 비밀번호" 
+                    className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-gray-200" required />
+                  <input type="password" name="newPasswordConfirm" value={passwordForm.newPasswordConfirm} onChange={handlePasswordChange} placeholder="새 비밀번호 다시 입력" 
+                    className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-gray-200" required />
                 </div>
-                <button className="w-full py-3.5 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all shadow-md">
+                <button type="submit" className="w-full py-3.5 bg-gray-900 text-white rounded-2xl font-bold hover:bg-black transition-all shadow-md">
                   비밀번호 재설정
                 </button>
-              </div>
+              </form>
             </div>
           </div>
         </div>
