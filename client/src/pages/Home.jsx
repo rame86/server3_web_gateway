@@ -122,21 +122,9 @@ export default function Home() {
             </p>
 
             <div className="flex flex-wrap gap-3 fade-in-up" style={{ animationDelay: '0.3s' }}>
-              <Link href="/login">
-                <button className="flex items-center gap-2 px-6 py-3 text-base font-semibold text-white rounded-2xl btn-primary-gradient shadow-md">
-                  팬으로 시작하기
-                  <ArrowRight size={18} />
-                </button>
-              </Link>
               <Link href="/user">
                 <button className="flex items-center gap-2 px-6 py-3 text-base font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-2xl transition-colors shadow-sm">
                   게스트로 둘러보기
-                  <ArrowRight size={18} />
-                </button>
-              </Link>
-              <Link href="/artist">
-                <button className="flex items-center gap-2 px-6 py-3 text-base font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-2xl transition-colors">
-                  아티스트 모드
                   <ArrowRight size={18} />
                 </button>
               </Link>
@@ -344,19 +332,9 @@ export default function Home() {
             좋아하는 아티스트의 팬덤에 가입하고 특별한 경험을 누려보세요
           </p>
           <div className="flex flex-wrap justify-center gap-4">
-            <Link href="/login">
-              <button className="px-8 py-3.5 bg-white text-rose-600 font-bold rounded-2xl hover:bg-rose-50 transition-colors shadow-lg">
-                팬으로 가입하기
-              </button>
-            </Link>
             <Link href="/user">
               <button className="px-8 py-3.5 bg-transparent border border-white text-white font-bold rounded-2xl hover:bg-white/10 transition-colors shadow-sm">
                 게스트 모드로 진행
-              </button>
-            </Link>
-            <Link href="/artist">
-              <button className="px-8 py-3.5 bg-white/20 text-white font-bold rounded-2xl hover:bg-white/30 transition-colors border border-white/40">
-                아티스트로 가입하기
               </button>
             </Link>
           </div>

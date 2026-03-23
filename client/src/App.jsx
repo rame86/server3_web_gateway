@@ -33,6 +33,7 @@ import UserProfile from "./pages/user/UserProfile";
 // Auth pages
 import UserLogin from "./pages/auth/UserLogin";
 import UserSignup from "./pages/auth/UserSignup";
+import Unauthorized from "./pages/auth/Unauthorized";
 
 // Artist pages
 import ArtistDashboard from "./pages/artist/ArtistDashboard";
@@ -79,8 +80,12 @@ function Router() {
         // 3. 주소창 청소
         window.history.replaceState({}, null, window.location.pathname);
 
-        // 대시보드로 이동
-        setLocation("/user");
+        // role에 따라 페이지 이동
+        if (role === "ARTIST") {
+          setLocation("/artist");
+        } else {
+          setLocation("/user");
+        }
 
       } catch (e) {
         console.error("토큰 처리 중 에러!", e);
@@ -97,6 +102,7 @@ function Router() {
       {/* Auth Routes */}
       <Route path="/login" component={UserLogin} />
       <Route path="/signup" component={UserSignup} />
+      <Route path="/unauthorized" component={Unauthorized} />
 
       {/* User Routes */}
       <Route path="/user" component={UserDashboard} />
