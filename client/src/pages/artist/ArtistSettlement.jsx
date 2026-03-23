@@ -9,7 +9,7 @@ import Layout from '@/components/Layout';
 import { BarChart3, TrendingUp, Wallet, Download, Calendar, ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { coreApi } from '@/lib/api';
+import { payApi } from '@/lib/api';
 
 const statusConfig = {
   PENDING: { label: '정산 예정', class: 'bg-amber-100 text-amber-700' },
@@ -40,7 +40,7 @@ export default function ArtistSettlement() {
     const fetchSettlementData = async () => {
       try {
         setIsLoading(true);
-        const response = await coreApi.get('/artist/settlement');
+        const response = await payApi.get('/artist/settlement');
         setData(response.data);
       } catch (error) {
         toast.error('정산 데이터를 불러오는데 실패했습니다.');
