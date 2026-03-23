@@ -28,6 +28,8 @@ import UserEventDetail from "./pages/user/UserEventDetail";
 import UserBookingProcess from "./pages/user/UserBookingProcess";
 import UserStoreDetail from "./pages/user/UserStoreDetail";
 import UserPurchaseProcess from "./pages/user/UserPurchaseProcess";
+import UserWishlist from "./pages/user/UserWishlist";
+import UserCart from "./pages/user/UserCart";
 import UserProfile from "./pages/user/UserProfile";
 
 // Auth pages
@@ -107,8 +109,10 @@ function Router() {
       {/* User Routes */}
       <Route path="/user" component={UserDashboard} />
       <Route path="/user/store" component={UserStore} />
-      <Route path="/user/store/:id" component={UserStoreDetail} />
+      <Route path="/user/store/cart" component={UserCart} />
+      <Route path="/user/store/wishlist" component={UserWishlist} />
       <Route path="/user/store/purchase/:id" component={UserPurchaseProcess} />
+      <Route path="/user/store/:id" component={UserStoreDetail} />
       <Route path="/user/booking" component={UserEvents} />
       <Route path="/user/events" component={UserEvents} />
       <Route path="/user/events/:id" component={UserEventDetail} />
