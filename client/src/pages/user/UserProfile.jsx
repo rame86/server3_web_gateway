@@ -95,12 +95,7 @@ export default function UserProfile() {
         imageUrl: `${upgradeForm.profileImageUrl}|${upgradeForm.communityLink}`
       };
 
-      // 🌟 coreApi에 기본적으로 토큰 세팅이 안 되어 있다면 직접 헤더 추가
-      await coreApi.post('/artist/apply', payload, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}` // 👈 입구컷 방지용 신분증
-        }
-      });
+      await coreApi.post('/artist/apply', payload);
 
       toast.dismiss();
       toast.success('신청 완료! 관리자 승인 후 알려줄게.');
