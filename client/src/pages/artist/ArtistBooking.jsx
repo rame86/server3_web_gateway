@@ -51,6 +51,7 @@ export default function ArtistBooking() {
   const [selectedManageEvent, setSelectedManageEvent] = useState(null); 
 
   const [selectedFile, setSelectedFile] = useState(null); // 🌟 파일 상태 추가
+  const [reservedSeats, setReservedSeats] = useState([]);
 
   // 🌟 백엔드 응답 객체 구조에 맞게 수정된 버전
   // ArtistBooking.jsx 내 fetchMyEvents 함수 수정
@@ -486,9 +487,18 @@ const fetchMyEvents = async () => {
 
                               {/* 🌟 실시간 관리 버튼 (클릭 시 모달 오픈) */}
                               <button 
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation();
-                                  setSelectedManageEvent(event); // 선택된 이벤트 데이터 저장
+                                  setSelectedManageEvent(event);
+                                  
+                                  // ✅ 상세 API 호출해서 reservedSeats 가져오기
+                                  try {
+                                    const res = await resApi.get(`/events/${event.event_id || event.id}`);
+                                    setReservedSeats(res.data.reservedSeats || []);
+                                  } catch (err) {
+                                    console.error('좌석 조회 실패:', err);
+                                    setReservedSeats([]);
+                                  }
                                 }}
                                 className="px-4 py-2 text-xs font-bold text-white bg-teal-600 rounded-xl hover:bg-teal-700 shadow-sm transition-colors"
                               >
@@ -511,118 +521,121 @@ const fetchMyEvents = async () => {
       </div>
 
       {/* 🌟 실시간 좌석 현황 모달 (Dialog) */}
-      <Dialog open={!!selectedManageEvent} onOpenChange={() => setSelectedManageEvent(null)}>
+      <Dialog open={!!selectedManageEvent} onOpenChange={() => {
+        setSelectedManageEvent(null);
+        setReservedSeats([]); // ✅ 추가
+      }}>
         <DialogContent className="sm:max-w-[600px] rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
-  {(() => {
-    // 1. 🔍 데이터 정밀 판별 (대소문자, 공백 무시)
-    const rawStatus = (selectedManageEvent?.approval_status || selectedManageEvent?.status || 'PENDING').toString().trim().toUpperCase();
-    
-    // 2. 🚦 상태값 확정
-    const isConfirmed = rawStatus === 'CONFIRMED';
-    const isFailed = rawStatus === 'FAILED' || rawStatus === 'REJECTED';
-    
-    // 3. 📊 수치 계산 (데이터 필드명 유연하게 대응)
-    const total = selectedManageEvent?.total_capacity || selectedManageEvent?.totalCapacity || 0;
-    const available = selectedManageEvent?.available_seats || selectedManageEvent?.availableSeats || selectedManageEvent?.stock || 0;
-    const reservedCount = total - available;
+          {(() => {
+            // 1. 🔍 데이터 정밀 판별 (대소문자, 공백 무시)
+            const rawStatus = (selectedManageEvent?.approval_status || selectedManageEvent?.status || 'PENDING').toString().trim().toUpperCase();
+            
+            // 2. 🚦 상태값 확정
+            const isConfirmed = rawStatus === 'CONFIRMED';
+            const isFailed = rawStatus === 'FAILED' || rawStatus === 'REJECTED';
+            
+            // 3. 📊 수치 계산 (데이터 필드명 유연하게 대응)
+            const total = selectedManageEvent?.total_capacity || selectedManageEvent?.totalCapacity || 0;
+            const available = selectedManageEvent?.available_seats || selectedManageEvent?.availableSeats || selectedManageEvent?.stock || 0;
+            const reservedCount = total - available;
 
-    // 콘솔에서 데이터 확인 (F12 눌러서 확인해봐!)
-    console.log("현재 모달 데이터:", selectedManageEvent);
-    console.log("판별된 상태:", rawStatus);
+            // 콘솔에서 데이터 확인 (F12 눌러서 확인해봐!)
+            console.log("현재 모달 데이터:", selectedManageEvent);
+            console.log("판별된 상태:", rawStatus);
 
-    return (
-      <>
-        {/* 헤더: 상태에 따라 색상 변경 (승인이면 Teal, 그 외엔 Rose) */}
-        <DialogHeader className={cn(
-          "p-6 text-white transition-colors duration-300",
-          isConfirmed ? "bg-teal-600" : "bg-rose-600"
-        )}>
-          <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-            {isConfirmed ? (
-              <><Sparkles size={20} className="text-rose-300 animate-pulse" /> 라이브 좌석 현황</>
-            ) : (
-              <><X size={20} /> {isFailed ? "이벤트 반려 사유" : "승인 대기 중"}</>
-            )}
-          </DialogTitle>
-          <p className="opacity-90 text-xs mt-1 font-medium">
-            {selectedManageEvent?.eventTitle || selectedManageEvent?.title}
-          </p>
-        </DialogHeader>
+            return (
+              <>
+                {/* 헤더: 상태에 따라 색상 변경 (승인이면 Teal, 그 외엔 Rose) */}
+                <DialogHeader className={cn(
+                  "p-6 text-white transition-colors duration-300",
+                  isConfirmed ? "bg-teal-600" : "bg-rose-600"
+                )}>
+                  <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+                    {isConfirmed ? (
+                      <><Sparkles size={20} className="text-rose-300 animate-pulse" /> 라이브 좌석 현황</>
+                    ) : (
+                      <><X size={20} /> {isFailed ? "이벤트 반려 사유" : "승인 대기 중"}</>
+                    )}
+                  </DialogTitle>
+                  <p className="opacity-90 text-xs mt-1 font-medium">
+                    {selectedManageEvent?.eventTitle || selectedManageEvent?.title}
+                  </p>
+                </DialogHeader>
 
-        <div className="p-8 bg-white min-h-[300px] flex flex-col justify-center">
-          {isConfirmed ? (
-            /* ✅ [승인 완료] 좌석표 모드 */
-            <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-              <div className="flex justify-around items-center bg-slate-50 p-5 rounded-2xl border border-slate-100 shadow-inner">
-                <div className="text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase font-black mb-1">Total</p>
-                  <p className="text-xl font-bold text-slate-700">{total}석</p>
+                <div className="p-8 bg-white min-h-[300px] flex flex-col justify-center">
+                  {isConfirmed ? (
+                    /* ✅ [승인 완료] 좌석표 모드 */
+                    <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+                      <div className="flex justify-around items-center bg-slate-50 p-5 rounded-2xl border border-slate-100 shadow-inner">
+                        <div className="text-center">
+                          <p className="text-[10px] text-muted-foreground uppercase font-black mb-1">Total</p>
+                          <p className="text-xl font-bold text-slate-700">{total}석</p>
+                        </div>
+                        <div className="w-px h-8 bg-slate-200" />
+                        <div className="text-center">
+                          <p className="text-[10px] text-rose-500 uppercase font-black mb-1">Reserved</p>
+                          <p className="text-xl font-bold text-rose-600">{reservedCount}석</p>
+                        </div>
+                        <div className="w-px h-8 bg-slate-200" />
+                        <div className="text-center">
+                          <p className="text-[10px] text-teal-500 uppercase font-black mb-1">Remaining</p>
+                          <p className="text-xl font-bold text-teal-600">{available}석</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-slate-50 rounded-[2rem] border border-dashed border-slate-200 p-6 flex justify-center items-center overflow-auto max-h-[400px] custom-scrollbar">
+                        <div className="transform scale-90 origin-center">
+                          <SeatSelection 
+                            {...getSeatLayoutConfig(total, selectedManageEvent?.venue || selectedManageEvent?.location)} 
+                            ticketCount={0} 
+                            reservedSeats={reservedSeats}
+                            onSeatSelect={() => {}} 
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-6 justify-center text-[11px] text-gray-400 font-bold">
+                        <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-white border border-gray-300 rounded-sm"></div> 빈 좌석</span>
+                        <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-gray-800 rounded-sm"></div> 예매 완료</span>
+                      </div>
+                    </div>
+                  ) : (
+                    /* ❌ [반려됨 또는 대기] 사유 안내 모드 */
+                    <div className="space-y-4 py-6 text-center animate-in slide-in-from-bottom-4 duration-300">
+                      <div className={cn(
+                        "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4",
+                        isFailed ? "bg-rose-50 text-rose-500" : "bg-amber-50 text-amber-500"
+                      )}>
+                        {isFailed ? <MessageSquareX size={32} /> : <Clock size={32} className="animate-spin-slow" />}
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-800">
+                        {isFailed ? "관리자 검토 의견" : "관리자 승인을 기다리는 중입니다"}
+                      </h4>
+                      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-slate-600 text-sm leading-relaxed whitespace-pre-wrap font-medium">
+                        {isFailed 
+                          ? (selectedManageEvent?.rejection_reason || selectedManageEvent?.rejectionReason || "상세 반려 사유가 등록되지 않았습니다.")
+                          : "승인이 완료되면 실시간 좌석 현황을 모니터링할 수 있습니다."
+                        }
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-4">
+                        현재 상태: <span className="font-bold text-rose-500">{rawStatus}</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <div className="w-px h-8 bg-slate-200" />
-                <div className="text-center">
-                  <p className="text-[10px] text-rose-500 uppercase font-black mb-1">Reserved</p>
-                  <p className="text-xl font-bold text-rose-600">{reservedCount}석</p>
-                </div>
-                <div className="w-px h-8 bg-slate-200" />
-                <div className="text-center">
-                  <p className="text-[10px] text-teal-500 uppercase font-black mb-1">Remaining</p>
-                  <p className="text-xl font-bold text-teal-600">{available}석</p>
-                </div>
-              </div>
+              </>
+            );
+          })()}
 
-              <div className="bg-slate-50 rounded-[2rem] border border-dashed border-slate-200 p-6 flex justify-center items-center overflow-auto max-h-[400px] custom-scrollbar">
-                <div className="transform scale-90 origin-center">
-                  <SeatSelection 
-                    {...getSeatLayoutConfig(total, selectedManageEvent?.venue || selectedManageEvent?.location)} 
-                    ticketCount={0} 
-                    reservedSeats={selectedManageEvent?.reservedSeats || []} 
-                    onSeatSelect={() => {}} 
-                  />
-                </div>
-              </div>
-              
-              <div className="flex gap-6 justify-center text-[11px] text-gray-400 font-bold">
-                <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-white border border-gray-300 rounded-sm"></div> 빈 좌석</span>
-                <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-gray-800 rounded-sm"></div> 예매 완료</span>
-              </div>
-            </div>
-          ) : (
-            /* ❌ [반려됨 또는 대기] 사유 안내 모드 */
-            <div className="space-y-4 py-6 text-center animate-in slide-in-from-bottom-4 duration-300">
-              <div className={cn(
-                "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4",
-                isFailed ? "bg-rose-50 text-rose-500" : "bg-amber-50 text-amber-500"
-              )}>
-                {isFailed ? <MessageSquareX size={32} /> : <Clock size={32} className="animate-spin-slow" />}
-              </div>
-              <h4 className="text-lg font-bold text-slate-800">
-                {isFailed ? "관리자 검토 의견" : "관리자 승인을 기다리는 중입니다"}
-              </h4>
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-slate-600 text-sm leading-relaxed whitespace-pre-wrap font-medium">
-                {isFailed 
-                  ? (selectedManageEvent?.rejection_reason || selectedManageEvent?.rejectionReason || "상세 반려 사유가 등록되지 않았습니다.")
-                  : "승인이 완료되면 실시간 좌석 현황을 모니터링할 수 있습니다."
-                }
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-4">
-                현재 상태: <span className="font-bold text-rose-500">{rawStatus}</span>
-              </p>
-            </div>
-          )}
-        </div>
-      </>
-    );
-  })()}
-
-  <DialogFooter className="p-4 bg-slate-50 border-t">
-    <Button 
-      onClick={() => setSelectedManageEvent(null)}
-      className="w-full bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-2xl font-bold h-12 shadow-sm"
-    >
-      모니터링 종료
-    </Button>
-  </DialogFooter>
-</DialogContent>
+          <DialogFooter className="p-4 bg-slate-50 border-t">
+            <Button 
+              onClick={() => setSelectedManageEvent(null)}
+              className="w-full bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-2xl font-bold h-12 shadow-sm"
+            >
+              모니터링 종료
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
     </Layout>
   );

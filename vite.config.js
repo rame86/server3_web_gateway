@@ -45,7 +45,8 @@ function trimLogFile(logPath, maxSize) {
     fs.writeFileSync(logPath, keptLines.join("\n"), "utf-8");
   } catch {
 
-    /* ignore trim errors */}
+    /* ignore trim errors */
+  }
 }
 
 function writeToLogFile(source, entries) {
@@ -84,14 +85,14 @@ function vitePluginManusDebugCollector() {
       return {
         html,
         tags: [
-        {
-          tag: "script",
-          attrs: {
-            src: "/__manus__/debug-collector.js",
-            defer: true
-          },
-          injectTo: "head"
-        }]
+          {
+            tag: "script",
+            attrs: {
+              src: "/__manus__/debug-collector.js",
+              defer: true
+            },
+            injectTo: "head"
+          }]
 
       };
     },
@@ -191,13 +192,13 @@ export default defineConfig({
       },
     },
     allowedHosts: [
-    ".manuspre.computer",
-    ".manus.computer",
-    ".manus-asia.computer",
-    ".manuscomputer.ai",
-    ".manusvm.computer",
-    "localhost",
-    "127.0.0.1"],
+      ".manuspre.computer",
+      ".manus.computer",
+      ".manus-asia.computer",
+      ".manuscomputer.ai",
+      ".manusvm.computer",
+      "localhost",
+      "127.0.0.1"],
 
     fs: {
       strict: true,
