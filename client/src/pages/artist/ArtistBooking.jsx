@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react'; // 🌟 useEffect 추가
 import Layout from '@/components/Layout';
 import { cn } from "@/lib/utils";
-import { Calendar, Plus, Search, MapPin, Users, Ticket, Clock, Check, MoreVertical, Image as ImageIcon, Sparkles, Map } from 'lucide-react';
+import { Calendar, Plus, Search, MapPin, Users, Ticket, Clock, Check, X, MoreVertical, Image as ImageIcon, Sparkles, Map, MessageSquareX } from 'lucide-react';
 import { events, formatPrice, eventTypeLabel, eventTypeBadgeClass } from '@/lib/data';
 import { toast } from 'sonner';
 import { resApi } from '@/lib/api'; // 🌟 백엔드 통신을 위한 API 추가
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import SeatSelection from '../user/UserBookingSeatSelection';
 
 // 🌟 추가: DB의 영문 상태값을 예쁜 한글과 색상으로 바꿔주는 매핑 객체
 const statusMap = {
@@ -23,6 +24,15 @@ const statusMap = {
   FAILED: { label: '반려됨', style: 'bg-rose-500 text-white' },
   CANCELED: { label: '취소됨', style: 'bg-gray-500 text-white' },
   CANCELLED: { label: '취소됨', style: 'bg-gray-500 text-white' }
+};
+
+const getSeatLayoutConfig = (capacity, venueName = "") => {
+    if (venueName.includes('루미나50') || capacity === 50) return { rows: 5, cols: 10 };
+    if (venueName.includes('루미나100') || capacity === 100) return { rows: 10, cols: 10 };
+    if (venueName.includes('루미나200') || capacity === 200) return { rows: 10, cols: 20 };
+    const safeCapacity = capacity || 100;
+    const defaultRows = 10;
+    return { rows: defaultRows, cols: Math.ceil(safeCapacity / defaultRows) };
 };
 
 export default function ArtistBooking() {
@@ -35,6 +45,12 @@ export default function ArtistBooking() {
 
   // 🌟 추가: 통계 데이터를 담을 상태 (기본값 0)
   const [stats, setStats] = useState({ totalReservations: 0 });
+
+  // ArtistBooking.jsx 상단 state 선언부
+  const [openManagerId, setOpenManagerId] = useState(null); // 기존에 있던 것
+  const [selectedManageEvent, setSelectedManageEvent] = useState(null); 
+
+  const [selectedFile, setSelectedFile] = useState(null); // 🌟 파일 상태 추가
 
   // 🌟 백엔드 응답 객체 구조에 맞게 수정된 버전
   // ArtistBooking.jsx 내 fetchMyEvents 함수 수정
@@ -89,38 +105,50 @@ const fetchMyEvents = async () => {
   // 🌟 수정: FormData를 추출해 백엔드로 전송하는 로직으로 변경
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget); // 폼 데이터 추출
+    const form = e.currentTarget;
     const memberId = localStorage.getItem('memberId') || '3';
 
-    // 컨트롤러(requestEventApproval)가 요구하는 정확한 필드명으로 매핑
-    const eventData = {
-      member_id: memberId,
-      requester_id: memberId,
-      artist_id: memberId,
-      artist_name: "아티스트 본인",
-      title: formData.get('title'),
-      event_type: formData.get('type'),
-      event_date: formData.get('event_date'),
-      open_time: formData.get('open_time'),
-      close_time: formData.get('close_time'),
-      venue: formData.get('venue'),
-      address: formData.get('address'),
-      total_capacity: parseInt(formData.get('total_capacity'), 10),
-      price: parseInt(formData.get('price'), 10),
-      description: formData.get('description'),
-      images: [formData.get('image_url')], // URL을 배열에 담아서 보냄
-      age_limit: 0,
-      running_time: 120,
-      is_standing: false
-    };
+    // 1. 🌟 JSON 대신 FormData 객체 생성 (파일 전송을 위해 필수)
+    const data = new FormData();
+
+    // 2. 🌟 [핵심] 이미지 처리: 파일이 1순위, URL이 2순위
+    if (selectedFile) {
+      data.append('file', selectedFile); // 선택된 파일이 있으면 추가
+    } else {
+      data.append('image_url', form.image_url.value); // 파일 없으면 URL 추가
+    }
+
+    // 3. 🌟 나머지 필드들 담기 (기존 eventData에 있던 내용들)
+    data.append('member_id', memberId);
+    data.append('requester_id', memberId);
+    data.append('artist_id', memberId);
+    data.append('artist_name', "아티스트 본인");
+    data.append('title', form.title.value);
+    data.append('event_type', form.type.value);
+    data.append('event_date', form.event_date.value);
+    data.append('open_time', form.open_time.value);
+    data.append('close_time', form.close_time.value);
+    data.append('venue', form.venue.value);
+    data.append('address', form.address.value);
+    data.append('total_capacity', form.total_capacity.value);
+    data.append('price', form.price.value);
+    data.append('description', form.description.value);
+    data.append('age_limit', '0');
+    data.append('running_time', '120');
+    data.append('is_standing', 'false');
 
     try {
       toast.loading('등록 요청 중...');
-      await resApi.post('/events', eventData); 
+      
+      // 4. 🌟 중요: eventData 대신 data(FormData)를 보내고 헤더 설정
+      await resApi.post('/events', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      }); 
+
       toast.dismiss();
-      toast.success('이벤트 등록 요청이 완료되었습니다. 관리자 승인 후 티켓 판매가 시작됩니다.');
+      toast.success('이벤트 등록 요청이 완료되었습니다.');
       setIsAdding(false);
-      fetchMyEvents(); // 🌟 등록 성공 시 목록 실시간 새로고침
+      fetchMyEvents(); 
     } catch (error) {
       toast.dismiss();
       toast.error('등록 요청 중 오류가 발생했습니다.');
@@ -182,6 +210,7 @@ const fetchMyEvents = async () => {
               </button>
 
             </DialogTrigger>
+
             <DialogContent className="sm:max-w-[550px] rounded-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold" style={{ fontFamily: "'Playfair Display', serif" }}>새 이벤트(공연) 등록 요청 (Res Schema)</DialogTitle>
@@ -247,16 +276,35 @@ const fetchMyEvents = async () => {
                     <Textarea name="description" id="description" placeholder="이벤트에 대한 상세 설명을 입력하세요" className="rounded-xl border-teal-100 min-h-[100px]" />
                 </div>
 
+                <div className="space-y-4"> {/* 간격 조금 넓힘 */}
+                {/* 1. 파일 업로드 부분 */}
                 <div className="space-y-2">
-                    <Label htmlFor="image_url">포스터 이미지 URL (Image URL)</Label>
-                    <div className="flex gap-2">
-                      <Input name="image_url" id="image_url" placeholder="https://..." required className="rounded-xl border-teal-100" />
-                      <Button type="button" variant="outline" className="rounded-xl border-teal-200">
-                        <ImageIcon size={18} />
-                      </Button>
-                    </div>
+                  <Label htmlFor="image_file">포스터 이미지 업로드 (파일)</Label>
+                  <Input 
+                    id="image_file" 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => setSelectedFile(e.target.files[0])} 
+                    className="rounded-xl border-teal-100" 
+                  />
                 </div>
-                
+                {/* 2. URL 입력 부분 */}
+                <div className="space-y-2">
+                  <Label htmlFor="image_url">포스터 이미지 주소 (URL)</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      name="image_url" 
+                      id="image_url" 
+                      placeholder="https://..." 
+                      className="rounded-xl border-teal-100" 
+                    />
+                    <Button type="button" variant="outline" className="rounded-xl border-teal-200">
+                      <ImageIcon size={18} />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+                              
                 <DialogFooter className="pt-4">
                   <Button type="button" variant="ghost" onClick={() => setIsAdding(false)} className="rounded-xl">취소</Button>
                   <Button type="submit" className="bg-teal-600 hover:bg-teal-700 rounded-xl px-8 text-white">등록 제안하기</Button>
@@ -335,7 +383,28 @@ const fetchMyEvents = async () => {
               // 1. 사용할 변수들을 상단에 안전하게 선언
               const capacity = event.total_capacity || event.totalCapacity || 0;
               const remaining = event.available_seats || event.availableSeats || 0;
-              const imageUrl = event.event_images?.[0]?.image_url || event.image || 'https://placehold.co/300x200?text=No+Image';
+             
+              // 1. 일단 환경변수를 가져온다 (http://localhost 가 담기겠지?)
+              const rawUrl = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost';
+
+              // 2. 만약 주소가 localhost인데 포트(:8082)가 없다면 강제로 붙여버림
+              const gatewayUrl = (rawUrl === 'http://localhost') 
+                  ? 'http://localhost:8082' 
+                  : rawUrl.replace(/\/$/, '');
+
+              // 3. 이미지 주소 조립 (나머지 로직은 그대로!)
+              const rawImageUrl = event.event_images?.[0]?.image_url || event.imageUrl || event.image;
+              let imageUrl = 'https://placehold.co/300x200?text=No+Image';
+
+              if (rawImageUrl) {
+                  if (rawImageUrl.startsWith('http')) {
+                      imageUrl = rawImageUrl;
+                  } else {
+                      const imagePath = rawImageUrl.startsWith('/') ? rawImageUrl : `/images/res/${rawImageUrl}`;
+                      imageUrl = `${gatewayUrl}${imagePath}`;
+                  }
+              }
+             
               const eventTypeStr = event.event_type?.toLowerCase() || event.type?.toLowerCase() || 'concert';
               const venueName = event.venue || event.event_locations?.venue || '장소 미정';
               const eventDateStr = event.event_date || event.date ? new Date(event.event_date || event.date).toLocaleDateString() : 'TBD';
@@ -414,10 +483,19 @@ const fetchMyEvents = async () => {
                               >
                                   내역 내려받기
                               </button>
-                              <button className="px-4 py-2 text-xs font-bold text-white bg-teal-600 rounded-xl hover:bg-teal-700 shadow-sm transition-colors">
-                                  실시간 관리
+
+                              {/* 🌟 실시간 관리 버튼 (클릭 시 모달 오픈) */}
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedManageEvent(event); // 선택된 이벤트 데이터 저장
+                                }}
+                                className="px-4 py-2 text-xs font-bold text-white bg-teal-600 rounded-xl hover:bg-teal-700 shadow-sm transition-colors"
+                              >
+                                실시간 관리
                               </button>
-                          </div>
+
+                            </div>
                       </div>
                   </div>
                 </div>
@@ -431,6 +509,121 @@ const fetchMyEvents = async () => {
           )}
         </div>
       </div>
+
+      {/* 🌟 실시간 좌석 현황 모달 (Dialog) */}
+      <Dialog open={!!selectedManageEvent} onOpenChange={() => setSelectedManageEvent(null)}>
+        <DialogContent className="sm:max-w-[600px] rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
+  {(() => {
+    // 1. 🔍 데이터 정밀 판별 (대소문자, 공백 무시)
+    const rawStatus = (selectedManageEvent?.approval_status || selectedManageEvent?.status || 'PENDING').toString().trim().toUpperCase();
+    
+    // 2. 🚦 상태값 확정
+    const isConfirmed = rawStatus === 'CONFIRMED';
+    const isFailed = rawStatus === 'FAILED' || rawStatus === 'REJECTED';
+    
+    // 3. 📊 수치 계산 (데이터 필드명 유연하게 대응)
+    const total = selectedManageEvent?.total_capacity || selectedManageEvent?.totalCapacity || 0;
+    const available = selectedManageEvent?.available_seats || selectedManageEvent?.availableSeats || selectedManageEvent?.stock || 0;
+    const reservedCount = total - available;
+
+    // 콘솔에서 데이터 확인 (F12 눌러서 확인해봐!)
+    console.log("현재 모달 데이터:", selectedManageEvent);
+    console.log("판별된 상태:", rawStatus);
+
+    return (
+      <>
+        {/* 헤더: 상태에 따라 색상 변경 (승인이면 Teal, 그 외엔 Rose) */}
+        <DialogHeader className={cn(
+          "p-6 text-white transition-colors duration-300",
+          isConfirmed ? "bg-teal-600" : "bg-rose-600"
+        )}>
+          <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+            {isConfirmed ? (
+              <><Sparkles size={20} className="text-rose-300 animate-pulse" /> 라이브 좌석 현황</>
+            ) : (
+              <><X size={20} /> {isFailed ? "이벤트 반려 사유" : "승인 대기 중"}</>
+            )}
+          </DialogTitle>
+          <p className="opacity-90 text-xs mt-1 font-medium">
+            {selectedManageEvent?.eventTitle || selectedManageEvent?.title}
+          </p>
+        </DialogHeader>
+
+        <div className="p-8 bg-white min-h-[300px] flex flex-col justify-center">
+          {isConfirmed ? (
+            /* ✅ [승인 완료] 좌석표 모드 */
+            <div className="space-y-6 animate-in fade-in zoom-in duration-300">
+              <div className="flex justify-around items-center bg-slate-50 p-5 rounded-2xl border border-slate-100 shadow-inner">
+                <div className="text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-black mb-1">Total</p>
+                  <p className="text-xl font-bold text-slate-700">{total}석</p>
+                </div>
+                <div className="w-px h-8 bg-slate-200" />
+                <div className="text-center">
+                  <p className="text-[10px] text-rose-500 uppercase font-black mb-1">Reserved</p>
+                  <p className="text-xl font-bold text-rose-600">{reservedCount}석</p>
+                </div>
+                <div className="w-px h-8 bg-slate-200" />
+                <div className="text-center">
+                  <p className="text-[10px] text-teal-500 uppercase font-black mb-1">Remaining</p>
+                  <p className="text-xl font-bold text-teal-600">{available}석</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-[2rem] border border-dashed border-slate-200 p-6 flex justify-center items-center overflow-auto max-h-[400px] custom-scrollbar">
+                <div className="transform scale-90 origin-center">
+                  <SeatSelection 
+                    {...getSeatLayoutConfig(total, selectedManageEvent?.venue || selectedManageEvent?.location)} 
+                    ticketCount={0} 
+                    reservedSeats={selectedManageEvent?.reservedSeats || []} 
+                    onSeatSelect={() => {}} 
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-6 justify-center text-[11px] text-gray-400 font-bold">
+                <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-white border border-gray-300 rounded-sm"></div> 빈 좌석</span>
+                <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-gray-800 rounded-sm"></div> 예매 완료</span>
+              </div>
+            </div>
+          ) : (
+            /* ❌ [반려됨 또는 대기] 사유 안내 모드 */
+            <div className="space-y-4 py-6 text-center animate-in slide-in-from-bottom-4 duration-300">
+              <div className={cn(
+                "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4",
+                isFailed ? "bg-rose-50 text-rose-500" : "bg-amber-50 text-amber-500"
+              )}>
+                {isFailed ? <MessageSquareX size={32} /> : <Clock size={32} className="animate-spin-slow" />}
+              </div>
+              <h4 className="text-lg font-bold text-slate-800">
+                {isFailed ? "관리자 검토 의견" : "관리자 승인을 기다리는 중입니다"}
+              </h4>
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-slate-600 text-sm leading-relaxed whitespace-pre-wrap font-medium">
+                {isFailed 
+                  ? (selectedManageEvent?.rejection_reason || selectedManageEvent?.rejectionReason || "상세 반려 사유가 등록되지 않았습니다.")
+                  : "승인이 완료되면 실시간 좌석 현황을 모니터링할 수 있습니다."
+                }
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-4">
+                현재 상태: <span className="font-bold text-rose-500">{rawStatus}</span>
+              </p>
+            </div>
+          )}
+        </div>
+      </>
+    );
+  })()}
+
+  <DialogFooter className="p-4 bg-slate-50 border-t">
+    <Button 
+      onClick={() => setSelectedManageEvent(null)}
+      className="w-full bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-2xl font-bold h-12 shadow-sm"
+    >
+      모니터링 종료
+    </Button>
+  </DialogFooter>
+</DialogContent>
+      </Dialog>
     </Layout>
   );
 }
