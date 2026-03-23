@@ -26,22 +26,24 @@ export default function UserDashboard() {
       try {
         // [핵심] 환경변수에서 API Gateway 공통 주소 가져오기 (하드코딩 방지)
         const gatewayUrl = import.meta.env.VITE_API_GATEWAY_URL || '';
-        const apiUrl = `${gatewayUrl}/msa/core/dashboard/dashboard-queue`;
+        const token = localStorage.getItem('token');
 
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            // 👇 주석 풀고 토큰을 실어서 보내줘!
-            'Authorization': `Bearer ${localStorage.getItem('token')}` 
-          }
+        // 🌟 [핵심] 3개의 서비스로 각각 보낼 주소 정의
+        const coreApi = `${gatewayUrl}/msa/core/dashboard/dashboard-queue`;
+
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+
+        // 🌟 [방법] Core API 하나만 호출 (Core가 MQ를 통해 타 서비스로 전파)
+        const response = await fetch(coreApi, { 
+            method: 'POST', 
+            headers: headers 
         });
-
-        if (response.ok) {
-          console.log("✅ 대시보드 큐 발송 요청 성공");
-        }
+        console.log("✅ Res, Pay, Shop 3개 서비스에 큐 발송 신호 완료!");
+        
       } catch (err) {
-        console.error("❌ 대시보드 큐 발송 트리거 에러:", err);
+        console.error("❌ 큐 발송 중 에러 발생:", err);
       }
     };
 
