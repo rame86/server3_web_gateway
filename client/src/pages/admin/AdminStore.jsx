@@ -7,11 +7,12 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { 
   Package, Check, X, Eye, Clock, User, 
-  Tag, Info, AlertCircle, Image as ImageIcon, ChevronRight
+  Tag, Info, AlertCircle, Image as ImageIcon, ChevronRight, Code, RefreshCw, Loader2
 } from 'lucide-react';
-import { goodsItems, formatPrice } from '@/lib/data';
+import { Button } from "@/components/ui/button";
+import { formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
-import { coreApi } from '@/lib/api';
+import { shopApi, coreApi } from '@/lib/api';
 
 const categoryLabel = {
   official: { label: '공식 굿즈', class: 'badge-rose' },
@@ -34,27 +35,28 @@ export default function AdminStore() {
 
   // --- [백엔드 API 연동 추가 부분] ---
   const [pendingGoods, setPendingGoods] = useState([]);
+  const [approvedGoods, setApprovedGoods] = useState([]);
+  const [showJson, setShowJson] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const fetchPendingGoods = async () => {
     try {
       const response = await coreApi.get('/admin/shop/approvalList');
-      
-      // 화면이 깨지지 않게 백엔드 데이터를 네 기존 UI 변수명(id, name 등)에 강제로 맞춰줌
       const mappedData = response.data.map(item => ({
         ...item,
-        id: item.approvalId, // 백엔드의 approvalId를 UI의 id로
+        id: item.approvalId,
         name: item.goodsName || '이름 없음', 
-        image: item.image || 'https://via.placeholder.com/400', 
-        category: item.category ? item.category.toLowerCase() : 'official',
-        subCategory: item.subCategory || '분류 없음',
+        image: item.imageUrl || 'https://via.placeholder.com/400', 
+        category: item.goodsType ? item.goodsType.toLowerCase() : 'official',
+        subCategory: item.goodsType || '분류 없음',
         submittedDate: item.createdAt ? item.createdAt.split('T')[0] : '날짜 없음',
         description: item.description || '상세 설명이 없습니다.',
-        stock: item.stock || 0,
-        user: item.user || { name: item.artistName || '알 수 없음', email: '정보 없음', role: 'ARTIST' },
-        detailImages: item.detailImages || []
+        stock: item.stockQuantity || 0,
+        user: { name: item.requesterName || '알 수 없음', email: '정보 없음', role: 'ARTIST' }
       }));
       setPendingGoods(mappedData);
     } catch (error) {
+      console.error(error);
       toast.error('승인 대기 목록을 불러오지 못했습니다.');
     }
   };
@@ -113,11 +115,26 @@ export default function AdminStore() {
     <Layout role="admin">
       <div className="p-4 lg:p-6 space-y-6 fade-in-up">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground gradient-text" style={{ fontFamily: "'Playfair Display', serif" }}>
-            굿즈 승인 관리
-          </h1>
-          <p className="text-sm text-muted-foreground font-medium">등록 요청된 굿즈를 검토하고 승인합니다</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground gradient-text" style={{ fontFamily: "'Playfair Display', serif" }}>
+              굿즈 승인 관리
+            </h1>
+            <p className="text-sm text-muted-foreground font-medium">등록 요청된 굿즈를 검토하고 승인합니다</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              setLoading(true);
+              Promise.all([fetchPendingGoods(), fetchApprovedGoods()]).finally(() => setLoading(false));
+            }}
+            disabled={loading}
+            className="rounded-xl border-rose-100 text-rose-500 hover:bg-rose-50"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+            데이터 새로고침
+          </Button>
         </div>
 
         {/* Stats */}
@@ -245,8 +262,8 @@ export default function AdminStore() {
         {/* 승인 완료 탭 */}
         {activeTab === 'approved' && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {goodsItems.map((item) => (
-              <div key={item.id} className="glass-card rounded-[1.5rem] overflow-hidden soft-shadow hover-lift">
+            {approvedGoods.map((item) => (
+              <div key={item.id} className="glass-card rounded-[1.5rem] overflow-hidden soft-shadow hover-lift border border-border/50">
                 <div className="relative aspect-square">
                   <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                   <div className="absolute top-2 right-2 w-7 h-7 bg-teal-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
@@ -262,6 +279,29 @@ export default function AdminStore() {
             ))}
           </div>
         )}
+
+        {/* JSON 데이터 보기 토글 (요청사항 반영) */}
+        <div className="mt-8 pt-8 border-t border-dashed">
+          <button 
+            onClick={() => setShowJson(!showJson)}
+            className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mx-auto"
+          >
+            <Code size={14} />
+            {showJson ? 'JSON 데이터 숨기기' : 'RAW JSON 데이터 보기'}
+          </button>
+          
+          {showJson && (
+            <div className="mt-4 p-4 bg-slate-900 rounded-2xl overflow-x-auto shadow-inner border border-slate-800">
+              <pre className="text-[10px] text-teal-400 font-mono leading-relaxed">
+                {JSON.stringify({ 
+                  activeTab, 
+                  pendingSummary: pendingList.map(p => ({ id: p.id, name: p.name, status: p.status })),
+                  shopGoodsSummary: approvedGoods.map(g => ({ id: g.id, name: g.name, price: g.price }))
+                }, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* [4] 상세 보기 모달 */}
