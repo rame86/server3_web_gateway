@@ -73,37 +73,46 @@ export default function UserProfile() {
   
   // 🌟 아티스트 전환 신청 API 호출 함수
   const handleUpgradeSubmit = async () => {
-  // 1. 유효성 검사 (프론트엔드 상태값 기준)
-  if (!upgradeForm.artistName || !upgradeForm.subCategory || !upgradeForm.description) {
-    toast.error('신청 정보를 모두 입력해 주세요!');
-    return;
-  }
-  try {
-    setIsSubmitting(true);
-    toast.loading('아티스트 전환 신청을 접수 중이야...');
+    // 1. 유효성 검사
+    if (!upgradeForm.artistName || !upgradeForm.subCategory || !upgradeForm.description) {
+      toast.error('신청 정보를 모두 입력해 주세요!');
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      toast.loading('아티스트 전환 신청을 접수 중이야...');
 
-    // 🌟 핵심 주석: 자바 DTO 구조에 맞게 데이터 재구성 (Payload 생성)
-    const payload = {
-      artistName: upgradeForm.artistName,    // 그대로 매핑
-      subCategory: upgradeForm.subCategory,  // 그대로 매핑
-      description: upgradeForm.description,  // 그대로 매핑
-      // 🌟 핵심: profileImageUrl과 communityLink를 구분자(|)로 묶어서 'imageUrl' 하나에 담음
-      imageUrl: `${upgradeForm.profileImageUrl}|${upgradeForm.communityLink}`
-    };
+      // 🌟 핵심: 로컬스토리지에서 로그인한 유저의 ID 가져오기 (프로젝트 키 이름에 맞게 확인 필수!)
+      const currentUserId = localStorage.getItem('memberId') || localStorage.getItem('userId');
 
-    // 🌟 가공된 payload를 서버로 전송
-    await coreApi.post('/artist/apply', payload);
+      // 🌟 자바 DTO 구조에 맞게 데이터 재구성 (유저 ID 추가)
+      const payload = {
+        memberId: Number(currentUserId),       // 👈 누가 신청하는지 서버에 알려줌
+        artistName: upgradeForm.artistName,    
+        subCategory: upgradeForm.subCategory,  
+        description: upgradeForm.description,  
+        imageUrl: `${upgradeForm.profileImageUrl}|${upgradeForm.communityLink}`
+      };
 
-    toast.dismiss();
-    toast.success('신청 완료! 관리자 승인 후 알려줄게.');
-    setIsUpgradeModalOpen(false);
-  } catch (error) {
-    toast.dismiss();
-    toast.error('신청 중 오류가 발생했어.');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+      // 🌟 coreApi에 기본적으로 토큰 세팅이 안 되어 있다면 직접 헤더 추가
+      await coreApi.post('/artist/apply', payload, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}` // 👈 입구컷 방지용 신분증
+        }
+      });
+
+      toast.dismiss();
+      toast.success('신청 완료! 관리자 승인 후 알려줄게.');
+      setIsUpgradeModalOpen(false);
+    } catch (error) {
+      toast.dismiss();
+      console.error("❌ 전환 신청 에러:", error);
+      toast.error('신청 중 오류가 발생했어.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

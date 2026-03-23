@@ -14,28 +14,24 @@ export default function AdminBooking() {
   const [bookingStart, setBookingStart] = useState('');
   const [bookingEnd, setBookingEnd] = useState('');
 
-  // 1️⃣ [GET] 데이터 불러오기 함수
+// 1️⃣ [GET] 데이터 불러오기 함수 (예매 승인 대기 목록)
   const fetchData = async () => {
     try {
       setLoading(true);
-      // 대기 중인 목록 (Spring: /admin/event/list 혹은 별도 대기 쿼리)
-      // 만약 /admin/event/list가 전체라면 필터링해서 사용
       const { data } = await adminApi.get('/admin/event/list');
-      // 🌟 이 로그를 추가하고 브라우저 콘솔(F12)을 봐봐!
       console.log("📡 백엔드 응답 데이터:", data);
-      // 🌟 [중요] 백엔드에서 'title'로 오면 'eventTitle'로도 쓸 수 있게 복사해줌
+      
       const formattedData = data.map(item => ({
         ...item,
-        eventTitle: item.eventTitle || item.title, // 둘 중 있는 걸로 사용
+        eventTitle: item.eventTitle || item.title, 
         location: item.location || item.venue,
         eventStartDate: item.eventStartDate || item.eventDate,
         totalCapacity: item.totalCapacity || item.total_capacity || 0
       }));
-      // 1. 전체 데이터 중 'EVENT' 카테고리만 먼저 걸러냄
+      
       const eventOnlyData = data.filter(item => item.category === 'EVENT');
-      // 2. 전체 이벤트 탭용 데이터 세팅
       setAllEvents(eventOnlyData);
-      // 3. 승인 대기(PENDING) 탭용 데이터 세팅
+      
       const pendingOnly = eventOnlyData.filter(e => e.status === 'PENDING');
       setPendingList(pendingOnly);
     } catch (error) {
@@ -50,37 +46,34 @@ export default function AdminBooking() {
     fetchData();
   }, []);
 
-  // 2️⃣ [POST] 승인/거절 처리 함수 (Spring: /admin/event/confirm 호출)
-const handleProcessApproval = async (event, isApproved) => {
-  try {
-    // 승인일 때는 시간이 필수니까 체크!
-    if (isApproved && (!bookingStart || !bookingEnd)) {
-      return toast.error("예매 시작 및 종료 시간을 설정해주세요.");
+  // 2️⃣ [POST] 승인/거절 처리 함수 
+  const handleProcessApproval = async (event, isApproved) => {
+    try {
+      if (isApproved && (!bookingStart || !bookingEnd)) {
+        return toast.error("예매 시작 및 종료 시간을 설정해주세요.");
+      }
+
+      const payload = {
+        eventId: event.approvalId, 
+        status: isApproved ? 'CONFIRMED' : 'FAILED',
+        rejectionReason: isApproved ? "" : "관리자 거절 사유 입력",
+        eventTitle: event.eventTitle,
+        price: event.price || 0,
+        bookingStartDate: bookingStart,
+        bookingEndDate: bookingEnd
+      };
+
+      console.log("📤 백엔드로 보내는 데이터:", payload);
+      await adminApi.post('/admin/event/confirm', payload);
+      
+      toast.success(isApproved ? "승인 완료" : "거절 완료");
+      setSelectedEvent(null); 
+      fetchData(); 
+    } catch (error) {
+      console.error("처리 실패:", error);
+      toast.error("처리 도중 오류가 발생했습니다.");
     }
-
-    const payload = {
-      eventId: event.approvalId, 
-      status: isApproved ? 'CONFIRMED' : 'FAILED',
-      rejectionReason: isApproved ? "" : "관리자 거절 사유 입력",
-      eventTitle: event.eventTitle,
-      price: event.price || 0,
-      // 🌟 여기에 관리자가 설정한 시간 추가해서 보냄
-      bookingStartDate: bookingStart,
-      bookingEndDate: bookingEnd
-    };
-
-    console.log("📤 백엔드로 보내는 데이터:", payload);
-    await adminApi.post('/admin/event/confirm', payload);
-    
-    toast.success(isApproved ? "승인 완료" : "거절 완료");
-    setSelectedEvent(null); // 모달 닫기
-    fetchData(); 
-  } catch (error) {
-    console.error("처리 실패:", error);
-    toast.error("처리 도중 오류가 발생했습니다.");
-  }
-};
-
+  };
   return (
     <Layout role="admin">
       <div className="p-4 lg:p-6 space-y-6">

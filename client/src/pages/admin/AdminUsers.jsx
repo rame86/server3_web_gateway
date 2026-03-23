@@ -67,9 +67,11 @@ export default function AdminUsers() {
   const handleViewDetail = async (memberId) => {
     try {
       toast.loading('상세 정보를 불러오는 중...');
-      const response = await coreApi.get(`/admin/user`, {
-        params: { page, size: 10 }
-      });
+      
+      // 🌟 핵심 주석: 전체 목록이 아닌 특정 유저(memberId)의 상세 정보를 조회하도록 경로 수정
+      // 백엔드 API 설계에 따라 `/admin/user/${memberId}` 형태인지 확인 필요!
+      const response = await coreApi.get(`/admin/user/${memberId}`);
+      
       setSelectedUser(response.data); 
       toast.dismiss();
     } catch (error) {
