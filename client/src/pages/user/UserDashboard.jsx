@@ -4,12 +4,11 @@
  */
 
 import { useEffect, useState } from 'react';
-import SockJS from 'sockjs-client';
-import { Client } from '@stomp/stompjs';
 import Layout from '@/components/Layout';
 import { Heart, ShoppingBag, Calendar, MessageCircle, Sparkles, ArrowRight, Bell, Loader2 } from 'lucide-react';
 import { Link } from 'wouter';
-import { coreApi, getGatewayUrl } from '@/lib/api';
+import { payApi, getGatewayUrl } from '@/lib/api';
+import { toast } from 'sonner';
 import { toast } from 'sonner';
 
 export default function UserDashboard() {
@@ -29,60 +28,26 @@ export default function UserDashboard() {
       return;
     }
 
-    // 1. WebSocket(STOMP) 클라이언트 설정
-    //    AdminUsers.jsx의 user-stats 구독 패턴과 동일하게, 유저 전용 채널 구독
-    const client = new Client({
-      webSocketFactory: () => new SockJS(`${gatewayUrl}/msa/core/ws-admin?token=${token}`, null, {
-        transports: ['websocket']  // xhr_streaming, eventsource 등 fallback 비활성화
-      }),
-      connectHeaders: {
-        Authorization: `Bearer ${token}`,
-      },
-      reconnectDelay: 5000,
-    });
-
-    client.onConnect = () => {
-      console.log('[UserDashboard] WebSocket 연결 완료');
-
-      // 2. 유저 전용 STOMP 토픽 구독
-      //    UserDashboardPayListener가 이 채널로 Pay 서비스 응답을 relay함
-      client.subscribe(`/topic/user-dashboard/${memberId}`, (msg) => {
-        try {
-          const data = JSON.parse(msg.body);
-          console.log('[UserDashboard] 결제 데이터 수신:', data);
-          setPaymentData(data);
-          setIsLoading(false);
-          toast.success('대시보드 데이터를 불러왔습니다!');
-        } catch (e) {
-          console.error('[UserDashboard] 데이터 파싱 오류:', e);
-          setIsLoading(false);
-        }
-      });
-
-      // 3. 구독 완료 후 Core에 MQ 트리거 요청
-      //    Core → Pay (pay.request 큐, type=ADMIN, orderId=USER_DETAIL)
-      //    Pay → Core (user.dashboard.pay.res 큐) → STOMP /topic/user-dashboard/{memberId}
-      coreApi.post('/dashboard/dashboard-queue', { memberId: Number(memberId) })
-        .then(() => console.log('[UserDashboard] MQ 트리거 요청 완료'))
-        .catch(err => {
-          console.error('[UserDashboard] MQ 트리거 실패:', err);
-          setIsLoading(false);
-        });
+    const fetchData = async () => {
+      try {
+        const res = await payApi.get(`/payment/admin/user-detail/${memberId}`);
+        setPaymentData(res.data);
+      } catch (e) {
+        console.error('[UserDashboard] 데이터 조회 오류:', e);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    client.onStompError = (frame) => {
-      console.error('[UserDashboard] STOMP 에러:', frame.headers['message']);
-      setIsLoading(false);
-    };
+    fetchData(); // 최초 진입 시 즉시 실행
 
-    client.activate();
-
-    // 5초 후에도 데이터 없으면 로딩 해제
-    const timeout = setTimeout(() => setIsLoading(false), 5000);
+    // 단순 REST API 방식으로 3초마다 가져오기
+    const interval = setInterval(() => {
+      fetchData();
+    }, 3000);
 
     return () => {
-      clearTimeout(timeout);
-      client.deactivate();
+      clearInterval(interval);
     };
   }, []);
 
