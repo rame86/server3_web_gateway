@@ -19,23 +19,20 @@ const AdminRefund = () => {
   const fetchRefunds = async () => {
     try {
       setLoading(true);
-      // 🌟 TODO: 게이트웨이 주소나 백엔드 포트에 맞춰 수정!
-      const response = await axios.get(`${API_URL}/msa/core/refund`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
-      });
+      
+      // 🌟 [핵심 수정] 컨트롤러가 @RequestMapping("/admin") 이니까 
+      // 주소도 /msa/admin/refund 로 쏴야 서버가 찾아낼 수 있어!
+      const response = await axios.get(`${API_URL}/msa/admin/refund`);
 
-      console.log("💰 환불 리스트 원본 데이터:", response.data);
-      // 🌟 핵심: 서버에서 준 데이터가 진짜 배열(Array)일 때만 넣고, 아니면 빈 배열로 처리!
       if (Array.isArray(response.data)) {
         setRequests(response.data);
       } else {
-        setRequests([]); // 에러나 이상한 데이터면 빈 배열로 초기화
+        setRequests([]);
       }
-
     } catch (error) {
       console.error('환불 목록 조회 실패:', error);
-      toast.error('환불 요청 목록을 불러오지 못했습니다.');
-      setRequests([]); // 에러 났을 때도 무조건 빈 배열 보장
+      toast.error('목록을 불러오지 못했습니다.');
+      setRequests([]);
     } finally {
       setLoading(false);
     }
@@ -45,21 +42,28 @@ const AdminRefund = () => {
   const handleProcessRefund = async (targetId, action) => {
     const actionText = action === 'APPROVED' ? '승인' : '거절';
     
+    // 🌟 [핵심 수정] 하드코딩된 '1' 대신 로컬 스토리지에서 실제 관리자 ID를 가져옴
+    const adminId = localStorage.getItem('memberId') || localStorage.getItem('userId');
+
+    if (!adminId) {
+      toast.error("관리자 정보를 확인할 수 없습니다. 다시 로그인해 주세요.");
+      return;
+    }
+
     if (!window.confirm(`해당 요청을 ${actionText} 처리하시겠습니까?`)) return;
 
     try {
-      // 🌟 Java AdminController의 @PostMapping("/refund")와 연결!
+      // 🌟 서버로 실제 관리자 ID를 함께 보냄
       await axios.post(`${API_URL}/msa/admin/refund`, {
         targetId: targetId,
-        status: action // 'APPROVED' 또는 'REJECTED'
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
+        status: action,
+        adminId: Number(adminId) // 숫자로 형변환해서 전송
       });
 
       toast.success(`환불 요청이 ${actionText}되었습니다.`);
-      fetchRefunds(); // 처리 완료 후 목록 새로고침
+      fetchRefunds(); // 목록 새로고침
     } catch (error) {
-      console.error(`환불 ${actionText} 처리 실패:`, error);
+      console.error(`처리 실패:`, error);
       toast.error(`처리 중 오류가 발생했습니다.`);
     }
   };

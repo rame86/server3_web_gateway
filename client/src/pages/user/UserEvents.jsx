@@ -53,6 +53,20 @@ export default function UserEvents() {
     setIsDetailOpen(true);
   };
 
+  // 🌟 [추가] 로컬 환경 대응용 게이트웨이 주소 설정
+    const rawUrl = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost';
+    const gatewayUrl = (rawUrl === 'http://localhost') 
+        ? 'http://localhost:8082' 
+        : rawUrl.replace(/\/$/, '');
+
+    // 🌟 [추가] 이미지 URL 완성 함수
+    const getImageUrl = (url) => {
+        if (!url || url.includes('placehold.co')) return 'https://placehold.co/600x400?text=No+Image';
+        if (url.startsWith('http')) return url;
+        const imagePath = url.startsWith('/') ? url : `/images/res/${url}`;
+        return `${gatewayUrl}${imagePath}`;
+    };
+
   // 2. 환불 요청하기
   const handleRefundRequest = async (booking) => {
     const memberId = localStorage.getItem('memberId'); // 🌟 여기도 하드코딩 제거
@@ -102,7 +116,7 @@ export default function UserEvents() {
       remaining: e.available_seats || 0,
       capacity: e.total_capacity || 0,
       price: e.price || 0,
-      image: e.event_images?.[0]?.image_url || e.image || 'https://placehold.co/600x400?text=No+Image'
+      image: getImageUrl(e.event_images?.[0]?.image_url || e.image)
     });
 
     // 2. 이벤트 목록 가져오기
