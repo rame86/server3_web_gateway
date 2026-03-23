@@ -32,7 +32,7 @@ export default function UserDashboard() {
     // 1. WebSocket(STOMP) 클라이언트 설정
     //    AdminUsers.jsx의 user-stats 구독 패턴과 동일하게, 유저 전용 채널 구독
     const client = new Client({
-      webSocketFactory: () => new SockJS(`${gatewayUrl}/msa/core/ws-admin`),
+      webSocketFactory: () => new SockJS(`${gatewayUrl}/msa/core/ws-admin?token=${token}`),
       connectHeaders: {
         Authorization: `Bearer ${token}`,
       },
