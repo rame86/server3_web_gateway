@@ -33,6 +33,7 @@ import UserProfile from "./pages/user/UserProfile";
 // Auth pages
 import UserLogin from "./pages/auth/UserLogin";
 import UserSignup from "./pages/auth/UserSignup";
+import Unauthorized from "./pages/auth/Unauthorized";
 
 // Artist pages
 import ArtistDashboard from "./pages/artist/ArtistDashboard";
@@ -101,6 +102,7 @@ function Router() {
       {/* Auth Routes */}
       <Route path="/login" component={UserLogin} />
       <Route path="/signup" component={UserSignup} />
+      <Route path="/unauthorized" component={Unauthorized} />
 
       {/* User Routes */}
       <Route path="/user" component={UserDashboard} />
