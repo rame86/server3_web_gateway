@@ -284,8 +284,7 @@ export default function UserPurchaseProcess() {
                             </button>
                             <button
                                 onClick={() => {
-                                    toast.info("주문/배송 조회 탭을 준비 중입니다.");
-                                    setLocation('/user/store');
+                                    setLocation('/user/store/orders');
                                 }}
                                 className="flex-1 py-3.5 btn-primary-gradient text-white font-semibold rounded-2xl shadow-sm hover:shadow-md transition-shadow"
                             >
