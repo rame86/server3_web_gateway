@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import TopNav from './TopNav';
+import ProfileEditModal from './ProfileEditModal';
 
 
 
@@ -98,6 +99,7 @@ const roleConfig = {
 export default function Layout({ children, role }) {
   const [location,setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const config = roleConfig[role];
   const userName = localStorage.getItem('userName') || config?.userName || '사용자';
 
@@ -130,6 +132,7 @@ export default function Layout({ children, role }) {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-background flex">
       {/* Mobile overlay */}
       {sidebarOpen &&
@@ -179,7 +182,12 @@ export default function Layout({ children, role }) {
             
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm text-foreground truncate">{userName}</p>
-              <p className={`text-xs ${config.textColor} font-medium`}>{config.label}</p>
+              <button
+                onClick={() => setProfileModalOpen(true)}
+                className={`text-xs ${config.textColor} font-medium hover:underline transition-all cursor-pointer`}
+              >
+                정보수정
+              </button>
             </div>
             <button
               onClick={() => toast.info('알림 기능 준비 중입니다')}
@@ -269,6 +277,15 @@ export default function Layout({ children, role }) {
           {children}
         </main>
       </div>
-    </div>);
+    </div>
+
+    {/* 프로필 수정 모달 */}
+    <ProfileEditModal
+      isOpen={profileModalOpen}
+      onClose={() => setProfileModalOpen(false)}
+      role={role}
+    />
+    </>
+  );
 
 }
