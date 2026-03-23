@@ -4,7 +4,7 @@ import Layout from '@/components/Layout';
 import { ArrowLeft, Send, Heart, MessageCircle, Eye, AlertCircle, Trash2, Edit, Paperclip, Download, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
-// 환경 변수에서 게이트웨이 URL을 가져옵니다.
+// 환경 변수 설정
 const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL;
 const API_BASE_URL = `${API_GATEWAY}/msa/core/board`;
 
@@ -20,7 +20,7 @@ export default function UserCommunityDetail() {
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editContent, setEditContent] = useState("");
   
-  // 로그인 정보 로드
+  // 로그인 정보
   const [loginInfo] = useState(() => ({
     memberId: localStorage.getItem('memberId'),
     role: localStorage.getItem('role'),
@@ -41,7 +41,7 @@ export default function UserCommunityDetail() {
     return fetch(url, options);
   }, []);
 
-  // 데이터 로드 (게시글 + 댓글)
+  // 데이터 로드
   const fetchData = useCallback(async () => {
     if (!params?.id) return;
     try {
@@ -67,7 +67,7 @@ export default function UserCommunityDetail() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 권한 체크
+  // 권한 체크 (post가 null일 경우를 대비해 Optional Chaining 사용)
   const isPostOwner = useMemo(() => {
     if (!post || !loginInfo.memberId) return false;
     return String(loginInfo.memberId) === String(post.memberId) || loginInfo.role === 'ADMIN';
@@ -100,25 +100,54 @@ export default function UserCommunityDetail() {
     if(res.ok) { setEditingCommentId(null); fetchData(); }
   };
 
-  // 게시글 신고
+  // 게시글 신고 (API 경로 및 데이터 구조 수정)
   const handleReport = async () => {
     const reason = window.prompt("게시글 신고 사유를 입력해주세요.");
     if (!reason || reason.trim().length < 2) return;
-    const res = await apiFetch(`${API_BASE_URL}/${params.id}/report`, 'POST', { reason });
-    if (res.ok) toast.success("게시글 신고가 접수되었습니다.");
+
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/admin/report/board`, 'POST', { 
+        boardId: params.id, 
+        reason: reason
+      });
+
+      if (res.ok) {
+        toast.success("게시글 신고가 접수되었습니다.");
+      } else {
+        const errorText = await res.text();
+        toast.error(errorText || "이미 신고했거나 처리에 실패했습니다.");
+      }
+    } catch (err) {
+      toast.error("신고 처리 중 오류가 발생했습니다.");
+    }
   };
 
-  // 댓글 신고 (추가된 부분)
+  // 댓글 신고 (API 경로 및 데이터 구조 수정)
   const handleCommentReport = async (commentId) => {
     const reason = window.prompt("댓글 신고 사유를 입력해주세요.");
     if (!reason || reason.trim().length < 2) return;
-    const res = await apiFetch(`${API_BASE_URL}/comments/${commentId}/report`, 'POST', { reason });
-    if (res.ok) toast.success("댓글 신고가 접수되었습니다.");
+
+    try {
+      // 마찬가지로 API_BASE_URL을 사용합니다.
+      const res = await apiFetch(`${API_BASE_URL}/admin/report/comment`, 'POST', { 
+        commentId: commentId, 
+        reason: reason 
+      });
+
+      if (res.ok) {
+        toast.success("댓글 신고가 접수되었습니다.");
+      } else {
+        const errorText = await res.text();
+        toast.error(errorText || "이미 신고했거나 처리에 실패했습니다.");
+      }
+    } catch (err) {
+      toast.error("신고 처리 중 오류가 발생했습니다.");
+    }
   };
 
-  if (loading || !post) {
-    return <Layout role="user"><div className="p-20 text-center text-rose-500 font-bold">불러오는 중...</div></Layout>;
-  }
+  // [중요] 방어 코드: 로딩 중이거나 데이터가 없으면 아래 JSX를 실행하지 않음
+  if (loading) return <Layout role="user"><div className="p-20 text-center text-rose-500 font-bold">불러오는 중...</div></Layout>;
+  if (!post) return <Layout role="user"><div className="p-20 text-center text-gray-400 font-bold">게시글을 찾을 수 없습니다.</div></Layout>;
 
   return (
     <Layout role="user">
@@ -164,10 +193,10 @@ export default function UserCommunityDetail() {
             </div>
           )}
 
-          {/* 하단 정보 (좋아요, 댓글수, 조회수) */}
+          {/* 하단 정보 */}
           <div className="flex gap-6 pt-6 border-t border-rose-50 text-gray-400 text-xs font-bold">
             <button onClick={async () => (await apiFetch(`${API_BASE_URL}/${params.id}/like`, 'POST')).ok && fetchData()} className="flex items-center gap-1.5 hover:text-rose-500 transition-colors">
-              <Heart size={18} fill={post.likeCount > 0 ? "#f43f5e" : "none"} className={post.likeCount > 0 ? "text-rose-500" : ""}/> 
+              <Heart size={18} fill={(post.likeCount || 0) > 0 ? "#f43f5e" : "none"} className={(post.likeCount || 0) > 0 ? "text-rose-500" : ""}/> 
               <span>좋아요 {post.likeCount || 0}</span>
             </button>
             <span className="flex items-center gap-1.5"><MessageCircle size={18}/> 댓글 {comments.length}</span>
@@ -203,7 +232,6 @@ export default function UserCommunityDetail() {
                             <button onClick={() => handleDeleteComment(c.commentId)} className="p-1 text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
                           </>
                         ) : (
-                          /* 다른 사람 댓글일 때 나타나는 신고 버튼 */
                           <button onClick={() => handleCommentReport(c.commentId)} className="p-1 text-gray-400 hover:text-rose-500 transition-colors" title="댓글 신고"><AlertCircle size={14} /></button>
                         )}
                       </div>

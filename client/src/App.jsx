@@ -30,6 +30,7 @@ import UserStoreDetail from "./pages/user/UserStoreDetail";
 import UserPurchaseProcess from "./pages/user/UserPurchaseProcess";
 import UserWishlist from "./pages/user/UserWishlist";
 import UserCart from "./pages/user/UserCart";
+import UserOrders from "./pages/user/UserOrders";
 import UserProfile from "./pages/user/UserProfile";
 
 // Auth pages
@@ -125,6 +126,7 @@ function Router() {
       <Route path="/user/store" component={UserStore} />
       <Route path="/user/store/cart" component={UserCart} />
       <Route path="/user/store/wishlist" component={UserWishlist} />
+      <Route path="/user/store/orders" component={UserOrders} />
       <Route path="/user/store/purchase/:id" component={UserPurchaseProcess} />
       <Route path="/user/store/:id" component={UserStoreDetail} />
       <Route path="/user/booking" component={UserEvents} />
