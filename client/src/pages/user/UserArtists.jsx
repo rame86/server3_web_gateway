@@ -16,8 +16,8 @@ export default function UserArtists() {
   useEffect(() => {
     const fetchArtists = async () => {
       try {
-        const res = await coreApi.get('/artist/list');
-        setArtistList(res.data);
+        const artistList = await coreApi.get('/artist/list');
+        setArtistList(artistList.data);
       } catch (err) {
         toast.error("아티스트 목록을 불러오지 못했습니다.");
       }
@@ -28,8 +28,8 @@ export default function UserArtists() {
   // 2. 팔로우 토글 API 연결
   const handleFollow = async (artistId) => {
     try {
-      const res = await coreApi.post(`/artist/follow/${artistId}`);
-      toast.success(res.data);
+      const artistList = await coreApi.post(`/artist/follow/${artistId}`);
+      toast.success(artistList.data);
       
       setFollowed(prev => 
         prev.includes(artistId) ? prev.filter(id => id !== artistId) : [...prev, artistId]
