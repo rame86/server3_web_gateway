@@ -166,7 +166,7 @@ export default function Home() {
                 인기 아티스트
               </h2>
             </div>
-            <Link href="/user/artists">
+            <Link href="/artists">
               <button className="flex items-center gap-1 text-sm font-semibold text-rose-500 hover:text-rose-600 transition-colors">
                 전체보기 <ArrowRight size={16} />
               </button>
@@ -175,7 +175,7 @@ export default function Home() {
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {artists.map((artist, i) =>
-              <Link key={artist.id} href="/user/artists">
+              <Link key={artist.id} href="/artists">
                 <div
                   className="glass-card rounded-2xl p-4 text-center hover-lift cursor-pointer"
                   style={{ animationDelay: `${i * 0.05}s` }}>
