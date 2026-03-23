@@ -79,8 +79,12 @@ function Router() {
         // 3. 주소창 청소
         window.history.replaceState({}, null, window.location.pathname);
 
-        // 대시보드로 이동
-        setLocation("/user");
+        // role에 따라 페이지 이동
+        if (role === "ARTIST") {
+          setLocation("/artist");
+        } else {
+          setLocation("/user");
+        }
 
       } catch (e) {
         console.error("토큰 처리 중 에러!", e);
