@@ -175,6 +175,23 @@ export default function UserStore() {
               <p className="text-white/70 text-sm">공식 굿즈부터 팬메이드, 중고거래까지</p>
             </div>
           </div>
+          {/* 우상단 - 위시리스트 / 장바구니 바로가기 */}
+          <div className="absolute top-3 right-3 flex gap-2">
+            <button
+              onClick={() => setLocation('/user/store/wishlist')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-xl text-xs font-semibold text-rose-600 shadow hover:bg-white transition-colors"
+            >
+              <Heart size={13} fill="currentColor" />
+              위시리스트
+            </button>
+            <button
+              onClick={() => setLocation('/user/store/cart')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-xl text-xs font-semibold text-rose-600 shadow hover:bg-white transition-colors"
+            >
+              <ShoppingCart size={13} />
+              장바구니
+            </button>
+          </div>
         </div>
 
         {/* Search & Filter */}
