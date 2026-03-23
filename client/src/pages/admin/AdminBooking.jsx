@@ -30,6 +30,20 @@ export default function AdminBooking() {
   const [rejectingEvent, setRejectingEvent] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
+  // 🌟 [추가] 게이트웨이 주소 설정 (포트 강제 주입 로직)
+  const rawUrl = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost';
+  const gatewayUrl = (rawUrl === 'http://localhost') 
+      ? 'http://localhost:8082' 
+      : rawUrl.replace(/\/$/, '');
+
+  // 🌟 [추가] 이미지 URL 조립 함수
+  const getImageUrl = (url) => {
+    if (!url) return 'https://placehold.co/400x200?text=Lumina+Pulse';
+    if (url.startsWith('http')) return url;
+    const imagePath = url.startsWith('/') ? url : `/images/res/${url}`;
+    return `${gatewayUrl}${imagePath}`;
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -174,8 +188,8 @@ export default function AdminBooking() {
                       <div className="flex flex-col sm:flex-row">
                         <div className="relative sm:w-48 h-36 sm:h-auto flex-shrink-0 bg-gray-100">
                           <img 
-                            src={event.imageUrl || 'https://placehold.co/400x200?text=Lumina+Pulse'} 
-                            alt={event.eventTitle || event.title} 
+                            src={getImageUrl(event.imageUrl)} 
+                            alt={event.eventTitle} 
                             className="w-full h-full object-cover" 
                           />
                         </div>
@@ -261,9 +275,9 @@ export default function AdminBooking() {
                 {allEvents.map((event) => (
                   <div key={event.approvalId || event.eventId} className="glass-card rounded-2xl p-4 soft-shadow flex items-center gap-4 bg-white border">
                     <img 
-                      src={event.imageUrl || event.imageURL || event.image || 'https://placehold.co/100x100?text=No+Img'} 
-                      alt={event.eventTitle || event.title} 
-                      className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-gray-50" 
+                      src={getImageUrl(event.imageUrl || event.imageURL || event.image)} 
+                      alt={event.eventTitle} 
+                      className="w-16 h-16 rounded-xl object-cover" 
                     />
                     
                     <div className="flex-1 min-w-0">
@@ -325,7 +339,10 @@ export default function AdminBooking() {
 
             <div className="p-8 overflow-y-auto space-y-8 custom-scrollbar">
               <div className="flex gap-5 p-6 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-                <img src={selectedEvent.imageUrl || 'https://placehold.co/200x200'} className="w-28 h-28 rounded-2xl object-cover shadow-md" />
+                <img 
+                  src={getImageUrl(selectedEvent.imageUrl)} 
+                  className="w-28 h-28 rounded-2xl object-cover shadow-md" 
+                />
                 <div className="flex-1">
                   <h3 className="font-bold text-xl text-slate-800">{selectedEvent.eventTitle || selectedEvent.title}</h3>
                   <p className="text-sm text-rose-500 font-bold mb-2">{selectedEvent.artistName}</p>
