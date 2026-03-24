@@ -116,13 +116,15 @@ export default function Layout({ children, role }) {
     try {
       const token = localStorage.getItem('TOKEN');
       if (token) {
-        await fetch('http://localhost/msa/core/member/logout', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        // await fetch('http://localhost/msa/core/member/logout', {
+        //   method: 'POST',
+        //   headers: {
+        //     'Authorization': `Bearer ${token}`,
+        //     'Content-Type': 'application/json'
+        //   }
+        // });
+        // console.log("백엔드 Redis 세션 삭제 성공");
+        await coreApi.post('/member/logout');
         console.log("백엔드 Redis 세션 삭제 성공");
       }
     } catch (error) {
