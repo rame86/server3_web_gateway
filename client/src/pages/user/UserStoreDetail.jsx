@@ -273,9 +273,19 @@ export default function UserStoreDetail() {
                                             </div>
                                         </div>
                                     </div>
-                                    <p className="text-sm text-foreground leading-relaxed">
+                                    <p className="text-sm text-foreground leading-relaxed mb-4">
                                         {review.comment}
                                     </p>
+                                    {review.imageUrl && (
+                                        <div className="mt-4 rounded-2xl overflow-hidden border border-gray-100 max-w-sm bg-gray-50/50">
+                                            <img
+                                                src={review.imageUrl}
+                                                alt="Review"
+                                                className="w-full h-auto object-cover hover:scale-105 transition-transform duration-500 cursor-pointer"
+                                                onClick={() => window.open(review.imageUrl, '_blank')}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>

@@ -21,6 +21,8 @@ export default function UserOrders() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
+  const [reviewImage, setReviewImage] = useState(null);
+  const [reviewImagePreview, setReviewImagePreview] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
 
   const fetchOrders = async () => {
@@ -56,6 +58,8 @@ export default function UserOrders() {
     setSelectedProduct(product);
     setReviewRating(5);
     setReviewComment('');
+    setReviewImage(null);
+    setReviewImagePreview(null);
     setIsReviewModalOpen(true);
   };
 
@@ -66,11 +70,21 @@ export default function UserOrders() {
     }
     try {
       setSubmittingReview(true);
-      await shopApi.post('/shop/review', {
-        productId: selectedProduct.productId,
-        rating: reviewRating,
-        comment: reviewComment
+      
+      const formData = new FormData();
+      formData.append('productId', selectedProduct.productId);
+      formData.append('rating', reviewRating);
+      formData.append('comment', reviewComment);
+      if (reviewImage) {
+        formData.append('image', reviewImage);
+      }
+
+      await shopApi.post('/shop/review', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
+
       toast.success('리뷰가 등록되었습니다!');
       setIsReviewModalOpen(false);
     } catch (err) {
@@ -268,6 +282,42 @@ export default function UserOrders() {
                   placeholder="착용감, 색상, 디자인 등 만족스러웠던 점을 공유해주세요!"
                   className="w-full h-32 p-4 rounded-2xl border bg-gray-50 focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all outline-none resize-none text-sm"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-bold">사진 첨부 (선택)</p>
+                <div className="flex gap-4 items-center">
+                  <label className="flex-shrink-0 w-20 h-20 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-rose-200 transition-all">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          setReviewImage(file);
+                          setReviewImagePreview(URL.createObjectURL(file));
+                        }
+                      }}
+                    />
+                    <Package size={20} className="text-gray-400 mb-1" />
+                    <span className="text-[10px] text-gray-500">사진 추가</span>
+                  </label>
+                  {reviewImagePreview && (
+                    <div className="relative w-20 h-20 rounded-2xl overflow-hidden border">
+                      <img src={reviewImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button 
+                        onClick={() => {
+                          setReviewImage(null);
+                          setReviewImagePreview(null);
+                        }}
+                        className="absolute top-1 right-1 p-1 bg-black/50 rounded-full text-white hover:bg-black transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <button
