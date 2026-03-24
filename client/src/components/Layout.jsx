@@ -163,7 +163,7 @@ export default function Layout({ children, role }) {
 
           {/* 로고 영역 */}
           <div className="p-5 border-b border-rose-100">
-            <Link href="/" className="flex items-center gap-2.5">
+            <Link href={role === 'user' ? '/user' : role === 'artist' ? '/artist' : '/admin'} className="flex items-center gap-2.5">
               <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${config.color} flex items-center justify-center shadow-sm`}>
                 <Heart size={16} className="text-white" fill="white" />
               </div>
