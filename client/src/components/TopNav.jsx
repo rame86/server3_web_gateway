@@ -72,7 +72,13 @@ const roleConfig = {
 export default function TopNav({ role }) {
   const [location] = useLocation(); // 현재 경로 추적
   const [searchOpen, setSearchOpen] = useState(false); // 모바일 검색바 확장 상태
-  const config = roleConfig[role]; // 현재 역할에 맞는 설정값
+
+  // 🌟 [수정 포인트] 대문자로 들어와도 소문자로 변환하고, 없으면 'user'를 기본값으로!
+  const currentRole = (role || 'user').toLowerCase();
+  
+  // 🌟 [수정 포인트] 혹시 모를 에러 방지를 위해 config가 없을 때 'user' 설정을 쓰도록 방어
+  const config = roleConfig[currentRole] || roleConfig['user'];
+  //const config = roleConfig[role]; // 현재 역할에 맞는 설정값
 
   // 현재 경로와 메뉴 링크가 일치하는지 확인 (서브 경로 포함)
   const isActive = (href) => {
