@@ -73,7 +73,7 @@ export default function UserArtists() {
                 {/* Cover - 🌟 높이 28 복구 */}
                 <div className="relative h-28">
                   <img
-                    src="https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=600&auto=format&fit=crop"
+                    src={artist.profileImageUrl || "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=600&auto=format&fit=crop"}
                     alt={artist.stageName}
                     className="w-full h-full object-cover" />
 

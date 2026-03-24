@@ -64,7 +64,7 @@ export default function UserArtistDetail({ params }) {
         // 내 포인트 잔액 가져오기
         payApi.get('/payment/')
           .then(res => {
-            if (res.data?.balance !== undefined) setMyPoints(res.data.balance);
+            if (res.data?.currentBalance !== undefined) setMyPoints(res.data.currentBalance);
           }).catch(e => console.error(e));
 
         // 1. 아티스트 정보 & 팔로우 상태
@@ -82,7 +82,7 @@ export default function UserArtistDetail({ params }) {
             id: foundArtist.memberId,
             name: finalArtistName,
             group: foundArtist.category || "",
-            coverImage: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1200&auto=format&fit=crop",
+            coverImage: foundArtist.profileImageUrl || "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1200&auto=format&fit=crop",
             image: foundArtist.profileImageUrl || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop",
             followers: foundArtist.followerCount || 0,
             fandom: 'STARLIGHT',
@@ -115,7 +115,7 @@ export default function UserArtistDetail({ params }) {
             id: `board_${b.boardId}`,
             type: b.category || "공지사항",
             title: b.title,
-            date: formatLocalDate(b.regDate)
+            date: formatLocalDate(b.createdAt)
           }));
 
           const rawEvents = eventsRes.data?.events || eventsRes.data || [];
