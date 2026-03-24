@@ -14,43 +14,57 @@ export default function UserStoreDetail() {
     const [loading, setLoading] = useState(true);
     const [wishlisted, setWishlisted] = useState(false);
     const [quantity, setQuantity] = useState(1);
+    const [reviews, setReviews] = useState([]);
+    const [reviewsLoading, setReviewsLoading] = useState(false);
+
+    const fetchProduct = async () => {
+        try {
+            setLoading(true);
+            const response = await shopApi.get(`shop/detail/${productId}`);
+            let data = response.data;
+            if (data && data.data) data = data.data; 
+            
+            const mappedItem = {
+                id: data.productId || data.id,
+                name: data.title || data.name || '알 수 없는 상품',
+                artistId: data.sellerId,
+                artistName: data.sellerType === 'ARTIST' ? '아티스트' : (data.artistName || '유저'),
+                price: data.basePrice || data.price || 0,
+                originalPrice: data.originalPrice, // If any
+                description: data.description || '',
+                image: data.imageUrl,
+                category: data.category === 'OFFICIAL' ? 'official' :
+                    data.category === 'UNOFFICIAL' ? 'unofficial' : 'used',
+                stock: 100, // Placeholder
+                rating: data.averageRating || 0.0,
+                reviewCount: data.reviewCount || 0,
+                badge: data.category === 'OFFICIAL' ? 'OFFICIAL' : null
+            };
+            setItem(mappedItem);
+        } catch (error) {
+            console.error('Failed to fetch product:', error);
+            toast.error('상품 정보를 가져오는 데 실패했습니다.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchReviews = async () => {
+        try {
+            setReviewsLoading(true);
+            const res = await shopApi.get(`/shop/product/${productId}/reviews`);
+            setReviews(res.data || []);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setReviewsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchProduct = async () => {
-            try {
-                setLoading(true);
-                // The backend likely has a detail endpoint at /{id}
-                // If not, we could fetch all and filter, but let's try /{id} first
-                const response = await shopApi.get(`shop/detail/${productId}`);
-                let data = response.data;
-                if (data && data.data) data = data.data; // Handle potential API wrappers
-                
-                const mappedItem = {
-                    id: data.productId || data.id,
-                    name: data.title || data.name || '알 수 없는 상품',
-                    artistId: data.sellerId,
-                    artistName: data.sellerType === 'ARTIST' ? '아티스트' : (data.artistName || '유저'),
-                    price: data.basePrice || data.price || 0,
-                    description: data.description || '',
-                    image: data.imageUrl,
-                    category: data.category === 'OFFICIAL' ? 'official' :
-                        data.category === 'UNOFFICIAL' ? 'unofficial' : 'used',
-                    stock: 100, // Placeholder
-                    rating: 4.5, // Placeholder
-                    reviews: 10, // Placeholder
-                    badge: data.category === 'OFFICIAL' ? 'OFFICIAL' : null
-                };
-                setItem(mappedItem);
-            } catch (error) {
-                console.error('Failed to fetch product:', error);
-                toast.error('상품 정보를 가져오는 데 실패했습니다.');
-            } finally {
-                setLoading(false);
-            }
-        };
-
         if (productId) {
             fetchProduct();
+            fetchReviews();
         }
     }, [productId]);
 
@@ -118,8 +132,8 @@ export default function UserStoreDetail() {
                             <div className="flex items-center gap-4 text-sm mb-6">
                                 <div className="flex items-center gap-1">
                                     <Star size={16} className="text-amber-400" fill="currentColor" />
-                                    <span className="font-bold">{item.rating}</span>
-                                    <span className="text-muted-foreground">({item.reviews}개 리뷰)</span>
+                                    <span className="font-bold">{item.rating.toFixed(1)}</span>
+                                    <span className="text-muted-foreground">({item.reviewCount}개 리뷰)</span>
                                 </div>
                                 <div className="w-1 h-1 rounded-full bg-gray-300" />
                                 <span className="text-muted-foreground">남은 수량: {item.stock}개</span>
@@ -215,6 +229,67 @@ export default function UserStoreDetail() {
                             <Info size={14} /> 이 상품은 Lumina 포인트 서비스로만 결제 가능합니다.
                         </p>
                     </div>
+                </div>
+
+                {/* Reviews Section */}
+                <div className="mt-16 space-y-8">
+                    <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+                        <h2 className="text-2xl font-bold">리뷰</h2>
+                        <span className="text-rose-500 font-bold">{reviews.length}</span>
+                    </div>
+
+                    {reviewsLoading ? (
+                        <div className="flex justify-center py-12">
+                            <Loader2 className="text-rose-500 animate-spin" />
+                        </div>
+                    ) : reviews.length === 0 ? (
+                        <div className="text-center py-20 bg-gray-50 rounded-3xl border border-dashed">
+                            <Star size={40} className="mx-auto text-gray-200 mb-4" />
+                            <p className="text-muted-foreground font-medium">아직 작성된 리뷰가 없습니다.</p>
+                            <p className="text-sm text-muted-foreground mt-1">이 상품의 첫 번째 리뷰어가 되어보세요!</p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-6">
+                            {reviews.map((review) => (
+                                <div key={review.reviewId} className="p-6 bg-white rounded-3xl border border-gray-100 soft-shadow">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 font-bold text-sm">
+                                                {review.memberId.toString().substring(0, 2)}
+                                            </div>
+                                            <div>
+                                                <div className="flex gap-0.5 mb-1">
+                                                    {[1, 2, 3, 4, 5].map((s) => (
+                                                        <Star 
+                                                            key={s} 
+                                                            size={14} 
+                                                            className={s <= review.rating ? "fill-amber-400 text-amber-400" : "text-gray-200"} 
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {new Date(review.createdAt).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-foreground leading-relaxed mb-4">
+                                        {review.comment}
+                                    </p>
+                                    {review.imageUrl && (
+                                        <div className="mt-4 rounded-2xl overflow-hidden border border-gray-100 max-w-sm bg-gray-50/50">
+                                            <img
+                                                src={review.imageUrl}
+                                                alt="Review"
+                                                className="w-full h-auto object-cover hover:scale-105 transition-transform duration-500 cursor-pointer"
+                                                onClick={() => window.open(review.imageUrl, '_blank')}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </Layout>

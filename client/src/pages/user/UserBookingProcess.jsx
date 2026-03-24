@@ -35,6 +35,7 @@ export default function UserBookingProcess() {
     const [userPoints, setUserPoints] = useState(0);
 
     const MAX_TICKETS = 2; // 1인당 최대 구매 제한 2매
+    const [isPayConfirmOpen, setIsPayConfirmOpen] = useState(false);
 
    /* -----------------------------------------------------------
     * [CONFIG] 공연장별 좌석 규모 설정
@@ -118,6 +119,55 @@ export default function UserBookingProcess() {
         else if (step === 2) setStep(1);
         else if (step === 3) isSeatSelectionMode ? setStep(2) : setStep(1);
         else setStep(step - 1);
+    };
+
+    const handlePayment = async () => {
+        setIsPayConfirmOpen(false);
+        const memberId = localStorage.getItem('memberId');
+        if (!memberId) {
+            toast.error('로그인이 필요한 서비스입니다.');
+            return;
+        }
+        toast.loading('예약 요청 중...', { id: 'pay-toast' });
+        try {
+            const { data } = await resApi.post('/reserve', { 
+                event_id: event.id, 
+                ticket_count: finalTicketCount,
+                member_id: memberId,
+                selected_seats: isSeatSelectionMode ? selectedSeats : null
+            });
+            const currentTicketCode = data.ticket_id || data.ticketCode;
+            setReservationResult({ ticket_code: currentTicketCode });
+            toast.loading('결제 확인 중... 잠시만 기다려주세요.', { id: 'pay-toast' });
+            let attempts = 0;
+            const maxAttempts = 10;
+            const checkStatus = async () => {
+                if (attempts >= maxAttempts) {
+                    toast.dismiss('pay-toast');
+                    toast.error('결제 확인이 지연되고 있습니다.. 나중에 예매 내역을 확인해주세요.');
+                    return;
+                }
+                attempts++;
+                try {
+                    const statusRes = await resApi.get(`/reservations/status/${currentTicketCode}`);
+                    const { status } = statusRes.data;
+                    if (status === 'CONFIRMED') {
+                        toast.success('결제 완료!', { id: 'pay-toast' });
+                        handleNext();
+                    } else if (status === 'FAILED') {
+                        toast.error('결제 실패. 포인트를 확인해주세요..', { id: 'pay-toast' });
+                    } else {
+                        setTimeout(checkStatus, 2000);
+                    }
+                } catch (err) {
+                    setTimeout(checkStatus, 2000);
+                }
+            };
+            checkStatus();
+        } catch (error) {
+            toast.dismiss('pay-toast');
+            toast.error('결제 요청에 실패했습니다..');
+        }
     };
 
     const handleMapReady = async (map) => {
@@ -268,68 +318,7 @@ export default function UserBookingProcess() {
                         </div>
 
                          <button
-                            onClick={async () => {
-                                const memberId = localStorage.getItem('memberId');
-                                if (!memberId) {
-                                    toast.error('로그인이 필요한 서비스입니다.');
-                                    return;
-                                }
-
-                                toast.loading('예약 요청 중...', { id: 'pay-toast' });
-                                
-                                try {
-                                    const { data } = await resApi.post('/reserve', { 
-                                        event_id: event.id, 
-                                        ticket_count: finalTicketCount,
-                                        member_id: memberId,
-                                        selected_seats: isSeatSelectionMode ? selectedSeats : null
-                                    });
-                                    
-                                    const currentTicketCode = data.ticket_id || data.ticketCode;
-                                    setReservationResult({ ticket_code: currentTicketCode });
-                                    
-                                    // [폴링 시작] 응답(202)을 받으면 바로 넘어가지 않고 2초 간격으로 상태를 찔러봄
-                                    toast.loading('결제 확인 중... 잠시만 기다려주세요.', { id: 'pay-toast' });
-                                    
-                                    let attempts = 0;
-                                    const maxAttempts = 10; // 무한 루프 방지 (최대 20초 대기)
-                                    
-                                    const checkStatus = async () => {
-                                        if (attempts >= maxAttempts) {
-                                            toast.dismiss('pay-toast');
-                                            toast.error('결제 확인이 지연되고 있습니다.. 나중에 예매 내역을 확인해주세요.');
-                                            return;
-                                        }
-                                        attempts++;
-                                        
-                                        try {
-                                            // 백엔드 상태 조회 API 호출 (URL은 백엔드 라우터 설정에 맞춰 수정 필요)
-                                            const statusRes = await resApi.get(`/reservations/status/${currentTicketCode}`);
-                                            const { status } = statusRes.data;
-                                            
-                                            if (status === 'CONFIRMED') {
-                                                toast.success('결제 완료!', { id: 'pay-toast' });
-                                                // 🌟 결제가 확정된 이 시점에만 Step 4로 넘김
-                                                handleNext(); 
-                                            } else if (status === 'FAILED') {
-                                                toast.error('결제 실패. 포인트를 확인해주세요..', { id: 'pay-toast' });
-                                            } else {
-                                                // PENDING 상태면 2초 뒤 재귀 호출로 다시 확인
-                                                setTimeout(checkStatus, 2000); 
-                                            }
-                                        } catch (err) {
-                                            // 상태 조회 실패 시에도 다음 턴에 다시 시도
-                                            setTimeout(checkStatus, 2000);
-                                        }
-                                    };
-                                    
-                                    checkStatus(); // 폴링 최초 실행
-
-                                } catch (error) {
-                                    toast.dismiss('pay-toast');
-                                    toast.error('결제 요청에 실패했습니다..');
-                                }
-                            }}
+                            onClick={() => setIsPayConfirmOpen(true)}  // ← 이것만 교체
                             disabled={!isEnoughPoints}
                             className={`w-full py-4 rounded-2xl font-bold transition-all ${isEnoughPoints ? 'btn-primary-gradient text-white' : 'bg-gray-200 text-gray-400'}`}
                         >
@@ -391,6 +380,46 @@ export default function UserBookingProcess() {
                         </div>
                     </div>
                 )}
+
+                {/* 결제 확인 모달 */}
+                <Dialog open={isPayConfirmOpen} onOpenChange={setIsPayConfirmOpen}>
+                    <DialogContent className="sm:max-w-sm p-0 overflow-hidden bg-white rounded-3xl border-none">
+                        <div className="p-8 space-y-6 text-center">
+                            <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto">
+                                <CreditCard size={32} className="text-rose-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-foreground">결제를 진행할까요?</h3>
+                                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                                    {event.title}<br/>
+                                    <span className="text-rose-500 font-bold text-lg">
+                                        {formatPrice(grandTotal).replace('원', 'P')}
+                                    </span>
+                                    이 차감됩니다.
+                                </p>
+                            </div>
+                            {isSeatSelectionMode && selectedSeats.length > 0 && (
+                                <div className="px-4 py-3 bg-rose-50 rounded-2xl text-sm text-rose-600 font-medium">
+                                    선택 좌석: {selectedSeats.join(', ')}
+                                </div>
+                            )}
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    onClick={() => setIsPayConfirmOpen(false)}
+                                    className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    onClick={handlePayment}
+                                    className="flex-[1.5] py-3 btn-primary-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all"
+                                >
+                                    결제하기
+                                </button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Map Modal */}
                 <Dialog open={isMapOpen} onOpenChange={setIsMapOpen}>
