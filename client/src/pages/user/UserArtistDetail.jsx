@@ -5,32 +5,13 @@
 
 import { useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
-import { 
-  Heart, MessageCircle, PlaySquare, ShoppingBag, 
-  Bell, Gift, Sparkles, LayoutDashboard, X, 
+import {
+  Heart, MessageCircle, PlaySquare, ShoppingBag,
+  Bell, Gift, Sparkles, LayoutDashboard, X,
   Send, Play, MessageSquare, ThumbsUp, ShoppingCart, CalendarDays
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-// --- 임시 데이터 (나중에 API로 대체할 부분) ---
-const initialArtistData = {
-  id: 1,
-  name: "김지수",
-  group: "NOVA",
-  coverImage: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1200&auto=format&fit=crop",
-  image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop",
-  followers: 520000,
-  fandom: "STARLIGHT",
-  description: "감성적인 보컬과 퍼포먼스로 팬들의 마음을 사로잡는 아티스트",
-  tags: ["보컬", "K-POP", "댄스"],
-  isFollowed: true
-};
-
-const mockNotices = [
-  { id: 1, type: "공지", title: "NOVA 정규 3집 발매 기념 팬사인회 안내", date: "2026.03.18" },
-  { id: 2, type: "일정", title: "뮤직뱅크 사전녹화 참여 안내", date: "2026.03.20" },
-  { id: 3, type: "아티스트", title: "팬 여러분 사랑해요! 오늘 무대 어땠나요?", date: "2026.03.15" },
-];
+import { coreApi, resApi } from '@/lib/api';
 
 const mockMedia = [
   { id: 1, title: "'Starry Night' M/V Behind The Scenes", img: "https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?q=80&w=400&auto=format&fit=crop" },
@@ -47,15 +28,27 @@ const mockShop = [
 
 export default function UserArtistDetail({ params }) {
   const id = params?.id;
-  
-  const [artist, setArtist] = useState(initialArtistData);
+
+  const [artist, setArtist] = useState({
+    id: 0,
+    name: "로딩 중...",
+    group: "",
+    coverImage: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1200&auto=format&fit=crop",
+    image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop",
+    followers: 0,
+    fandom: "",
+    description: "",
+    tags: [],
+    isFollowed: false
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [notices, setNotices] = useState([]);
 
   // 후원 모달 상태
-  const [isDonateOpen, setIsDonateOpen] = useState(false); 
-  const [donateAmount, setDonateAmount] = useState(''); 
-  const [myPoints, setMyPoints] = useState(15000); 
+  const [isDonateOpen, setIsDonateOpen] = useState(false);
+  const [donateAmount, setDonateAmount] = useState('');
+  const [myPoints, setMyPoints] = useState(0);
 
   // 가상 챗봇 상태
   const [chatMessage, setChatMessage] = useState('');
@@ -64,7 +57,75 @@ export default function UserArtistDetail({ params }) {
   ]);
 
   useEffect(() => {
-    // API 데이터 로딩 로직 들어갈 자리
+    const fetchArtistData = async () => {
+      if (!id) return;
+      setLoading(true);
+      try {
+        // 내 포인트 잔액 가져오기
+        coreApi.get('/member/my-info')
+          .then(res => {
+            if (res.data?.payment?.balance) setMyPoints(res.data.payment.balance);
+          }).catch(e => console.error(e));
+
+        // 1. 아티스트 정보 & 팔로우 상태
+        const [artistRes, followRes] = await Promise.all([
+          coreApi.get('/artist/list'),
+          coreApi.get('/artist/my-follows').catch(() => ({ data: [] }))
+        ]);
+
+        const foundArtist = artistRes.data.find(a => a.memberId === parseInt(id));
+        if (foundArtist) {
+          const isFollowed = followRes.data.some(f => f.memberId === parseInt(id));
+          const finalArtistName = foundArtist.stageName || foundArtist.artistName || "이름 없음";
+
+          setArtist({
+            id: foundArtist.memberId,
+            name: finalArtistName,
+            group: foundArtist.category || "",
+            coverImage: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1200&auto=format&fit=crop",
+            image: foundArtist.profileImageUrl || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop",
+            followers: foundArtist.followerCount || 0,
+            fandom: 'STARLIGHT',
+            description: foundArtist.description || "아티스트 소개가 없습니다.",
+            tags: [foundArtist.category].filter(Boolean),
+            isFollowed
+          });
+
+          // 2. 공지사항 (Board) & 최근일정 (Events)
+          const [boardRes, eventsRes] = await Promise.all([
+            coreApi.get(`/artist/board/${id}?category=전체`).catch(() => ({ data: [] })),
+            resApi.get('/events').catch(() => ({ data: [] }))
+          ]);
+
+          const mappedNotices = (boardRes.data || []).slice(0, 3).map(b => ({
+            id: `board_${b.boardId}`,
+            type: b.category || "공지사항",
+            title: b.title,
+            date: new Date(b.regDate).toLocaleDateString()
+          }));
+
+          const rawEvents = eventsRes.data?.events || eventsRes.data || [];
+          const matchedEvents = Array.isArray(rawEvents) ? rawEvents
+            .filter(e => e.artist_name === finalArtistName)
+            .slice(0, 3)
+            .map(e => ({
+              id: `event_${e.event_id}`,
+              type: "일정",
+              title: e.title,
+              date: e.event_date ? new Date(e.event_date).toLocaleDateString() : 'TBD'
+            })) : [];
+
+          // 날짜 혹은 최신순 정렬 없이 결합
+          setNotices([...mappedNotices, ...matchedEvents]);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('정보를 불러오는데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchArtistData();
   }, [id]);
 
   const tabs = [
@@ -76,8 +137,19 @@ export default function UserArtistDetail({ params }) {
     { id: 'ai_recommend', label: 'AI 추천', icon: Sparkles },
   ];
 
+  // 팔로우 토글 액션
+  const handleFollowToggle = async () => {
+    try {
+      await coreApi.post(`/artist/follow/${id}`);
+      setArtist(p => ({ ...p, isFollowed: !p.isFollowed }));
+      toast.success(artist.isFollowed ? '팔로우가 취소되었습니다.' : '아티스트를 팔로우했습니다!');
+    } catch (e) {
+      toast.error('요청 처리 중 오류가 발생했습니다.');
+    }
+  };
+
   // 후원 실행
-  const executeDonation = () => {
+  const executeDonation = async () => {
     const amount = parseInt(donateAmount);
     if (!amount || isNaN(amount) || amount <= 0) {
       toast.error('올바른 후원 금액을 입력해주세요.');
@@ -87,10 +159,22 @@ export default function UserArtistDetail({ params }) {
       toast.error('보유 포인트가 부족합니다. 충전 후 이용해주세요.');
       return;
     }
-    setMyPoints(prev => prev - amount); 
-    setIsDonateOpen(false); 
-    setDonateAmount(''); 
-    toast.success(`${artist.name}님에게 ${amount.toLocaleString()} P를 후원했습니다! 🎉`);
+
+    try {
+      toast.loading('후원 처리 중...');
+      const req = { artistId: parseInt(id), amount: amount };
+      const res = await coreApi.post('/artist/donate', req);
+
+      toast.dismiss();
+      toast.success(`${artist.name}님에게 ${amount.toLocaleString()} P를 후원했습니다! 🎉`);
+      setIsDonateOpen(false);
+      setDonateAmount('');
+      setMyPoints(prev => prev - amount); // UI 차감 업데이트
+    } catch (e) {
+      toast.dismiss();
+      const serverMsg = e.response?.data || '후원 요청 중 오류가 발생했습니다.';
+      toast.error(typeof serverMsg === 'string' ? serverMsg : '잔액 부족 또는 서버 오류입니다.');
+    }
   };
 
   // 챗봇 메시지 전송
@@ -113,7 +197,7 @@ export default function UserArtistDetail({ params }) {
         <div className="relative h-64 md:h-80 w-full">
           <img src={artist.coverImage} alt="cover" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-          
+
           <div className="absolute bottom-0 left-0 w-full p-6 lg:px-12 flex flex-col md:flex-row items-end md:items-center justify-between gap-4">
             <div className="flex items-end gap-4">
               <img src={artist.image} alt={artist.name} className="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover ring-4 ring-white shadow-xl" />
@@ -130,7 +214,7 @@ export default function UserArtistDetail({ params }) {
               <button onClick={() => setIsDonateOpen(true)} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-amber-400 text-amber-950 font-bold hover:bg-amber-500 transition-colors shadow-lg">
                 <Gift size={18} /> 후원하기
               </button>
-              <button onClick={() => setArtist(p => ({...p, isFollowed: !p.isFollowed}))} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg ${artist.isFollowed ? 'bg-white/20 backdrop-blur-md text-white border border-white/30 hover:bg-white/30' : 'btn-primary-gradient text-white'}`}>
+              <button onClick={handleFollowToggle} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg ${artist.isFollowed ? 'bg-white/20 backdrop-blur-md text-white border border-white/30 hover:bg-white/30' : 'btn-primary-gradient text-white'}`}>
                 <Heart size={18} fill={artist.isFollowed ? 'currentColor' : 'none'} /> {artist.isFollowed ? '팔로잉' : '팔로우'}
               </button>
             </div>
@@ -149,27 +233,28 @@ export default function UserArtistDetail({ params }) {
 
           {/* === 탭 콘텐츠 영역 === */}
           <div className="fade-in-up mt-6">
-            
+
             {/* 1. 대쉬보드 */}
             {activeTab === 'dashboard' && (
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="glass-card p-6 rounded-2xl">
-                  <h3 className="font-bold flex items-center gap-2 mb-4 text-foreground"><Bell size={18} className="text-rose-500"/> 최근 공지 및 일정</h3>
+                  <h3 className="font-bold flex items-center gap-2 mb-4 text-foreground"><Bell size={18} className="text-rose-500" /> 최근 공지 및 일정</h3>
                   <div className="space-y-3">
-                    {mockNotices.map(notice => (
+                    {notices.map(notice => (
                       <div key={notice.id} className="flex flex-col gap-1 p-3 rounded-xl hover:bg-rose-50/50 transition-colors cursor-pointer border border-transparent hover:border-rose-100">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-rose-600 bg-rose-100 px-2 py-0.5 rounded-md">{notice.type}</span>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${notice.type === '일정' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'}`}>{notice.type}</span>
                           <span className="text-xs text-muted-foreground">{notice.date}</span>
                         </div>
                         <p className="text-sm font-medium text-foreground line-clamp-1">{notice.title}</p>
                       </div>
                     ))}
+                    {notices.length === 0 && <p className="text-sm text-gray-500 text-center py-4">등록된 공지나 일정이 없습니다.</p>}
                   </div>
                 </div>
 
                 <div className="glass-card p-6 rounded-2xl">
-                  <h3 className="font-bold flex items-center gap-2 mb-4 text-foreground"><PlaySquare size={18} className="text-rose-500"/> 최근 아티스트 미디어</h3>
+                  <h3 className="font-bold flex items-center gap-2 mb-4 text-foreground"><PlaySquare size={18} className="text-rose-500" /> 최근 아티스트 미디어</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {mockMedia.map(media => (
                       <div key={media.id} className="group relative rounded-xl overflow-hidden cursor-pointer aspect-video">
@@ -208,14 +293,14 @@ export default function UserArtistDetail({ params }) {
             {activeTab === 'community' && (
               <div className="glass-card p-6 rounded-2xl">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold flex items-center gap-2"><MessageSquare size={18} className="text-rose-500"/> 팬레터 & 공지사항</h3>
+                  <h3 className="font-bold flex items-center gap-2"><MessageSquare size={18} className="text-rose-500" /> 팬레터 & 공지사항</h3>
                   <button className="text-sm bg-gray-100 px-4 py-2 rounded-lg font-medium hover:bg-gray-200">글쓰기</button>
                 </div>
                 <div className="space-y-4">
-                  {[...mockNotices, {id: 4, type:"팬레터", title:"언니 목소리 들으면 힘이나요!", date:"방금 전"}].map(item => (
+                  {[...notices.filter(n => n.type !== '일정'), { id: 'mock_fanletter_1', type: "팬레터", title: "언니 목소리 들으면 힘이나요!", date: "방금 전" }].map(item => (
                     <div key={item.id} className="flex items-center justify-between p-4 border border-border rounded-xl hover:shadow-md transition-shadow cursor-pointer bg-white">
                       <div className="flex items-center gap-4">
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${item.type === '공지' ? 'bg-gray-800 text-white' : item.type === '아티스트' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-600'}`}>
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${item.type === '공지' || item.type === '공지사항' ? 'bg-gray-800 text-white' : item.type === '아티스트' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-600'}`}>
                           {item.type}
                         </span>
                         <p className="font-medium">{item.title}</p>
@@ -243,16 +328,15 @@ export default function UserArtistDetail({ params }) {
                     <p className="text-xs text-rose-600">현재 온라인</p>
                   </div>
                 </div>
-                
+
                 {/* 채팅 내역 */}
                 <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50/50">
                   {chatHistory.map((msg, idx) => (
                     <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm ${
-                        msg.sender === 'user' 
-                        ? 'bg-rose-500 text-white rounded-tr-sm' 
-                        : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm shadow-sm'
-                      }`}>
+                      <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-sm ${msg.sender === 'user'
+                          ? 'bg-rose-500 text-white rounded-tr-sm'
+                          : 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm shadow-sm'
+                        }`}>
                         {msg.text}
                       </div>
                     </div>
@@ -261,12 +345,12 @@ export default function UserArtistDetail({ params }) {
 
                 {/* 입력창 */}
                 <div className="p-3 border-t border-gray-100 bg-white flex gap-2">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="메시지를 입력해봐!" 
+                    placeholder="메시지를 입력해봐!"
                     className="flex-1 bg-gray-100 border-transparent rounded-xl px-4 focus:ring-rose-200 text-sm"
                   />
                   <button onClick={handleSendMessage} className="bg-rose-500 hover:bg-rose-600 text-white p-3 rounded-xl transition-colors">
@@ -280,15 +364,15 @@ export default function UserArtistDetail({ params }) {
             {activeTab === 'ai_recommend' && (
               <div className="glass-card p-6 rounded-2xl">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="bg-purple-100 p-2 rounded-xl"><Sparkles className="text-purple-600" size={20}/></div>
+                  <div className="bg-purple-100 p-2 rounded-xl"><Sparkles className="text-purple-600" size={20} /></div>
                   <div>
                     <h3 className="font-bold">AI가 분석한 취향 저격 콘텐츠</h3>
                     <p className="text-sm text-muted-foreground">이전 시청 기록을 바탕으로 추천해줄게!</p>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[1,2,3,4].map(i => (
+                  {[1, 2, 3, 4].map(i => (
                     <div key={i} className="group cursor-pointer">
                       <div className="aspect-[3/4] rounded-xl overflow-hidden mb-2 bg-gray-100 relative">
                         <img src={`https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=300&auto=format&fit=crop&sig=${i}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
@@ -306,10 +390,10 @@ export default function UserArtistDetail({ params }) {
             {activeTab === 'shop' && (
               <div className="glass-card p-6 rounded-2xl">
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold flex items-center gap-2"><ShoppingBag size={18} className="text-rose-500"/> 공식 스토어</h3>
+                  <h3 className="font-bold flex items-center gap-2"><ShoppingBag size={18} className="text-rose-500" /> 공식 스토어</h3>
                   <span className="text-sm font-medium text-rose-500 cursor-pointer">더보기 &gt;</span>
                 </div>
-                
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {mockShop.map(item => (
                     <div key={item.id} className="group">
