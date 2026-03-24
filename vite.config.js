@@ -45,7 +45,8 @@ function trimLogFile(logPath, maxSize) {
     fs.writeFileSync(logPath, keptLines.join("\n"), "utf-8");
   } catch {
 
-    /* ignore trim errors */}
+    /* ignore trim errors */
+  }
 }
 
 function writeToLogFile(source, entries) {
@@ -84,14 +85,14 @@ function vitePluginManusDebugCollector() {
       return {
         html,
         tags: [
-        {
-          tag: "script",
-          attrs: {
-            src: "/__manus__/debug-collector.js",
-            defer: true
-          },
-          injectTo: "head"
-        }]
+          {
+            tag: "script",
+            attrs: {
+              src: "/__manus__/debug-collector.js",
+              defer: true
+            },
+            injectTo: "head"
+          }]
 
       };
     },
@@ -160,24 +161,44 @@ export default defineConfig({
       "@assets": path.resolve(import.meta.dirname, "attached_assets")
     }
   },
-  envDir: path.resolve(import.meta.dirname),
+  envDir: path.resolve(import.meta.dirname, "client"),
   root: path.resolve(import.meta.dirname, "client"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true
   },
   server: {
     port: 3000,
     strictPort: false, // Will find next available port if 3000 is busy
     host: true,
+    proxy: {
+      // 모든 /msa/* 경로를 Nginx API Gateway (port 80)로 프록시
+      // 브라우저는 localhost:3001으로 요청 → Vite가 localhost:80으로 전달 → CORS 없음
+      '/msa/core': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+      '/msa/pay': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+      '/msa/shop': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+      '/msa/res': {
+        target: 'http://localhost:80',
+        changeOrigin: true,
+      },
+    },
     allowedHosts: [
-    ".manuspre.computer",
-    ".manus.computer",
-    ".manus-asia.computer",
-    ".manuscomputer.ai",
-    ".manusvm.computer",
-    "localhost",
-    "127.0.0.1"],
+      ".manuspre.computer",
+      ".manus.computer",
+      ".manus-asia.computer",
+      ".manuscomputer.ai",
+      ".manusvm.computer",
+      "localhost",
+      "127.0.0.1"],
 
     fs: {
       strict: true,

@@ -440,5 +440,6 @@ export function formatNumber(n) {
 }
 
 export function formatPrice(n) {
-  return `${n.toLocaleString()}원`;
+  if (n === null || n === undefined || isNaN(n)) return '0원';
+  return `${Number(n).toLocaleString()}원`;
 }
