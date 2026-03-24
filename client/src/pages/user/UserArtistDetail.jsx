@@ -11,7 +11,7 @@ import {
   Send, Play, MessageSquare, ThumbsUp, ShoppingCart, CalendarDays
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { coreApi, resApi } from '@/lib/api';
+import { coreApi, resApi, payApi } from '@/lib/api';
 
 const mockMedia = [
   { id: 1, title: "'Starry Night' M/V Behind The Scenes", img: "https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?q=80&w=400&auto=format&fit=crop" },
@@ -62,9 +62,9 @@ export default function UserArtistDetail({ params }) {
       setLoading(true);
       try {
         // 내 포인트 잔액 가져오기
-        coreApi.get('/member/my-info')
+        payApi.get('/payment/')
           .then(res => {
-            if (res.data?.payment?.balance) setMyPoints(res.data.payment.balance);
+            if (res.data?.balance !== undefined) setMyPoints(res.data.balance);
           }).catch(e => console.error(e));
 
         // 1. 아티스트 정보 & 팔로우 상태
@@ -93,15 +93,29 @@ export default function UserArtistDetail({ params }) {
 
           // 2. 공지사항 (Board) & 최근일정 (Events)
           const [boardRes, eventsRes] = await Promise.all([
-            coreApi.get(`/artist/board/${id}?category=전체`).catch(() => ({ data: [] })),
+            coreApi.get(`/artist/board/${id}?category=공지사항`).catch(() => ({ data: [] })),
             resApi.get('/events').catch(() => ({ data: [] }))
           ]);
+          
+          // 백엔드 LocalDateTime 배열 포맷에 대응하는 Helper
+          const formatLocalDate = (dateVal) => {
+            if (Array.isArray(dateVal)) {
+              return `${dateVal[0]}.${String(dateVal[1]).padStart(2, '0')}.${String(dateVal[2]).padStart(2, '0')}`;
+            }
+            if (!dateVal) return '';
+            const d = new Date(dateVal);
+            return !isNaN(d) ? d.toLocaleDateString() : '날짜 없음';
+          };
 
-          const mappedNotices = (boardRes.data || []).slice(0, 3).map(b => ({
+          // 서버에서 카테고리 필터 미작동에 대비해 프론트에서도 '공지' 관련만 필터링 진행
+          const boardList = Array.isArray(boardRes.data) ? boardRes.data : [];
+          const noticeList = boardList.filter(b => b.category === '공지' || b.category === '공지사항');
+
+          const mappedNotices = noticeList.slice(0, 3).map(b => ({
             id: `board_${b.boardId}`,
             type: b.category || "공지사항",
             title: b.title,
-            date: new Date(b.regDate).toLocaleDateString()
+            date: formatLocalDate(b.regDate)
           }));
 
           const rawEvents = eventsRes.data?.events || eventsRes.data || [];
@@ -109,10 +123,10 @@ export default function UserArtistDetail({ params }) {
             .filter(e => e.artist_name === finalArtistName)
             .slice(0, 3)
             .map(e => ({
-              id: `event_${e.event_id}`,
-              type: "일정",
-              title: e.title,
-              date: e.event_date ? new Date(e.event_date).toLocaleDateString() : 'TBD'
+               id: `event_${e.event_id}`,
+               type: "일정",
+               title: e.title,
+               date: e.event_date ? formatLocalDate(e.event_date) : 'TBD'
             })) : [];
 
           // 날짜 혹은 최신순 정렬 없이 결합
