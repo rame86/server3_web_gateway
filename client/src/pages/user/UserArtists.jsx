@@ -88,7 +88,7 @@ export default function UserArtists() {
                 <div className="px-4 pb-4 relative z-10">
                   <div className="flex items-end gap-3 -mt-6 mb-3">
                     <img
-                      src={artist.profileImageUrl || "https://placehold.co/200x200"}
+                      src={artist.profileImageUrl || "https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=200&h=200&fit=crop"}
                       alt={artist.stageName}
                       className="w-14 h-14 rounded-2xl object-cover ring-3 ring-white shadow-md flex-shrink-0" />
 
