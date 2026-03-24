@@ -82,7 +82,7 @@ export default function UserArtistDetail({ params }) {
             id: foundArtist.memberId,
             name: finalArtistName,
             group: foundArtist.category || "",
-            coverImage: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1200&auto=format&fit=crop",
+            coverImage: foundArtist.profileImageUrl || "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1200&auto=format&fit=crop",
             image: foundArtist.profileImageUrl || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop",
             followers: foundArtist.followerCount || 0,
             fandom: 'STARLIGHT',
