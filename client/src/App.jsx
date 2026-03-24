@@ -45,6 +45,7 @@ import ArtistChat from "./pages/artist/ArtistChat";
 import ArtistStore from "./pages/artist/ArtistStore";
 import ArtistBooking from "./pages/artist/ArtistBooking";
 import ArtistSettlement from "./pages/artist/ArtistSettlement";
+import ArtistProfile from "./pages/artist/ArtistProfile";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -148,7 +149,6 @@ function Router() {
       <Route path="/user/wallet/fail" component={UserWalletFail} />
       <Route path="/user/wallet/cancel" component={UserWalletCancel} />
       <Route path="/user/profile" component={UserProfile} />
-      <Route path="/artist/profile" component={UserProfile} />{/* 아티스트도 같은 컴포넌트 사용! */}
 
       {/* Artist Routes */}
       <Route path="/artist" component={ArtistDashboard} />
@@ -160,6 +160,7 @@ function Router() {
       <Route path="/artist/events" component={ArtistBooking} />
       <Route path="/artist/donations" component={ArtistSettlement} />
       <Route path="/artist/settlement" component={ArtistSettlement} />
+      <Route path="/artist/profile" component={ArtistProfile} />
 
       {/* Admin Routes */}
       <Route path="/admin" component={() => <AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
