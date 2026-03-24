@@ -36,6 +36,7 @@ import { toast } from 'sonner';
 const API_BASE = import.meta.env.VITE_API_GATEWAY_URL ?? '';
 
 async function apiFetch(path, options = {}) {
+  const token = localStorage.getItem('accessToken');
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include', // 세션 쿠키 방식 사용 시 유지
     headers: {
@@ -211,6 +212,7 @@ export default function AdminArtists() {
   // ── 상세 조회 ──────────────────────────────
 
   const handleOpenDetail = async (artist) => {
+    console.log("조회하려는 ID들:", artist.approvalId, artist.artistId);
     // pending은 list 데이터로 바로 표시
     if (artist.status === 'pending' || !artist.artistId) {
       setDetailArtist(artist);
