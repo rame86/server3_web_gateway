@@ -81,10 +81,10 @@ export default function ArtistSettlement() {
         {/* Summary Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { label: '이번 달 수익', value: `₩${data.thisMonthRevenue?.toLocaleString() || 0}`, change: '최근 계산됨', icon: <TrendingUp size={16} />, color: 'text-rose-600 bg-rose-50' },
-            { label: '누적 수익', value: `₩${data.totalAccumulatedRevenue?.toLocaleString() || 0}`, change: '전체', icon: <BarChart3 size={16} />, color: 'text-violet-600 bg-violet-50' },
-            { label: '정산 예정', value: `₩${data.pendingSettlement?.toLocaleString() || 0}`, change: '예정됨', icon: <Calendar size={16} />, color: 'text-amber-600 bg-amber-50' },
-            { label: '정산 완료', value: `₩${data.completedSettlement?.toLocaleString() || 0}`, change: '완료됨', icon: <Wallet size={16} />, color: 'text-teal-600 bg-teal-50' }
+            { label: '이번 달 수익', value: `₩${Math.floor(data.thisMonthRevenue || 0).toLocaleString()}`, change: '최근 계산됨', icon: <TrendingUp size={16} />, color: 'text-rose-600 bg-rose-50' },
+            { label: '누적 수익', value: `₩${Math.floor(data.totalAccumulatedRevenue || 0).toLocaleString()}`, change: '전체', icon: <BarChart3 size={16} />, color: 'text-violet-600 bg-violet-50' },
+            { label: '정산 예정', value: `₩${Math.floor(data.pendingSettlement || 0).toLocaleString()}`, change: '예정됨', icon: <Calendar size={16} />, color: 'text-amber-600 bg-amber-50' },
+            { label: '정산 완료', value: `₩${Math.floor(data.completedSettlement || 0).toLocaleString()}`, change: '완료됨', icon: <Wallet size={16} />, color: 'text-teal-600 bg-teal-50' }
           ].map((card, i) => (
             <div key={i} className="glass-card rounded-2xl p-4 soft-shadow">
               <div className={`inline-flex items-center justify-center w-8 h-8 rounded-xl ${card.color} mb-3`}>
@@ -187,7 +187,7 @@ export default function ArtistSettlement() {
                     <p className="text-xs text-muted-foreground">정산일: {s.date || '미정'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-foreground">₩{s.amount?.toLocaleString() || 0}</p>
+                    <p className="font-bold text-foreground">₩{Math.floor(s.amount || 0).toLocaleString()}</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusConfig[s.status]?.class || statusConfig.PENDING.class}`}>
                       {statusConfig[s.status]?.label || s.status}
                     </span>

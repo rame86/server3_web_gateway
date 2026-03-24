@@ -74,40 +74,61 @@ export default function AdminBooking() {
     fetchData();
   }, []);
 
-  const handleProcessApproval = async (event, isApproved, reason = "") => {
+  // ── 승인 (날짜 없이 바로) ──────────────────
+  const handleApprove = async (event) => {
     try {
-      if (isApproved && (!bookingStart || !bookingEnd)) {
-        return toast.error("예매 시작 및 종료 시간을 설정해주세요.");
-      }
-      
-      if (!isApproved && !reason.trim()) {
-        return toast.error("거절 사유를 입력해주세요.");
-      }
-
-      const payload = {
-        eventId: event.approvalId || event.eventId, 
-        status: isApproved ? 'CONFIRMED' : 'FAILED',
-        rejectionReason: isApproved ? "" : reason,
+      await adminApi.post('/admin/event/confirm', {
+        eventId: event.approvalId || event.eventId,
+        status: 'CONFIRMED',
+        rejectionReason: '',
         eventTitle: event.eventTitle,
         price: event.price || 0,
-        bookingStartDate: bookingStart,
-        bookingEndDate: bookingEnd
-      };
+        bookingStartDate: null,
+        bookingEndDate: null,
+      });
+      toast.success('승인 처리되었습니다.');
+      fetchData();
+    } catch (error) {
+      toast.error('승인 처리 실패');
+    }
+  };
 
-      await adminApi.post('/admin/event/confirm', payload);
-      
-      toast.success(isApproved ? "승인 처리되었습니다." : "반려 처리되었습니다.");
-      
-      setSelectedEvent(null); 
+  // ── 반려 ──────────────────────────────────
+  const handleReject = async () => {
+    if (!rejectionReason.trim()) return toast.error('거절 사유를 입력해주세요.');
+    try {
+      await adminApi.post('/admin/event/confirm', {
+        eventId: rejectingEvent.approvalId || rejectingEvent.eventId,
+        status: 'FAILED',
+        rejectionReason,
+        eventTitle: rejectingEvent.eventTitle,
+        price: rejectingEvent.price || 0,
+      });
+      toast.success('반려 처리되었습니다.');
       setRejectingEvent(null);
       setRejectionReason('');
+      fetchData();
+    } catch (error) {
+      toast.error('반려 처리 실패');
+    }
+  };
+
+  // ── 예매 날짜 설정 후 큐 발송 ──────────────
+  const handlePublishBooking = async () => {
+    if (!bookingStart || !bookingEnd) return toast.error('예매 시작/종료 시간을 설정해주세요.');
+    try {
+      await adminApi.post('/admin/event/booking/open', {  // ← 큐 발송 API (백엔드 확인 필요)
+        eventId: selectedEvent.approvalId || selectedEvent.eventId,
+        bookingStartDate: bookingStart,
+        bookingEndDate: bookingEnd,
+      });
+      toast.success('예매 일정이 발송되었습니다.');
+      setSelectedEvent(null);
       setBookingStart('');
       setBookingEnd('');
-      
-      fetchData(); 
+      fetchData();
     } catch (error) {
-      console.error("처리 실패:", error);
-      toast.error("처리 도중 오류가 발생했습니다.");
+      toast.error('예매 일정 발송 실패');
     }
   };
 
@@ -248,8 +269,9 @@ export default function AdminBooking() {
                           </div>
 
                           <div className="flex gap-2">
+                            {/* 대기 목록 카드의 버튼 */}
                             <button
-                              onClick={() => handleProcessApproval(event, true)}
+                              onClick={() => handleApprove(event)}  // ✅ 바로 승인
                               className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-white rounded-xl bg-teal-500 hover:bg-teal-600 transition-colors shadow-sm"
                             >
                               <Check size={16} /> 승인
@@ -414,10 +436,10 @@ export default function AdminBooking() {
                 승인 반려
               </button>
               <button 
-                onClick={() => handleProcessApproval(selectedEvent, true)}
+                onClick={handlePublishBooking}  // ✅
                 className="flex-[2.5] py-4 bg-teal-500 text-white font-bold rounded-full shadow-xl shadow-teal-100 hover:bg-teal-600 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm"
               >
-                <Check size={18}/> 최종 승인 및 예매 오픈
+                <Check size={18}/> 예매 일정 등록 및 발송
               </button>
             </div>
           </div>
@@ -470,7 +492,7 @@ export default function AdminBooking() {
                 취소
               </button>
               <button 
-                onClick={() => handleProcessApproval(rejectingEvent, false, rejectionReason)}
+                onClick={handleReject}  // ✅
                 className="flex-1 py-3 bg-red-500 text-white font-bold rounded-xl shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all text-sm"
               >
                 반려 확정

@@ -25,11 +25,13 @@ const tabs = [
   { key: 'my-bookings', label: '내 예매 내역' }];
 
 const statusConfig = {
-  confirmed: { label: '예매 확정', class: 'bg-teal-100 text-teal-700' },
-  refund_pending: { label: '환불 진행 중', class: 'bg-indigo-100 text-indigo-700' }, // 🌟 추가
-  refund_success: { label: '환불 완료', class: 'bg-gray-100 text-gray-500' },
-  cancelled: { label: '취소됨', class: 'bg-gray-200 text-gray-600' },
-  pending: { label: '대기 중', class: 'bg-amber-100 text-amber-700' }
+  pending:         { label: '확인 중',   class: 'bg-yellow-100 text-yellow-600' },
+  confirmed:       { label: '예매 완료', class: 'bg-green-100 text-green-600' },
+  failed:          { label: '결제 실패', class: 'bg-red-100 text-red-500' },
+  refund_pending:  { label: '환불 대기', class: 'bg-blue-100 text-blue-500' },
+  refund_rejected: { label: '환불 거절', class: 'bg-red-100 text-red-500' },
+  refunded:        { label: '환불 완료', class: 'bg-gray-100 text-gray-500' },
+  cancelled:       { label: '취소됨',   class: 'bg-gray-100 text-gray-400' },
 };
 
 export default function UserEvents() {
@@ -48,6 +50,7 @@ export default function UserEvents() {
   const [filterType, setFilterType] = useState('전체');
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [refundTarget, setRefundTarget] = useState(null);
   const handleViewDetail = (booking) => {
     setSelectedBooking(booking);
     setIsDetailOpen(true);
@@ -67,42 +70,72 @@ export default function UserEvents() {
         return `${gatewayUrl}${imagePath}`;
     };
 
-  // 2. 환불 요청하기
-  const handleRefundRequest = async (booking) => {
-    const memberId = localStorage.getItem('memberId'); // 🌟 여기도 하드코딩 제거
+//   // 2. 환불 요청하기
+//   const handleRefundRequest = async (booking) => {
+//     const memberId = localStorage.getItem('memberId'); // 🌟 여기도 하드코딩 제거
     
-    if (!memberId) {
-      toast.error("로그인이 필요한 서비스입니다.");
-      return;
-    }
+//     if (!memberId) {
+//       toast.error("로그인이 필요한 서비스입니다.");
+//       return;
+//     }
 
-    if (!window.confirm(`'${booking.eventTitle}' 예매를 취소하시겠습니까?`)) return;
+//     if (!window.confirm(`'${booking.eventTitle}' 예매를 취소하시겠습니까?`)) return;
 
-    try {
-      // 🌟 백엔드 컨트롤러 구조 { ticket_code, member_id, refund_reason } 에 맞춤
-      const response = await resApi.post('/refund', {
-            ticket_code: booking.ticketCode, // 👈 booking.ticketCode 값을 ticket_code 키로 보냄
-            member_id: memberId,            // 👈 member_id 로 보냄
-            refund_reason: "사용자 직접 취소"  // 👈 refund_reason 으로 보냄
-        });
+//     try {
+//       // 🌟 백엔드 컨트롤러 구조 { ticket_code, member_id, refund_reason } 에 맞춤
+//       const response = await resApi.post('/refund', {
+//             ticket_code: booking.ticketCode, // 👈 booking.ticketCode 값을 ticket_code 키로 보냄
+//             member_id: memberId,            // 👈 member_id 로 보냄
+//             refund_reason: "사용자 직접 취소"  // 👈 refund_reason 으로 보냄
+//         });
 
-      if (response.status === 202 || response.status === 200) {
-            toast.success('환불 요청이 관리자에게 전달되었습니다.');
+//       if (response.status === 202 || response.status === 200) {
+//             toast.success('환불 요청이 관리자에게 전달되었습니다.');
             
-            // 목록 새로고침 로직
+//             // 목록 새로고침 로직
+//             const current = activeTab;
+//             setActiveTab('events'); 
+//             setTimeout(() => setActiveTab(current), 10);
+//         }
+//     } catch (error) {
+//         console.error("Refund error:", error);
+//         // 백엔드에서 보낸 "환불에 필요한 티켓 코드가 없습니다." 메시지가 여기 뜰 거야
+//         const serverMsg = error.response?.data?.message || '취소 요청 중 오류가 발생했습니다.';
+//         toast.error(serverMsg);
+//     }
+// };
+
+  // UserEvents.jsx 내부 수정
+  const handleRefundRequest = (booking) => {
+    const memberId = localStorage.getItem('memberId');
+    if (!memberId) {
+        toast.error("로그인이 필요한 서비스입니다.");
+        return;
+    }
+    setRefundTarget(booking); // 모달 열기
+  };
+
+  const submitRefund = async () => {
+    const booking = refundTarget;
+    setRefundTarget(null);
+    try {
+        const memberId = localStorage.getItem('memberId');
+        const response = await resApi.post('/refund', {
+            ticket_code: booking.ticketCode,
+            member_id: memberId,
+            refund_reason: "사용자 직접 취소"
+        });
+        if (response.status === 202 || response.status === 200) {
+            toast.success('환불 요청이 관리자에게 전달되었습니다.');
             const current = activeTab;
-            setActiveTab('events'); 
+            setActiveTab('events');
             setTimeout(() => setActiveTab(current), 10);
         }
     } catch (error) {
-        console.error("Refund error:", error);
-        // 백엔드에서 보낸 "환불에 필요한 티켓 코드가 없습니다." 메시지가 여기 뜰 거야
         const serverMsg = error.response?.data?.message || '취소 요청 중 오류가 발생했습니다.';
         toast.error(serverMsg);
     }
 };
-
-  // UserEvents.jsx 내부 수정
 
   useEffect(() => {
     // 1. 매핑 함수 정의
@@ -470,5 +503,35 @@ export default function UserEvents() {
           </div>
         </DialogContent>
       </Dialog>
+      {refundTarget && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 space-y-5 shadow-2xl">
+                <div className="text-center">
+                    <div className="w-16 h-16 bg-rose-50 text-rose-400 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-100">
+                        <Ticket size={28} />
+                    </div>
+                    <h3 className="text-lg font-bold">예매 취소/환불</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        <span className="font-bold text-rose-500">'{refundTarget.eventTitle}'</span><br/>
+                        예매를 취소하시겠습니까?
+                    </p>
+                </div>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setRefundTarget(null)}
+                        className="flex-1 py-3 rounded-xl font-bold text-muted-foreground hover:bg-secondary transition-all text-sm"
+                    >
+                        돌아가기
+                    </button>
+                    <button
+                        onClick={submitRefund}
+                        className="flex-[1.5] py-3 rounded-xl bg-rose-500 text-white font-bold hover:bg-rose-600 active:scale-95 transition-all text-sm shadow-lg"
+                    >
+                        취소 확정
+                    </button>
+                </div>
+            </div>
+        </div>
+    )}
     </Layout>);
 }
