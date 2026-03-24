@@ -4,7 +4,7 @@
  * Role-based: user / artist / admin
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
   Home, ShoppingBag, MessageCircle, Calendar, BookOpen, Music,
@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import TopNav from './TopNav';
-import ProfileEditModal from './ProfileEditModal';
+import { coreApi } from '@/lib/api';
 
 
 
@@ -99,9 +99,25 @@ const roleConfig = {
 export default function Layout({ children, role }) {
   const [location,setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const config = roleConfig[role];
   const userName = localStorage.getItem('userName') || config?.userName || '사용자';
+  
+  const [userImage, setUserImage] = useState(localStorage.getItem('userImage') || null);
+
+  useEffect(() => {
+    const fetchMyImage = async () => {
+      try {
+        const res = await coreApi.get('/member/my-info');
+        if (res.data && res.data.profileImageUrl) {
+          setUserImage(res.data.profileImageUrl);
+          localStorage.setItem('userImage', res.data.profileImageUrl);
+        }
+      } catch (e) {
+        console.error('Failed to fetch user info for layout image', e);
+      }
+    };
+    fetchMyImage();
+  }, []);
 
   // 로그아웃 로직 함수
   const handleLogout = async () => {
@@ -176,18 +192,14 @@ export default function Layout({ children, role }) {
         <div className="p-4 border-b border-rose-100">
           <div className={`flex items-center gap-3 p-3 rounded-xl ${config.bgColor}`}>
             <img
-              src={config.userImage}
+              src={userImage || (role === 'artist' 
+                ? "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop" 
+                : "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop")}
               alt={config.userName}
               className="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
             
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm text-foreground truncate">{userName}</p>
-              <button
-                onClick={() => setProfileModalOpen(true)}
-                className={`text-xs ${config.textColor} font-medium hover:underline transition-all cursor-pointer`}
-              >
-                정보수정
-              </button>
             </div>
             <button
               onClick={() => toast.info('알림 기능 준비 중입니다')}
@@ -278,13 +290,6 @@ export default function Layout({ children, role }) {
         </main>
       </div>
     </div>
-
-    {/* 프로필 수정 모달 */}
-    <ProfileEditModal
-      isOpen={profileModalOpen}
-      onClose={() => setProfileModalOpen(false)}
-      role={role}
-    />
     </>
   );
 
