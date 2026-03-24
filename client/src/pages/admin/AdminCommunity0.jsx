@@ -13,17 +13,11 @@ export default function AdminCommunity() {
   const [postList, setPostList] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null); 
   const [loading, setLoading] = useState(false);
-
-  // 개별 카운트 상태
   const [totalReportCount, setTotalReportCount] = useState(0);
-  const [commentCount, setcommentCount] = useState(0);
-  const [boardCount, setBoardCount] = useState(0);
 
   // [주소 수정] /board 위치를 컨트롤러 구조에 맞게 조정했습니다.
   const ADMIN_API_BASE = "/msa/core/admin/board"; 
   const BOARD_API_BASE = "/msa/core/board";
-  const BOARD_ADMIN_API_BASE = "/msa/core/board/admin";
-  
 
   useEffect(() => {
     fetchPosts();
@@ -65,11 +59,7 @@ export default function AdminCommunity() {
       const boards = Array.isArray(boardRes.data) ? boardRes.data : [];
       const comments = Array.isArray(commentRes.data) ? commentRes.data : [];
 
-      // 카운트 업데이트
-      setBoardCount(boards.length);
-      setcommentCount(comments.length);
       setTotalReportCount(boards.length + comments.length);
-      
       setReportList(reportSubTab === 'boards' ? boards : comments);
 
     } catch (error) {
@@ -131,9 +121,7 @@ export default function AdminCommunity() {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const url = type === 'board' 
-        ? `${BOARD_ADMIN_API_BASE}/boards/${id}` 
-        : `${BOARD_ADMIN_API_BASE}/comments/${id}`;
+      const url = type === 'board' ? `${BOARD_API_BASE}/${id}` : `${BOARD_API_BASE}/comment/${id}`;
       
       await axios.delete(url, { headers: { 'Authorization': `Bearer ${token}` } });
       toast.success('영구 삭제되었습니다.');
@@ -166,8 +154,8 @@ export default function AdminCommunity() {
 
         {activeTab === 'reports' && (
           <div className="flex gap-6 border-b border-slate-100 mb-4 px-2">
-            <button onClick={() => setReportSubTab('boards')} className={`pb-3 text-sm font-black transition-all ${reportSubTab === 'boards' ? 'text-rose-500 border-b-2 border-rose-500' : 'text-slate-400'}`}>게시글 신고 ({boardCount})</button>
-            <button onClick={() => setReportSubTab('comments')} className={`pb-3 text-sm font-black transition-all ${reportSubTab === 'comments' ? 'text-rose-500 border-b-2 border-rose-500' : 'text-slate-400'}`}>댓글 신고 ({commentCount})</button>
+            <button onClick={() => setReportSubTab('boards')} className={`pb-3 text-sm font-black transition-all ${reportSubTab === 'boards' ? 'text-rose-500 border-b-2 border-rose-500' : 'text-slate-400'}`}>게시글 신고</button>
+            <button onClick={() => setReportSubTab('comments')} className={`pb-3 text-sm font-black transition-all ${reportSubTab === 'comments' ? 'text-rose-500 border-b-2 border-rose-500' : 'text-slate-400'}`}>댓글 신고</button>
           </div>
         )}
 
