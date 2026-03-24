@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { Package, Loader2, ChevronRight, CheckCircle2, ShoppingBag } from 'lucide-react';
+import { Package, Loader2, ChevronRight, CheckCircle2, ShoppingBag, Trash2, Star, X } from 'lucide-react';
 import { formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
 import { shopApi } from '@/lib/api';
@@ -16,10 +16,16 @@ export default function UserOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // 리뷰 관련 상태
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      // Backend expects pagination but has defaults (page=0, size=10)
       const res = await shopApi.get('/shop/order');
       setOrders(res.data || []);
     } catch (err) {
@@ -33,6 +39,47 @@ export default function UserOrders() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!confirm('정말로 이 주문 내역을 삭제하시겠습니까?')) return;
+    try {
+      await shopApi.delete(`/shop/order/${orderId}`);
+      toast.success('주문 내역이 삭제되었습니다.');
+      setOrders(prev => prev.filter(o => o.orderId !== orderId));
+    } catch (err) {
+      console.error(err);
+      toast.error('주문 내역 삭제에 실패했습니다.');
+    }
+  };
+
+  const openReviewModal = (product) => {
+    setSelectedProduct(product);
+    setReviewRating(5);
+    setReviewComment('');
+    setIsReviewModalOpen(true);
+  };
+
+  const handleReviewSubmit = async () => {
+    if (!reviewComment.trim()) {
+      toast.error('리뷰 내용을 입력해주세요.');
+      return;
+    }
+    try {
+      setSubmittingReview(true);
+      await shopApi.post('/shop/review', {
+        productId: selectedProduct.productId,
+        rating: reviewRating,
+        comment: reviewComment
+      });
+      toast.success('리뷰가 등록되었습니다!');
+      setIsReviewModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast.error('리뷰 등록에 실패했습니다.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const getStatusLabel = (status) => {
     switch(status) {
@@ -95,10 +142,17 @@ export default function UserOrders() {
                       <span className="text-xs font-bold text-rose-500 mb-0.5 block">{orderDate}</span>
                       <span className="text-sm font-semibold text-foreground">주문번호 {order.orderId.substring(0, 8).toUpperCase()}</span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-bold shadow-sm ${statusInfo.color}`}>
                         {statusInfo.text}
                       </span>
+                      <button 
+                        onClick={() => handleDeleteOrder(order.orderId)}
+                        className="p-1.5 text-gray-400 hover:text-rose-500 transition-colors"
+                        title="주문 내역 삭제"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
 
@@ -108,7 +162,7 @@ export default function UserOrders() {
                       <div key={item.orderItemId} className="flex gap-4 items-start">
                         {/* Image */}
                         <div
-                          onClick={() => setLocation(`/user/store/${item.variantId || ''}`)}
+                          onClick={() => setLocation(`/user/store/${item.productId || ''}`)}
                           className="cursor-pointer flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-50 border border-gray-100"
                         >
                           {item.imageUrl ? (
@@ -122,12 +176,23 @@ export default function UserOrders() {
 
                         {/* Info */}
                         <div className="flex-1">
-                          <p 
-                            className="font-semibold text-sm text-foreground line-clamp-2 cursor-pointer hover:text-rose-600 transition-colors"
-                            onClick={() => setLocation(`/user/store/${item.variantId || ''}`)}
-                          >
-                            {item.title}
-                          </p>
+                          <div className="flex justify-between items-start gap-2">
+                            <p 
+                              className="font-semibold text-sm text-foreground line-clamp-2 cursor-pointer hover:text-rose-600 transition-colors"
+                              onClick={() => setLocation(`/user/store/${item.productId || ''}`)}
+                            >
+                              {item.title}
+                            </p>
+                            {/* 리뷰 버튼 - 결제 완료 이후에만 표시 */}
+                            {(order.status === 'PAID' || order.status === 'SHIPPED' || order.status === 'DELIVERED') && (
+                              <button
+                                onClick={() => openReviewModal(item)}
+                                className="flex-shrink-0 px-2 py-1 text-[10px] font-bold text-rose-500 border border-rose-200 rounded-md hover:bg-rose-50 transition-colors"
+                              >
+                                리뷰 작성
+                              </button>
+                            )}
+                          </div>
                           {(item.color || item.size) && (
                             <p className="text-xs text-muted-foreground mt-1 gap-2 flex">
                               {item.color && <span>옵션: {item.color}</span>}
@@ -154,6 +219,68 @@ export default function UserOrders() {
           </div>
         )}
       </div>
+
+      {/* Review Modal */}
+      {isReviewModalOpen && selectedProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b flex items-center justify-between bg-rose-50/30">
+              <h2 className="text-lg font-bold text-rose-600">상품 리뷰 작성</h2>
+              <button onClick={() => setIsReviewModalOpen(false)} className="p-1 hover:bg-white rounded-full transition-colors">
+                <X size={20} className="text-gray-400" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <div className="flex gap-4 items-center p-3 bg-gray-50 rounded-2xl">
+                <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border bg-white">
+                  <img src={selectedProduct.imageUrl} alt={selectedProduct.title} className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm line-clamp-1">{selectedProduct.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">이 상품은 어떠셨나요?</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-center">별점을 선택해주세요</p>
+                <div className="flex justify-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setReviewRating(star)}
+                      className="transition-transform active:scale-90"
+                    >
+                      <Star
+                        size={32}
+                        className={star <= reviewRating ? "fill-amber-400 text-amber-400" : "text-gray-200"}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-bold">상세한 후기를 남겨주세요</p>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="착용감, 색상, 디자인 등 만족스러웠던 점을 공유해주세요!"
+                  className="w-full h-32 p-4 rounded-2xl border bg-gray-50 focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all outline-none resize-none text-sm"
+                />
+              </div>
+
+              <button
+                onClick={handleReviewSubmit}
+                disabled={submittingReview}
+                className="w-full py-4 btn-primary-gradient text-white rounded-2xl font-bold shadow-lg shadow-rose-200 disabled:opacity-50 transition-all active:scale-[0.98]"
+              >
+                {submittingReview ? <Loader2 size={24} className="animate-spin mx-auto" /> : '리뷰 등록하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
