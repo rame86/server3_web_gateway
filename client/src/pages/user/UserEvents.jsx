@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { Calendar, MapPin, Users, Ticket, Search, Filter } from 'lucide-react';
+import { Calendar, MapPin, Users, Ticket, Search, Filter, Heart } from 'lucide-react';
 import { formatPrice, eventTypeLabel, eventTypeBadgeClass } from '@/lib/data';
 import { toast } from 'sonner';
 import { resApi } from '@/lib/api';
@@ -55,57 +55,22 @@ export default function UserEvents() {
     setSelectedBooking(booking);
     setIsDetailOpen(true);
   };
+  const [wishlists, setWishlists] = useState(new Set());
 
   // 🌟 [추가] 로컬 환경 대응용 게이트웨이 주소 설정
-    const rawUrl = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost';
-    const gatewayUrl = (rawUrl === 'http://localhost') 
-        ? 'http://localhost:8082' 
-        : rawUrl.replace(/\/$/, '');
+  const rawUrl = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost';
+  const gatewayUrl = (rawUrl === 'http://localhost') 
+      ? 'http://localhost:8082' 
+      : rawUrl.replace(/\/$/, '');
 
-    // 🌟 [추가] 이미지 URL 완성 함수
-    const getImageUrl = (url) => {
-        if (!url || url.includes('placehold.co')) return 'https://placehold.co/600x400?text=No+Image';
-        if (url.startsWith('http')) return url;
-        const imagePath = url.startsWith('/') ? url : `/images/res/${url}`;
-        return `${gatewayUrl}${imagePath}`;
-    };
+  // 🌟 [추가] 이미지 URL 완성 함수
+  const getImageUrl = (url) => {
+      if (!url || url.includes('placehold.co')) return 'https://placehold.co/600x400?text=No+Image';
+      if (url.startsWith('http')) return url;
+      const imagePath = url.startsWith('/') ? url : `/images/res/${url}`;
+      return `${gatewayUrl}${imagePath}`;
+  };
 
-//   // 2. 환불 요청하기
-//   const handleRefundRequest = async (booking) => {
-//     const memberId = localStorage.getItem('memberId'); // 🌟 여기도 하드코딩 제거
-    
-//     if (!memberId) {
-//       toast.error("로그인이 필요한 서비스입니다.");
-//       return;
-//     }
-
-//     if (!window.confirm(`'${booking.eventTitle}' 예매를 취소하시겠습니까?`)) return;
-
-//     try {
-//       // 🌟 백엔드 컨트롤러 구조 { ticket_code, member_id, refund_reason } 에 맞춤
-//       const response = await resApi.post('/refund', {
-//             ticket_code: booking.ticketCode, // 👈 booking.ticketCode 값을 ticket_code 키로 보냄
-//             member_id: memberId,            // 👈 member_id 로 보냄
-//             refund_reason: "사용자 직접 취소"  // 👈 refund_reason 으로 보냄
-//         });
-
-//       if (response.status === 202 || response.status === 200) {
-//             toast.success('환불 요청이 관리자에게 전달되었습니다.');
-            
-//             // 목록 새로고침 로직
-//             const current = activeTab;
-//             setActiveTab('events'); 
-//             setTimeout(() => setActiveTab(current), 10);
-//         }
-//     } catch (error) {
-//         console.error("Refund error:", error);
-//         // 백엔드에서 보낸 "환불에 필요한 티켓 코드가 없습니다." 메시지가 여기 뜰 거야
-//         const serverMsg = error.response?.data?.message || '취소 요청 중 오류가 발생했습니다.';
-//         toast.error(serverMsg);
-//     }
-// };
-
-  // UserEvents.jsx 내부 수정
   const handleRefundRequest = (booking) => {
     const memberId = localStorage.getItem('memberId');
     if (!memberId) {
@@ -167,6 +132,19 @@ export default function UserEvents() {
       }
     };
 
+    const fetchWishlists = async () => {
+      const memberId = localStorage.getItem('memberId');
+      if (!memberId) return;
+      try {
+        const { data } = await resApi.get(`/wishlist?memberId=${memberId}`);
+        // ✅ event_id를 Number로 강제 변환해서 저장해봐 (백엔드 타입과 일치시키기)
+        const ids = new Set((data || []).map(w => Number(w.event_id || w.events?.event_id)));
+        setWishlists(ids);
+      } catch (e) {
+        console.error("위시리스트 로드 실패", e);
+      }
+    };
+
     // 3. 예매 내역 가져오기
     const fetchBookings = async () => {
       const memberId = localStorage.getItem('memberId');
@@ -196,8 +174,10 @@ export default function UserEvents() {
     };
 
     // 실행 분기
-    if (activeTab === 'events') fetchEvents();
-    else if (activeTab === 'my-bookings') fetchBookings();
+    if (activeTab === 'events') {
+      fetchEvents(); 
+      fetchWishlists();
+    } else if (activeTab === 'my-bookings') fetchBookings();
 
   }, [activeTab]); // 🌟 window.location.search 대신 activeTab만 감시해도 충분해!
 
@@ -207,6 +187,46 @@ export default function UserEvents() {
     const matchesFilter = filterType === '전체' || eventTypeLabel[event.type] === filterType;
     return matchesSearch && matchesFilter;
   });
+
+  // 기존 filteredEvents 아래에 추가
+  const sortedEvents = [
+      ...filteredEvents.filter(e => wishlists.has(e.id)),
+      ...filteredEvents.filter(e => !wishlists.has(e.id)),
+  ];
+
+  // [수정] 함수에서 어떤 공연인지 eventId를 인자로 받아야 함
+  const toggleWishlist = async (e, eventId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const memberId = localStorage.getItem('memberId');
+    if (!memberId) return toast.error('로그인이 필요합니다.');
+
+    const isWished = wishlists.has(eventId);
+
+    try {
+      if (isWished) {
+        // 찜 해제
+        await resApi.delete(`/events/${eventId}/wishlist`, { data: { memberId } });
+        setWishlists(prev => {
+          const next = new Set(prev);
+          next.delete(eventId);
+          return next;
+        });
+        toast.success('찜 해제');
+      } else {
+        // 찜 등록
+        await resApi.post(`/events/${eventId}/wishlist`, { memberId });
+        setWishlists(prev => {
+          const next = new Set(prev);
+          next.add(eventId);
+          return next;
+        });
+        toast.success('찜 완료!');
+      }
+    } catch (error) {
+      toast.error('처리 중 오류 발생');
+    }
+  };
 
   return (
     <Layout role="user">
@@ -294,7 +314,7 @@ export default function UserEvents() {
               {loading ? (
                 <div className="text-center py-10 text-muted-foreground">로딩 중...</div>
               ) : filteredEvents.length > 0 ? (
-                filteredEvents.map((event) =>
+                sortedEvents.map((event) =>
                   <div key={event.id} className="glass-card rounded-2xl overflow-hidden soft-shadow hover-lift">
                     <div className="flex flex-col sm:flex-row">
                       <div className="relative sm:w-48 h-36 sm:h-auto flex-shrink-0">
@@ -309,6 +329,16 @@ export default function UserEvents() {
                             {eventTypeLabel[event.type]}
                           </span>
                         </div>
+                       <button
+                            onClick={(e) => toggleWishlist(e, event.id)}
+                            className="absolute top-2 right-2 w-10 h-10 flex items-center justify-center bg-white/20 backdrop-blur-md rounded-full shadow-md transition-all hover:bg-white/40 hover:scale-110 active:scale-95"
+                        >
+                            <Heart 
+                                size={20} 
+                                className={wishlists.has(Number(event.id)) ? "text-rose-400" : "text-white"} 
+                                fill={wishlists.has(Number(event.id)) ? "currentColor" : "none"} 
+                            />  
+                        </button>
                       </div>
                       <div className="p-4 flex-1">
                         <h3 className="font-bold text-foreground mb-2">{event.title}</h3>
