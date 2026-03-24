@@ -22,6 +22,8 @@ export default function AdminCommunity() {
   // [주소 수정] /board 위치를 컨트롤러 구조에 맞게 조정했습니다.
   const ADMIN_API_BASE = "/msa/core/admin/board"; 
   const BOARD_API_BASE = "/msa/core/board";
+  const BOARD_ADMIN_API_BASE = "/msa/core/board/admin";
+  
 
   useEffect(() => {
     fetchPosts();
@@ -129,7 +131,9 @@ export default function AdminCommunity() {
 
     try {
       const token = localStorage.getItem('accessToken');
-      const url = type === 'board' ? `${BOARD_API_BASE}/${id}` : `${BOARD_API_BASE}/comment/${id}`;
+      const url = type === 'board' 
+        ? `${BOARD_ADMIN_API_BASE}/boards/${id}` 
+        : `${BOARD_ADMIN_API_BASE}/comments/${id}`;
       
       await axios.delete(url, { headers: { 'Authorization': `Bearer ${token}` } });
       toast.success('영구 삭제되었습니다.');
