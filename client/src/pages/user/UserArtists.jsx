@@ -12,6 +12,14 @@ export default function UserArtists() {
   const [followed, setFollowed] = useState([]);    // 🌟 팔로우한 ID 리스트
   const [, setLocation] = useLocation();
 
+  const gatewayUrl = (import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost').replace(/\/$/, '');
+
+  const resolveImageUrl = (url) => {
+      if (!url) return 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=600&auto=format&fit=crop';
+      if (url.startsWith('http')) return url;
+      return `${gatewayUrl}${url}`; // /images/core/profile/... 앞에 URL 붙이기
+  };
+
   // 1. 아티스트 목록 가져오기
   useEffect(() => {
     const fetchArtists = async () => {
@@ -73,8 +81,7 @@ export default function UserArtists() {
                 {/* Cover - 🌟 높이 28 복구 */}
                 <div className="relative h-28">
                   <img
-                    src={artist.profileImageUrl || "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=600&auto=format&fit=crop"}
-                    alt={artist.stageName}
+                    src={resolveImageUrl(artist.profileImageUrl)}
                     className="w-full h-full object-cover" />
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
@@ -88,9 +95,10 @@ export default function UserArtists() {
                 <div className="px-4 pb-4 relative z-10">
                   <div className="flex items-end gap-3 -mt-6 mb-3">
                     <img
-                      src={artist.profileImageUrl || "https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=200&h=200&fit=crop"}
-                      alt={artist.stageName}
-                      className="w-14 h-14 rounded-2xl object-cover ring-3 ring-white shadow-md flex-shrink-0" />
+                        src={resolveImageUrl(artist.profileImageUrl)}
+                        alt={artist.stageName}
+                        className="w-14 h-14 rounded-2xl object-cover ring-3 ring-white shadow-md flex-shrink-0"
+                    />
 
                     <div className="pb-1 drop-shadow-md">
                       <p className="font-bold text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">{artist.stageName}</p>
@@ -102,8 +110,8 @@ export default function UserArtists() {
 
                   {/* Tags */}
                   <div className="flex flex-wrap gap-1 mb-3">
-                    <span className="badge-rose px-2 py-0.5 rounded-full text-xs font-medium">#{artist.category || 'K-POP'}</span>
-                    <span className="badge-rose px-2 py-0.5 rounded-full text-xs font-medium">#ARTIST</span>
+                    <span className="badge-rose px-2 py-0.5 rounded-full text-xs font-medium">#{(artist.category || 'K-POP').split('/')[0].trim()}</span>
+                    <span className="badge-rose px-2 py-0.5 rounded-full text-xs font-medium">#{(artist.category || '').split('/')[1]?.trim() || 'ARTIST'}</span>
                   </div>
 
                   {/* Stats */}
