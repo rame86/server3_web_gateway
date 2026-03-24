@@ -23,6 +23,7 @@ import {
   AlertTriangle, Save, ShieldAlert, ExternalLink, Package
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { adminApi } from '@/lib/api'; // 경로 맞게 수정
 
 // ─────────────────────────────────────────────
 // API 유틸
@@ -41,8 +42,6 @@ async function apiFetch(path, options = {}) {
     credentials: 'include', // 세션 쿠키 방식 사용 시 유지
     headers: {
       'Content-Type': 'application/json',
-      // 🌟 루아가 '검증'을 시작할 수 있게 '재료'를 넘겨주는 유일한 통로!
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...options.headers,
     },
     ...options,
@@ -69,6 +68,19 @@ async function apiFetch(path, options = {}) {
 // 백엔드에서 문자열 "null"로 내려오는 경우 처리
 const clean = (v) => (!v || v === 'null' || v === 'undefined') ? null : v;
 
+// ✅ 이것만 추가
+function resolveImageUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return `${API_BASE}${url}`;
+}
+
+const ARTIST_EMOJIS = ['🎤', '🎸', '🎹', '🎺', '🥁', '🎻', '🎧', '🎼', '🌟', '✨'];
+
+function getArtistEmoji(id) {
+  return ARTIST_EMOJIS[(id || 0) % ARTIST_EMOJIS.length];
+}
+
 function mapPending(dto) {
   const artistName = clean(dto.artistName);
   const subRaw = clean(dto.subCategory) || '';
@@ -84,7 +96,7 @@ function mapPending(dto) {
     appliedDate: dto.createdAt ? dto.createdAt.slice(0, 10) : '-',
     status: 'pending',
     avatar: '🎤',
-    imageUrl: dto.imageUrl,
+    imageUrl: resolveImageUrl(dto.imageUrl),
     description: dto.description,
     email: '-',                         // DTO에 없음 → 백엔드 추가 필요
     phone: '-',                         // DTO에 없음 → 백엔드 추가 필요
@@ -168,7 +180,7 @@ export default function AdminArtists() {
 
   const fetchPending = useCallback(async () => {
     try {
-      const data = await apiFetch('/msa/core/admin/artist/approvalList');
+      const { data } = await adminApi.get('/admin/artist/approvalList');
       setPendingArtists((data || []).map(mapPending));
     } catch (err) {
       toast.error(`승인 대기 목록 조회 실패: ${err.message}`);
@@ -177,7 +189,7 @@ export default function AdminArtists() {
 
   const fetchApproved = useCallback(async () => {
     try {
-      const data = await apiFetch('/msa/core/admin/artist/activeList');
+      const { data } = await adminApi.get('/admin/artist/activeList');
       setApprovedArtists((data || []).map(mapApproved));
     } catch (err) {
       toast.error(`활성 아티스트 조회 실패: ${err.message}`);
@@ -210,20 +222,19 @@ export default function AdminArtists() {
   }, [fetchPending, fetchApproved, fetchRejectionHistory]);
 
   // ── 상세 조회 ──────────────────────────────
-
   const handleOpenDetail = async (artist) => {
     console.log("조회하려는 ID들:", artist.approvalId, artist.artistId);
     // pending은 list 데이터로 바로 표시
+
     if (artist.status === 'pending' || !artist.artistId) {
       setDetailArtist(artist);
       return;
     }
-    // approved는 상세 API 호출
     setDetailLoading(true);
-    setDetailArtist(artist); // 로딩 중 기본 데이터 먼저 표시
+    setDetailArtist(artist);
     try {
-      const detail = await apiFetch(`/msa/core/admin/artist/${artist.approvalId}/${artist.artistId}`);
-      setDetailArtist(mapApproved(detail));
+      const { data } = await adminApi.get(`/admin/artist/${artist.approvalId}/${artist.artistId}`);
+      setDetailArtist(mapApproved(data));
     } catch (err) {
       toast.error(`상세 조회 실패: ${err.message}`);
     } finally {
@@ -232,20 +243,16 @@ export default function AdminArtists() {
   };
 
   // ── 승인 처리 ──────────────────────────────
-
   const handleApprove = async (artist) => {
     try {
-      await apiFetch('/msa/core/admin/artist/confirm', {
-        method: 'POST',
-        body: JSON.stringify({
-          approvalId: artist.approvalId,
-          artistName: artist.name,
-          subCategory: `${artist.group} · ${artist.genre}`,
-          description: artist.description,
-          imageUrl: artist.imageUrl,
-          createdAt: artist.appliedDate,
-          status: 'CONFIRMED',
-        }),
+      await adminApi.post('/admin/artist/confirm', {
+        approvalId: artist.approvalId,
+        artistName: artist.name,
+        subCategory: `${artist.group} · ${artist.genre}`,
+        description: artist.description,
+        imageUrl: artist.imageUrl,
+        createdAt: artist.appliedDate,
+        status: 'CONFIRMED',
       });
       toast.success(`"${artist.name}" 아티스트 승인 완료!`);
       await fetchPending();
@@ -256,28 +263,23 @@ export default function AdminArtists() {
   };
 
   // ── 거절 처리 ──────────────────────────────
-
   const handleRejectSubmit = async () => {
     if (!rejectReason.trim()) return toast.error('거절 사유를 입력해주세요.');
     try {
-      await apiFetch('/msa/core/admin/artist/reject', {
-        method: 'POST',
-        body: JSON.stringify({
-          approvalId: rejectArtist.approvalId,
-          artistName: rejectArtist.name,
-          subCategory: `${rejectArtist.group} · ${rejectArtist.genre}`,
-          description: rejectArtist.description,
-          imageUrl: rejectArtist.imageUrl,
-          createdAt: rejectArtist.appliedDate,
-          status: 'FAILED',
-          rejectionReason: rejectReason,
-        }),
+      await adminApi.post('/admin/artist/reject', {
+        approvalId: rejectArtist.approvalId,
+        artistName: rejectArtist.name,
+        subCategory: `${rejectArtist.group} · ${rejectArtist.genre}`,
+        description: rejectArtist.description,
+        imageUrl: rejectArtist.imageUrl,
+        createdAt: rejectArtist.appliedDate,
+        status: 'FAILED',
+        rejectionReason: rejectReason,
       });
-      toast.error(`"${rejectArtist.name}" 거절 처리 완료`);
+      toast.success(`"${rejectArtist.name}" 거절 처리 완료`);
       setRejectArtist(null);
       setRejectReason('');
       await fetchPending();
-      await fetchRejectionHistory();
     } catch (err) {
       toast.error(`거절 처리 실패: ${err.message}`);
     }
@@ -451,10 +453,22 @@ export default function AdminArtists() {
                       {/* 프로필 이미지 or 이모지 */}
                       <div className="w-16 h-16 rounded-full bg-gradient-to-br from-rose-100 to-lavender flex items-center justify-center text-2xl shadow-inner border-2 border-white overflow-hidden">
                         {artist.imageUrl ? (
-                          <img src={artist.imageUrl} alt={artist.name} className="w-full h-full object-cover" />
-                        ) : (
-                          artist.avatar
-                        )}
+                          <img
+                            src={artist.imageUrl}
+                            alt={artist.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <span
+                          style={{ display: artist.imageUrl ? 'none' : 'flex' }}
+                          className="w-full h-full items-center justify-center text-2xl bg-gradient-to-br from-rose-100 to-lavender"
+                        >
+                          {getArtistEmoji(artist.id)}
+                        </span> 
                       </div>
                       <div>
                         <h3 className="text-lg font-bold text-foreground flex items-center gap-2">

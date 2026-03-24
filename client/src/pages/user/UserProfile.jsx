@@ -147,6 +147,13 @@ export default function UserProfile() {
       toast.success('회원 정보가 안전하게 변경되었습니다.');
       // Update local storage name if changed
       if (formData.name) localStorage.setItem('userName', formData.name);
+      if (formData.profileImageUrl) localStorage.setItem('userImage', formData.profileImageUrl);
+      
+      // 레이아웃의 좌측 프로필 이미지가 즉시 변경사항을 반영하게끔 페이지 자동 새로고침 처리
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+
     } catch (error) {
       toast.error('정보 수정 중 오류가 발생했습니다.');
     }
