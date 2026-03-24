@@ -142,7 +142,7 @@ export default function UserArtists() {
                       {isFollowed ? '팔로잉' : '팔로우'}
                     </button>
                     <button
-                      onClick={() => setLocation(`/artists/${artist.memberId}`)}
+                      onClick={() => setLocation(`/user/artists/${artist.memberId}`)}
                       className="flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-sm font-semibold bg-gray-50 text-muted-foreground hover:bg-gray-100 transition-colors">
                       페이지 <ChevronRight size={14} />
                     </button>

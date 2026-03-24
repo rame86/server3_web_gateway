@@ -138,11 +138,11 @@ function Router() {
       {/* 커뮤니티 경로: 구체적인 경로(write)를 동적 파라미터(:id)보다 먼저 선언해야 합니다. */}
       <Route path="/user/community" component={UserCommunity} />
       <Route path="/user/community/write" component={UserCommunityWrite} />
-        <Route path="/user/community/update/:id" component={UserCommunityUpdate} />
+      <Route path="/user/community/update/:id" component={UserCommunityUpdate} />
       <Route path="/user/community/:id" component={UserCommunityDetail} />
       <Route path="/user/artists" component={UserArtists} />
       {/* 아티스트 상세 페이지 - 동적 라우팅 적용 */}
-      <Route path="/artists/:id" component={UserArtistDetail} />
+      <Route path="/user/artists/:id" component={UserArtistDetail} />
       <Route path="/user/wallet" component={UserWallet} />
       <Route path="/user/wallet/success" component={UserWalletSuccess} />
       <Route path="/user/wallet/fail" component={UserWalletFail} />
