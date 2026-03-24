@@ -47,7 +47,7 @@ export default function UserDashboard() {
       if (!storedId) { setIsLoading(false); return; } // ID가 없으면 로딩 끄고 바로 종료
       try {
         // MSA 결제 서버(payApi)로 유저 상세 내역 요청
-        const res = await payApi.get(`/payment/admin/user-detail/${storedId}`);
+        const res = await payApi.get(`/payment/user-detail/${storedId}`);
         setPaymentData(res.data); // 받아온 데이터를 paymentData 상태에 저장
       } catch (e) {
         console.error('[Dashboard] 결제 내역 오류:', e);
