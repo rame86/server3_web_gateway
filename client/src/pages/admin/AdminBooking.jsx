@@ -53,7 +53,9 @@ export default function AdminBooking() {
         ...item,
         eventTitle: item.eventTitle || item.title, 
         location: item.location || item.venue,
-        eventStartDate: item.eventStartDate || item.eventDate,
+        eventStartDate: item.eventDate,       // 실제 공연일
+        bookingStartDate: item.eventStartDate, // 예매 시작일 (DB 컬럼이 event_start_date이므로)
+        bookingEndDate: item.eventEndDate,     // 예매 종료일
         totalCapacity: item.totalCapacity || item.total_capacity || 0
       }));
       
