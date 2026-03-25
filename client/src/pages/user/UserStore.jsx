@@ -326,7 +326,7 @@ export default function UserStore() {
                     <select id="category" className="w-full h-10 px-3 bg-white border border-rose-100 rounded-xl text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none">
                       <option value="OFFICIAL">공식굿즈</option>
                       <option value="SECONDHAND">중고굿즈</option>
-                      <option value="FANMADE">팬메이드</option>
+                      <option value="unofficial">팬메이드</option>
                     </select>
                   </div>
                   <div className="space-y-2">
