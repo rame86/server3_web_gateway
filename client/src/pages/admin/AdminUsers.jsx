@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'; 
 import { toast } from 'sonner';
 import { coreApi } from '@/lib/api'; 
+import SockJS from 'sockjs-client';
+import Stomp from 'stompjs';
 
 // [수정]: 백엔드 Enum 상태값(대문자)에 맞춰 매핑 키 수정
 const statusColors = {
@@ -62,6 +64,67 @@ export default function AdminUsers() {
   useEffect(() => {
     fetchUsers();
   }, [page]);
+
+  // [새로 추가]: 화면 처음 뜰 때 딱 한 번 실행되는 녀석 (의존성 배열이 [] 빈칸)
+  useEffect(() => {
+    const socket = new SockJS('http://localhost:8080/ws-admin'); 
+    const stompClient = Stomp.over(socket);
+
+    // 시끄러운 디버그 로그 끄기 (선택사항)
+    stompClient.debug = () => {}; 
+
+    stompClient.connect({}, (frame) => {
+      console.log('✅ 소켓 연결 성공!');
+
+      stompClient.subscribe('/topic/user-stats', (frame) => {
+        const response = JSON.parse(frame.body);
+        const { type, payload } = response;
+        
+        // 1. [상세보기 모달 업데이트] type이 USER_DETAIL일 때
+        if (type === 'USER_DETAIL') {
+          console.log("🎯 상세 데이터 수신:", payload);
+          
+          // 현재 열려있는 상세 유저 상태(setSelectedUser 등)를 업데이트합니다.
+          // 님의 코드에서 상세보기에 사용하는 state 함수명을 확인해 보세요!
+          setSelectedUser(prev => {
+            if (!prev) return null; 
+            return {
+              ...prev,    // 기존 이름, 이메일, 주소 등
+              ...payload  // 새 잔액, 구매이력, 포인트이력 덮어쓰기
+            };
+          });
+        } 
+        
+        // 2. [전체 목록 업데이트] 기존 로직 (배열 데이터일 때)
+        else {
+          setUsers(prevUsers => {
+            // 목록 데이터는 배열로 올 때만 실행
+            if (!Array.isArray(payload)) return prevUsers;
+
+            return prevUsers.map(user => {
+              const updatedData = payload.find(p => Number(p.memberId) === Number(user.memberId));
+              if (updatedData) {
+                return {
+                  ...user,
+                  ...updatedData,
+                  name: updatedData.name || user.name,
+                  email: updatedData.email || user.email,
+                  createdAt: updatedData.createdAt || user.createdAt
+                };
+              }
+              return user;
+            });
+          });
+        }
+      });
+    }, (error) => {
+      console.error('❌ 소켓 연결 실패:', error);
+    });
+
+    return () => {
+      if (stompClient && stompClient.connected) stompClient.disconnect();
+    };
+  }, []);
 
   // --- [기능 1: 상세보기] 눈모양 버튼 연동 ---
   const handleViewDetail = async (memberId) => {
@@ -265,7 +328,7 @@ export default function AdminUsers() {
                         </span>
                       </td>
                       <td className="px-6 py-5 text-sm font-bold text-foreground font-dm-sans">{user.purchaseCount}건</td>
-                      <td className="px-6 py-5 text-sm font-black text-primary font-dm-sans">{user.pointBalance?.toLocaleString()}P</td>
+                      <td className="px-6 py-5 text-sm font-black text-primary font-dm-sans">{user.balance?.toLocaleString()}P</td>
                       <td className="px-6 py-5 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button onClick={() => handleViewDetail(user.memberId)} className="p-3 bg-muted rounded-2xl text-primary hover:bg-primary hover:text-white transition-all shadow-sm">
