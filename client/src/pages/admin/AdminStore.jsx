@@ -14,9 +14,9 @@ import { toast } from 'sonner';
 import { shopApi } from '@/lib/api';
 
 const statusConfig = {
-  PENDING: { label: '승인 대기', class: 'bg-amber-50 text-amber-600 border border-amber-200', icon: Clock },
-  APPROVED: { label: '승인 완료', class: 'bg-teal-50 text-teal-600 border border-teal-200', icon: CheckCircle },
-  REJECTED: { label: '거절됨', class: 'bg-red-50 text-red-500 border border-red-200', icon: XCircle },
+  PENDING:  { label: '승인 대기', class: 'bg-amber-50 text-amber-600 border border-amber-200', icon: Clock },
+  APPROVED: { label: '승인 완료', class: 'bg-teal-50 text-teal-600 border border-teal-200',  icon: CheckCircle },
+  REJECTED: { label: '거절됨',   class: 'bg-red-50 text-red-500 border border-red-200',     icon: XCircle },
 };
 
 export default function AdminStore() {
