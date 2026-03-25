@@ -88,8 +88,8 @@ const roleConfig = {
 export default function Layout({ children, role }) {
   const [location, setLocation] = useLocation(); // 현재 경로 추적 및 이동
   const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 사이드바 개폐 상태
- const currentRole = (role || 'user').toLowerCase();
-  
+  const currentRole = (role || 'user').toLowerCase();
+
   // 해결 포인트 2: 만약 잘못된 role이 들어와도 터지지 않게 'user' 정보를 기본으로 가져옴
   const config = roleConfig[currentRole] || roleConfig['user'];
 
@@ -117,16 +117,8 @@ export default function Layout({ children, role }) {
   // 로그아웃 처리 (서버 세션 파기 및 클라이언트 데이터 초기화)
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem('TOKEN');
+      const token = localStorage.getItem('token');
       if (token) {
-        // await fetch('http://localhost/msa/core/member/logout', {
-        //   method: 'POST',
-        //   headers: {
-        //     'Authorization': `Bearer ${token}`,
-        //     'Content-Type': 'application/json'
-        //   }
-        // });
-        // console.log("백엔드 Redis 세션 삭제 성공");
         await coreApi.post('/member/logout');
         console.log("백엔드 Redis 세션 삭제 성공");
       }
