@@ -410,25 +410,38 @@ export default function AdminBooking() {
               <div className="space-y-4">
                 <h4 className="text-xs font-black text-primary uppercase tracking-[0.2em] ml-1">Seat Layout Plan</h4>
                 <div className="p-6 border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-slate-50/30">
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-sm font-bold text-slate-600">공연장: {selectedEvent.location}</span>
-                    <span className="text-xs font-black px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">Total {selectedEvent.totalCapacity} Seats</span>
-                  </div>
                   
-                  {/* 스크롤바가 생길 수 있으므로 overflow-auto 추가, 패딩 여유 있게 부여 */}
-                  <div className="bg-white rounded-3xl border border-slate-100 shadow-inner overflow-auto p-4 flex justify-center items-center">
-                    {/* 💡 네가 업로드한 컴포넌트에 동적으로 계산된 rows, cols 주입! */}
-                    <SeatSelection 
-                      {...getSeatLayoutConfig(selectedEvent.totalCapacity, selectedEvent.location)} 
-                      ticketCount={0} // 관리자는 선택 못하게 0으로 고정
-                      reservedSeats={[]} 
-                      onSeatSelect={() => {}} // 클릭해도 무시되도록 빈 함수 전달
-                    />
-                  </div>
+                  {/* 🌟 '루미나'가 포함된 공연장일 때만 좌석표 노출 */}
+                  {selectedEvent.location?.includes('루미나') ? (
+                    <>
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-sm font-bold text-slate-600">공연장: {selectedEvent.location}</span>
+                        <span className="text-xs font-black px-3 py-1 bg-white border border-slate-200 rounded-full shadow-sm">
+                          Total {selectedEvent.totalCapacity} Seats
+                        </span>
+                      </div>
+                      
+                      {/* 조회 전용 (클릭 방지) */}
+                      <div className="bg-white rounded-3xl border border-slate-100 shadow-inner overflow-auto p-4 flex justify-center items-center pointer-events-none select-none">
+                        <SeatSelection 
+                          {...getSeatLayoutConfig(selectedEvent.totalCapacity, selectedEvent.location)} 
+                          ticketCount={0} 
+                          reservedSeats={[]} 
+                          onSeatSelect={() => {}} 
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    /* 🌟 외부 공연장일 때 보여줄 대체 UI */
+                    <div className="py-12 text-center">
+                      <MapPin size={40} className="mx-auto text-slate-300 mb-3" />
+                      <p className="text-sm font-bold text-slate-400">외부 공연장은 좌석표 조회가 지원되지 않습니다.</p>
+                      <p className="text-xs text-slate-300 mt-1">현장 배정 또는 외부 예매 시스템을 확인해야 합니다.</p>
+                    </div>
+                  )}
 
                 </div>
               </div>
-
             </div>
 
             {/* --- 하단 버튼 영역: PENDING 상태일 때만 노출 --- */}

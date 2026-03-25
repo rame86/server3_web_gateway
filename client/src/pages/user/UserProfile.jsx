@@ -97,9 +97,9 @@ export default function UserProfile() {
   };
 
   const handleUpgradeSubmit = async () => {
-    // 1. 필수값 유효성 검사 (팬덤명과 배경 이미지도 체크)
-    if (!upgradeForm.artistName || !upgradeForm.fandomName || !upgradeForm.subCategory || !upgradeForm.bgImageFile) {
-      toast.error('필수 정보를 모두 입력하고 배경 이미지를 선택해 주세요!');
+    // 1. 필수값 유효성 검사 (이미지는 선택사항으로 처리)
+    if (!upgradeForm.artistName || !upgradeForm.fandomName || !upgradeForm.subCategory) {
+      toast.error('필수 정보를 모두 입력해 주세요!');
       return;
     }
 
@@ -107,24 +107,38 @@ export default function UserProfile() {
       setIsSubmitting(true);
       toast.loading('아티스트 전환 신청을 접수 중이야...');
 
+      let uploadedBgUrl = '';
       const currentUserId = localStorage.getItem('memberId') || localStorage.getItem('userId');
 
-      // 🌟 2. 파일 전송을 위한 FormData 생성
-      const formData = new FormData();
-      formData.append('memberId', Number(currentUserId));
-      formData.append('artistName', upgradeForm.artistName);
-      formData.append('fandomName', upgradeForm.fandomName); // 추가된 필드
-      formData.append('subCategory', upgradeForm.subCategory);
-      formData.append('description', upgradeForm.description);
-      formData.append('communityLink', upgradeForm.communityLink);
-      
-      // 실제 이미지 파일 담기
-      formData.append('bgImageFile', upgradeForm.bgImageFile); 
+      // 🌟 STEP 1: 이미지가 첨부되어 있다면, 먼저 이미지 전용 API로 업로드!
+      if (upgradeForm.bgImageFile) {
+        const imageFormData = new FormData();
+        // 백엔드 @RequestParam("bgImageFile") 와 이름 맞춤
+        imageFormData.append('bgImageFile', upgradeForm.bgImageFile); 
 
-      // 🌟 3. 전송 (multipart/form-data 헤더는 axios가 알아서 잡아주지만 명시해도 좋음)
-      await coreApi.post('/artist/apply', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+        // 새로 만든 이미지 전용 업로드 API 호출
+        const uploadRes = await coreApi.post('/artist/bg-image', imageFormData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        
+        // 서버에서 받아온 실제 이미지 경로
+        uploadedBgUrl = uploadRes.data.url; 
+      }
+
+      // 🌟 STEP 2: DTO 변수명에 딱 맞춘 깔끔한 JSON 데이터 조립
+      const finalApplyData = {
+        memberId: Number(currentUserId), // 혹시 몰라 기존처럼 남겨둠
+        artistName: upgradeForm.artistName, // DTO의 artistName
+        fandomName: upgradeForm.fandomName, // DTO의 fandomName
+        subCategory: upgradeForm.subCategory, // DTO의 subCategory
+        description: upgradeForm.description, // DTO의 description
+        // 커뮤니티 링크는 엔티티/DTO에 없으면 백엔드에서 무시되지만 일단 보냄
+        communityLink: upgradeForm.communityLink, 
+        fandomImage: uploadedBgUrl // 🌟 DTO의 fandomImage에 방금 받은 URL 매핑!
+      };
+
+      // 🌟 STEP 3: 최종 JSON 전송 (headers 설정 필요 없음, 알아서 application/json으로 감)
+      await coreApi.post('/artist/apply', finalApplyData); 
 
       toast.dismiss();
       toast.success('신청 완료! 관리자 승인 후 알려줄게.');
@@ -137,6 +151,47 @@ export default function UserProfile() {
       setIsSubmitting(false);
     }
   };
+  // const handleUpgradeSubmit = async () => {
+  //   // 1. 필수값 유효성 검사 (팬덤명과 배경 이미지도 체크)
+  //   if (!upgradeForm.artistName || !upgradeForm.fandomName || !upgradeForm.subCategory ) {
+  //     toast.error('필수 정보를 모두 입력하고 배경 이미지를 선택해 주세요!');
+  //     return;
+  //   }
+
+  //   try {
+  //     setIsSubmitting(true);
+  //     toast.loading('아티스트 전환 신청을 접수 중이야...');
+
+  //     const currentUserId = localStorage.getItem('memberId') || localStorage.getItem('userId');
+
+  //     // 🌟 2. 파일 전송을 위한 FormData 생성
+  //     const formData = new FormData();
+  //     formData.append('memberId', Number(currentUserId));
+  //     formData.append('artistName', upgradeForm.artistName);
+  //     formData.append('fandomName', upgradeForm.fandomName); // 추가된 필드
+  //     formData.append('subCategory', upgradeForm.subCategory);
+  //     formData.append('description', upgradeForm.description);
+  //     formData.append('communityLink', upgradeForm.communityLink);
+      
+  //     // 실제 이미지 파일 담기
+  //     formData.append('bgImageFile', upgradeForm.bgImageFile); 
+
+  //     // 🌟 3. 전송 (multipart/form-data 헤더는 axios가 알아서 잡아주지만 명시해도 좋음)
+  //     await coreApi.post('/artist/apply', formData, {
+  //       headers: { 'Content-Type': 'multipart/form-data' }
+  //     });
+
+  //     toast.dismiss();
+  //     toast.success('신청 완료! 관리자 승인 후 알려줄게.');
+  //     setIsUpgradeModalOpen(false);
+  //   } catch (error) {
+  //     toast.dismiss();
+  //     console.error("❌ 전환 신청 에러:", error);
+  //     toast.error('신청 중 오류가 발생했어.');
+  //   } finally {
+  //     setIsSubmitting(false);
+  //   }
+  // };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
