@@ -105,7 +105,8 @@ export default function AdminBooking() {
         price: rejectingEvent.price || 0,
       });
       toast.success('반려 처리되었습니다.');
-      setRejectingEvent(null);
+      setRejectingEvent(null); // 반려 입력창 닫기
+      setSelectedEvent(null); // 상세 보기 모달도 함께 닫기
       setRejectionReason('');
       fetchData();
     } catch (error) {
@@ -428,19 +429,32 @@ export default function AdminBooking() {
 
             </div>
 
-            <div className="p-8 border-t bg-white flex gap-4 items-center font-noto">
-              <button 
-                onClick={() => setRejectingEvent(selectedEvent)}
-                className="flex-1 py-4 bg-red-50 text-red-500 font-bold rounded-full border border-red-100 hover:bg-red-100 transition-all text-sm shadow-sm"
-              >
-                승인 반려
-              </button>
-              <button 
-                onClick={handlePublishBooking}  // ✅
-                className="flex-[2.5] py-4 bg-teal-500 text-white font-bold rounded-full shadow-xl shadow-teal-100 hover:bg-teal-600 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm"
-              >
-                <Check size={18}/> 예매 일정 등록 및 발송
-              </button>
+            {/* --- 하단 버튼 영역: PENDING 상태일 때만 노출 --- */}
+            <div className="p-8 border-t bg-white font-noto">
+              {selectedEvent.status === 'PENDING' ? (
+                <div className="flex gap-4 items-center">
+                  <button 
+                    onClick={() => setRejectingEvent(selectedEvent)}
+                    className="flex-1 py-4 bg-red-50 text-red-500 font-bold rounded-full border border-red-100 hover:bg-red-100 transition-all text-sm shadow-sm"
+                  >
+                    승인 반려
+                  </button>
+                  <button 
+                    onClick={handlePublishBooking} 
+                    className="flex-[2.5] py-4 bg-teal-500 text-white font-bold rounded-full shadow-xl shadow-teal-100 hover:bg-teal-600 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Check size={18}/> 예매 일정 등록 및 발송
+                  </button>
+                </div>
+              ) : (
+                /* 🌟 이미 승인/반려된 경우 보여줄 UI */
+                <div className="w-full py-4 bg-slate-50 rounded-full text-center border border-slate-100">
+                  <p className="text-sm font-bold text-slate-400 flex items-center justify-center gap-2">
+                    <Check size={16} className={selectedEvent.status === 'CONFIRMED' ? "text-teal-500" : "text-red-400"} />
+                    이 이벤트는 이미 **{selectedEvent.status === 'CONFIRMED' ? '승인' : '반려'}** 처리가 완료되었습니다.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

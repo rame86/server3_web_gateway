@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { User, Phone, MapPin, Lock, Star, Camera, Save, RefreshCw, Mail, Calendar } from 'lucide-react';
+import { User, Phone, MapPin, Lock, Star, Camera, Save, RefreshCw, Mail, Calendar, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { coreApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter
 } from "@/components/ui/dialog";
+
 
 // 핵심 주석: 하드코딩 지양을 위한 아티스트 카테고리 상수 분리 (팬덤 플랫폼 맞춤 추천)
 const ARTIST_CATEGORIES = [
@@ -67,13 +68,14 @@ export default function UserProfile() {
     fetchMyInfo();
   }, []);
 
-  // DB 컬럼 구조에 맞춰 신청 폼 상태값 최신화
+  // 🌟 수정된 초기 상태값
   const [upgradeForm, setUpgradeForm] = useState({
-    artistName: '',   // (stageName -> artistName)
-    subCategory: '', // (category -> subCategory)
+    artistName: '',
+    fandomName: '',    // 추가
+    subCategory: '',
     description: '',
-    profileImageUrl: '',
-    communityLink: ''
+    communityLink: '',
+    bgImageFile: null  // 파일 객체를 저장할 곳 추가
   });
 
   // select 박스에서 선택한 값을 추적하기 위한 전용 상태
@@ -94,11 +96,10 @@ export default function UserProfile() {
     }
   };
 
-  // 아티스트 전환 신청 API 호출 함수
   const handleUpgradeSubmit = async () => {
-    // 1. 유효성 검사
-    if (!upgradeForm.artistName || !upgradeForm.subCategory || !upgradeForm.description) {
-      toast.error('신청 정보를 모두 입력해 주세요!');
+    // 1. 필수값 유효성 검사 (팬덤명과 배경 이미지도 체크)
+    if (!upgradeForm.artistName || !upgradeForm.fandomName || !upgradeForm.subCategory || !upgradeForm.bgImageFile) {
+      toast.error('필수 정보를 모두 입력하고 배경 이미지를 선택해 주세요!');
       return;
     }
 
@@ -106,19 +107,24 @@ export default function UserProfile() {
       setIsSubmitting(true);
       toast.loading('아티스트 전환 신청을 접수 중이야...');
 
-      // 로컬스토리지에서 로그인한 유저의 ID 가져오기 (프로젝트 키 이름에 맞게 확인 필수!)
       const currentUserId = localStorage.getItem('memberId') || localStorage.getItem('userId');
 
-      // 자바 DTO 구조에 맞게 데이터 재구성 (유저 ID 추가)
-      const payload = {
-        memberId: Number(currentUserId),       // 누가 신청하는지 서버에 알려줌
-        artistName: upgradeForm.artistName,
-        subCategory: upgradeForm.subCategory,
-        description: upgradeForm.description,
-        imageUrl: `${upgradeForm.profileImageUrl}|${upgradeForm.communityLink}`
-      };
+      // 🌟 2. 파일 전송을 위한 FormData 생성
+      const formData = new FormData();
+      formData.append('memberId', Number(currentUserId));
+      formData.append('artistName', upgradeForm.artistName);
+      formData.append('fandomName', upgradeForm.fandomName); // 추가된 필드
+      formData.append('subCategory', upgradeForm.subCategory);
+      formData.append('description', upgradeForm.description);
+      formData.append('communityLink', upgradeForm.communityLink);
+      
+      // 실제 이미지 파일 담기
+      formData.append('bgImageFile', upgradeForm.bgImageFile); 
 
-      await coreApi.post('/artist/apply', payload);
+      // 🌟 3. 전송 (multipart/form-data 헤더는 axios가 알아서 잡아주지만 명시해도 좋음)
+      await coreApi.post('/artist/apply', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
 
       toast.dismiss();
       toast.success('신청 완료! 관리자 승인 후 알려줄게.');
@@ -355,8 +361,8 @@ export default function UserProfile() {
 
       {/* 🌟 아티스트 전환 신청 팝업(Dialog) */}
       <Dialog open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen}>
-        <DialogContent className="sm:max-w-[460px] rounded-[32px] p-0 border-none shadow-2xl overflow-hidden bg-white outline-none">
-          <div className="p-8 space-y-6">
+        <DialogContent className="sm:max-w-[460px] rounded-[32px] p-0 border-none shadow-2xl bg-white outline-none overflow-hidden">          
+          <div className="max-h-[85vh] overflow-y-auto custom-scrollbar p-8 pt-10">
             <DialogHeader className="text-center space-y-2">
               <div className="w-14 h-14 bg-violet-100 rounded-2xl flex items-center justify-center text-violet-600 mx-auto mb-2">
                 <Star size={28} fill="currentColor" />
@@ -378,6 +384,18 @@ export default function UserProfile() {
                   value={upgradeForm.artistName}
                   onChange={handleUpgradeChange}
                   placeholder="활동하실 아티스트명을 입력하세요"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none transition-all"
+                />
+              </div>
+
+              {/* 핵심 주석: 새로 추가된 팬덤명 입력란 */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Fandom Name</label>
+                <input
+                  name="fandomName" // 상태값의 키와 일치
+                  value={upgradeForm.fandomName}
+                  onChange={handleUpgradeChange}
+                  placeholder="팬덤 이름을 입력해주세요 (예: 아미, 블링크)"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none transition-all"
                 />
               </div>
@@ -433,22 +451,46 @@ export default function UserProfile() {
                 />
               </div>
 
-              {/* 🌟 프로필 이미지 URL 입력창 */}
+              {/* 🌟 기존 Background URL 대신 파일 업로드로 변경 */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Profile Image URL</label>
-                <div className="relative">
-                  <Camera size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    name="profileImageUrl" // 상태값의 키와 일치
-                    value={upgradeForm.profileImageUrl}
-                    onChange={handleUpgradeChange}
-                    placeholder="이미지 링크 주소"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none"
-                  />
+                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Dashboard Background Image</label>
+                <div className="group relative">
+                  <div className="flex items-center justify-center w-full">
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-[24px] bg-gray-50 hover:bg-violet-50 hover:border-violet-200 transition-all cursor-pointer overflow-hidden relative">
+                      {/* 선택된 파일 미리보기가 있으면 표시, 없으면 업로드 아이콘 표시 */}
+                      {upgradeForm.bgImageFile ? (
+                        <div className="flex flex-col items-center p-4">
+                          <ImageIcon size={24} className="text-violet-500 mb-2" />
+                          <span className="text-xs font-medium text-gray-600 truncate max-w-[200px]">
+                            {upgradeForm.bgImageFile.name}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-violet-500 mb-3 group-hover:scale-110 transition-transform">
+                            <ImageIcon size={20} />
+                          </div>
+                          <p className="text-xs text-gray-500 font-medium">이미지 파일을 선택해주세요</p>
+                          <p className="text-[10px] text-gray-400 mt-1">PNG, JPG (MAX. 5MB)</p>
+                        </div>
+                      )}
+                      <input 
+                        type="file" 
+                        name="bgImageFile"
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            setUpgradeForm(prev => ({ ...prev, bgImageFile: file }));
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
-
             {/* 안내 문구 */}
             <div className="bg-violet-50 p-4 rounded-2xl flex items-start gap-3">
               <Mail size={16} className="text-violet-500 mt-0.5" />

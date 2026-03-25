@@ -107,7 +107,8 @@ const fetchMyEvents = async () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const form = e.currentTarget;
-    const memberId = localStorage.getItem('memberId') || '3';
+    const memberId = localStorage.getItem('memberId');
+    const storedName = localStorage.getItem('userName');
 
     // 1. 🌟 JSON 대신 FormData 객체 생성 (파일 전송을 위해 필수)
     const data = new FormData();
@@ -123,7 +124,7 @@ const fetchMyEvents = async () => {
     data.append('member_id', memberId);
     data.append('requester_id', memberId);
     data.append('artist_id', memberId);
-    data.append('artist_name', "아티스트 본인");
+    data.append('artist_name', storedName);
     data.append('title', form.title.value);
     data.append('event_type', form.type.value);
     data.append('event_date', form.event_date.value);
@@ -613,12 +614,20 @@ const fetchMyEvents = async () => {
                       </h4>
                       <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-slate-600 text-sm leading-relaxed whitespace-pre-wrap font-medium">
                         {isFailed 
-                          ? (selectedManageEvent?.rejection_reason || selectedManageEvent?.rejectionReason || "상세 반려 사유가 등록되지 않았습니다.")
+                          ? (
+                              // 🌟 Prisma 관계명을 통해 들어온 반려 사유를 먼저 확인
+                              selectedManageEvent?.event_approvals_events_approval_idToevent_approvals?.rejection_reason || 
+                              selectedManageEvent?.rejection_reason || 
+                              selectedManageEvent?.rejectionReason || 
+                              "상세 반려 사유가 등록되지 않았습니다."
+                            )
                           : "승인이 완료되면 실시간 좌석 현황을 모니터링할 수 있습니다."
                         }
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-4">
-                        현재 상태: <span className="font-bold text-rose-500">{rawStatus}</span>
+                        현재 상태: <span className="font-bold text-rose-500">
+                          {statusMap[rawStatus]?.label || rawStatus}
+                        </span>
                       </p>
                     </div>
                   )}
