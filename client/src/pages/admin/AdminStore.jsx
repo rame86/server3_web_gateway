@@ -5,8 +5,8 @@
 
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { 
-  Package, Check, X, Eye, Clock, User, 
+import {
+  Package, Check, X, Eye, Clock, User,
   Info, AlertCircle, RefreshCw, Loader2, ShoppingBag, CheckCircle, XCircle
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,9 @@ import { toast } from 'sonner';
 import { shopApi } from '@/lib/api';
 
 const statusConfig = {
-  PENDING:  { label: '승인 대기', class: 'bg-amber-50 text-amber-600 border border-amber-200', icon: Clock },
-  APPROVED: { label: '승인 완료', class: 'bg-teal-50 text-teal-600 border border-teal-200',  icon: CheckCircle },
-  REJECTED: { label: '거절됨',   class: 'bg-red-50 text-red-500 border border-red-200',     icon: XCircle },
+  PENDING: { label: '승인 대기', class: 'bg-amber-50 text-amber-600 border border-amber-200', icon: Clock },
+  APPROVED: { label: '승인 완료', class: 'bg-teal-50 text-teal-600 border border-teal-200', icon: CheckCircle },
+  REJECTED: { label: '거절됨', class: 'bg-red-50 text-red-500 border border-red-200', icon: XCircle },
 };
 
 export default function AdminStore() {
@@ -65,10 +65,9 @@ export default function AdminStore() {
   // 승인 버튼
   const handleApprove = async (id, name, productId) => {
     try {
-      await shopApi.post('/admin/approval', {
-        approvalId: id,
+      await shopApi.post('/admin/product-approval', {
         productId: productId,
-        status: 'APPROVED'
+        isApproved: true
       });
       setApprovedIds([...approvedIds, id]);
       toast.success(`"${name}" 굿즈가 승인되었습니다`);
@@ -87,11 +86,9 @@ export default function AdminStore() {
       return;
     }
     try {
-      await shopApi.post('/admin/approval', {
-        approvalId: rejectItem.id,
+      await shopApi.post('/admin/product-approval', {
         productId: rejectItem.productId,
-        status: 'REJECTED',
-        reason: rejectReason
+        isApproved: false
       });
       setRejectedIds([...rejectedIds, rejectItem.id]);
       toast.warning(`"${rejectItem.name}" 거절 처리되었습니다`);
@@ -119,9 +116,9 @@ export default function AdminStore() {
             </h1>
             <p className="text-sm text-muted-foreground font-medium">등록 요청된 굿즈를 검토하고 승인합니다</p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={fetchPendingGoods}
             disabled={loading}
             className="rounded-xl border-rose-100 text-rose-500 hover:bg-rose-50"
@@ -259,110 +256,110 @@ export default function AdminStore() {
       </div>
 
       {/* 상세 보기 모달 */}
-        {detailItem && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm fade-in-up">
-            <div className="glass-card w-full max-w-lg rounded-[2rem] overflow-hidden shadow-2xl bg-white border border-rose-100">
-              <div className="p-5 border-b border-border flex justify-between items-center bg-secondary/30">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-primary/10 rounded-xl">
-                    <ShoppingBag className="text-primary" size={18} />
-                  </div>
-                  <h2 className="text-lg font-bold">굿즈 등록 요청 상세</h2>
+      {detailItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm fade-in-up">
+          <div className="glass-card w-full max-w-lg rounded-[2rem] overflow-hidden shadow-2xl bg-white border border-rose-100">
+            <div className="p-5 border-b border-border flex justify-between items-center bg-secondary/30">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-primary/10 rounded-xl">
+                  <ShoppingBag className="text-primary" size={18} />
                 </div>
-                <button onClick={() => setDetailItem(null)} className="p-2 hover:bg-white rounded-full transition-all">
-                  <X size={20} className="text-muted-foreground" />
-                </button>
+                <h2 className="text-lg font-bold">굿즈 등록 요청 상세</h2>
               </div>
-              <div className="p-6 space-y-4">
-                {/* 굿즈 정보 */}
-                <div className="space-y-3">
-                  {[
-                    { label: 'Approval ID', value: `#${detailItem.id}` },
-                    { label: 'Product ID',  value: `#${detailItem.productId}` },
-                    { label: '굿즈 이름',   value: detailItem.name },
-                    { label: '요청자',      value: detailItem.requesterName },
-                    { label: '상태',        value: statusConfig[detailItem.status]?.label || detailItem.status },
-                    { label: '활성 여부',   value: detailItem.active ? '활성' : '비활성' },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="flex items-center justify-between py-2.5 border-b border-border/30 last:border-0">
-                      <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">{label}</span>
-                      <span className="text-sm font-semibold text-foreground">{value}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* 요청자 정보 */}
-                <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                    <User className="text-primary" size={20} />
+              <button onClick={() => setDetailItem(null)} className="p-2 hover:bg-white rounded-full transition-all">
+                <X size={20} className="text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* 굿즈 정보 */}
+              <div className="space-y-3">
+                {[
+                  { label: 'Approval ID', value: `#${detailItem.id}` },
+                  { label: 'Product ID', value: `#${detailItem.productId}` },
+                  { label: '굿즈 이름', value: detailItem.name },
+                  { label: '요청자', value: detailItem.requesterName },
+                  { label: '상태', value: statusConfig[detailItem.status]?.label || detailItem.status },
+                  { label: '활성 여부', value: detailItem.active ? '활성' : '비활성' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex items-center justify-between py-2.5 border-b border-border/30 last:border-0">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">{label}</span>
+                    <span className="text-sm font-semibold text-foreground">{value}</span>
                   </div>
-                  <div>
-                    <p className="text-[10px] text-rose-400 font-bold uppercase">Requested By</p>
-                    <p className="font-bold text-rose-900 text-sm">{detailItem.requesterName}</p>
-                  </div>
-                </div>
+                ))}
               </div>
 
-              {/* 하단 액션 */}
-              <div className="p-5 bg-slate-50 border-t border-border flex gap-3">
-                <button 
-                  onClick={() => { setRejectItem(detailItem); setDetailItem(null); }}
-                  className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-red-500 bg-red-50 hover:bg-red-100 transition-colors border border-red-100"
-                >
-                  <X size={14} className="inline mr-1" />거절
-                </button>
-                <button 
-                  onClick={() => handleApprove(detailItem.id, detailItem.name, detailItem.productId)}
-                  className="flex-[2] py-3.5 rounded-2xl btn-primary-gradient text-white font-bold shadow-lg"
-                >
-                  <Check size={14} className="inline mr-1" />승인 처리
-                </button>
+              {/* 요청자 정보 */}
+              <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                  <User className="text-primary" size={20} />
+                </div>
+                <div>
+                  <p className="text-[10px] text-rose-400 font-bold uppercase">Requested By</p>
+                  <p className="font-bold text-rose-900 text-sm">{detailItem.requesterName}</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* [5] 거절 사유 입력 모달 */}
-        {rejectItem && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-md transition-all">
-            <div className="glass-card w-full max-w-md rounded-[2.5rem] p-8 space-y-6 bg-white shadow-2xl border border-red-100 fade-in-up">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100 shadow-inner">
-                  <AlertCircle size={32} />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800 font-playfair">거절 사유 입력</h2>
-                <p className="text-sm text-muted-foreground mt-2 font-medium">
-                  "{rejectItem.name}" 등록을 거절하시겠습니까?<br/>판매자에게 전달될 사유를 상세히 적어주세요.
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Reason for Rejection</label>
-                <textarea 
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="예: 상품 이미지가 선명하지 않습니다. 상세 설명에 저작권 위반 소지가 있는 이미지가 포함되어 있습니다."
-                  className="w-full h-36 p-5 rounded-3xl bg-slate-50 border-none focus:ring-4 focus:ring-red-100 text-sm leading-relaxed placeholder:text-slate-300 transition-all shadow-inner"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button 
-                  onClick={() => { setRejectItem(null); setRejectReason(''); }}
-                  className="flex-1 py-4 font-bold text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  취소
-                </button>
-                <button 
-                  onClick={handleRejectSubmit}
-                  className="flex-[1.5] py-4 rounded-2xl bg-red-500 text-white font-bold shadow-xl hover:bg-red-600 active:scale-95 transition-all"
-                >
-                  거절 확정하기
-                </button>
-              </div>
+            {/* 하단 액션 */}
+            <div className="p-5 bg-slate-50 border-t border-border flex gap-3">
+              <button
+                onClick={() => { setRejectItem(detailItem); setDetailItem(null); }}
+                className="flex-1 py-3.5 rounded-2xl text-sm font-bold text-red-500 bg-red-50 hover:bg-red-100 transition-colors border border-red-100"
+              >
+                <X size={14} className="inline mr-1" />거절
+              </button>
+              <button
+                onClick={() => handleApprove(detailItem.id, detailItem.name, detailItem.productId)}
+                className="flex-[2] py-3.5 rounded-2xl btn-primary-gradient text-white font-bold shadow-lg"
+              >
+                <Check size={14} className="inline mr-1" />승인 처리
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* [5] 거절 사유 입력 모달 */}
+      {rejectItem && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-md transition-all">
+          <div className="glass-card w-full max-w-md rounded-[2.5rem] p-8 space-y-6 bg-white shadow-2xl border border-red-100 fade-in-up">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-100 shadow-inner">
+                <AlertCircle size={32} />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800 font-playfair">거절 사유 입력</h2>
+              <p className="text-sm text-muted-foreground mt-2 font-medium">
+                "{rejectItem.name}" 등록을 거절하시겠습니까?<br />판매자에게 전달될 사유를 상세히 적어주세요.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-black text-slate-400 uppercase ml-1">Reason for Rejection</label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="예: 상품 이미지가 선명하지 않습니다. 상세 설명에 저작권 위반 소지가 있는 이미지가 포함되어 있습니다."
+                className="w-full h-36 p-5 rounded-3xl bg-slate-50 border-none focus:ring-4 focus:ring-red-100 text-sm leading-relaxed placeholder:text-slate-300 transition-all shadow-inner"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => { setRejectItem(null); setRejectReason(''); }}
+                className="flex-1 py-4 font-bold text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleRejectSubmit}
+                className="flex-[1.5] py-4 rounded-2xl bg-red-500 text-white font-bold shadow-xl hover:bg-red-600 active:scale-95 transition-all"
+              >
+                거절 확정하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
