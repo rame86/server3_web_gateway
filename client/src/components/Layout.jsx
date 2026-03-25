@@ -88,7 +88,10 @@ const roleConfig = {
 export default function Layout({ children, role }) {
   const [location, setLocation] = useLocation(); // 현재 경로 추적 및 이동
   const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 사이드바 개폐 상태
-  const config = roleConfig[role]; // 현재 역할에 맞는 설정값 선택
+  const currentRole = (role || 'user').toLowerCase();
+
+  // 해결 포인트 2: 만약 잘못된 role이 들어와도 터지지 않게 'user' 정보를 기본으로 가져옴
+  const config = roleConfig[currentRole] || roleConfig['user'];
 
   // 사용자 이름 및 이미지 상태 관리 (로컬스토리지 우선)\
   // 1. 상태 정의: 로컬스토리지에 값이 있으면 먼저 사용
@@ -114,16 +117,8 @@ export default function Layout({ children, role }) {
   // 로그아웃 처리 (서버 세션 파기 및 클라이언트 데이터 초기화)
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem('TOKEN');
+      const token = localStorage.getItem('token');
       if (token) {
-        // await fetch('http://localhost/msa/core/member/logout', {
-        //   method: 'POST',
-        //   headers: {
-        //     'Authorization': `Bearer ${token}`,
-        //     'Content-Type': 'application/json'
-        //   }
-        // });
-        // console.log("백엔드 Redis 세션 삭제 성공");
         await coreApi.post('/member/logout');
         console.log("백엔드 Redis 세션 삭제 성공");
       }
@@ -163,7 +158,7 @@ export default function Layout({ children, role }) {
 
           {/* 로고 영역 */}
           <div className="p-5 border-b border-rose-100">
-            <Link href="/" className="flex items-center gap-2.5">
+            <Link href={role === 'user' ? '/user' : role === 'artist' ? '/artist' : '/admin'} className="flex items-center gap-2.5">
               <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${config.color} flex items-center justify-center shadow-sm`}>
                 <Heart size={16} className="text-white" fill="white" />
               </div>
@@ -237,7 +232,7 @@ export default function Layout({ children, role }) {
           {/* 사이드바 하단 (설정/로그아웃) */}
           <div className="p-3 border-t border-rose-100">
             <button
-              onClick={() => setLocation('/user/profile')}
+              onClick={() => setLocation(`/${role}/profile`)}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-muted-foreground hover:bg-rose-50/80 hover:text-foreground transition-all">
               <Settings size={18} />
               <span className="text-sm font-medium">설정</span>

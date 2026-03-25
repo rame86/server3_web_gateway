@@ -126,8 +126,8 @@ function mapApproved(dto) {
     description: dto.description,
     processedDate: dto.processedAt ? dto.processedAt.slice(0, 10) : '-',
     admin: dto.adminId ? `관리자 #${dto.adminId}` : '-', // adminId만 있음, 이름 없음
-    email: '-',                         // DTO에 없음 → 백엔드 추가 필요
-    phone: '-',                         // DTO에 없음 → 백엔드 추가 필요
+    email: dto.email || '⭐',
+    phone: dto.phone || '-',
     regDate: dto.createdAt ? dto.createdAt.slice(0, 10) : '-',
     stats: {
       followerTrend: '+0%',             // DTO에 없음
@@ -147,9 +147,10 @@ function mapRejection(dto) {
   return {
     id: dto.approvalId,
     name: dto.artistName || '-',
-    group: dto.category || '-',
+    group: dto.createdAt ? `신청날짜 : ${dto.createdAt.slice(5, 10)}` : '-',
+    // group: dto.category || '-',
     genre: dto.category || '-',
-    rejectedDate: dto.processedAt ? dto.processedAt.slice(0, 10) : '-',
+    rejectedDate: dto.processedAt ? dto.processedAt.slice(0, 10) : (dto.createdAt ? dto.createdAt.slice(0, 10) : '-'),
     reason: dto.rejectionReason || '-',
     count: 1,
   };
@@ -202,14 +203,16 @@ export default function AdminArtists() {
    * 현재는 빈 배열로 처리합니다.
    */
   const fetchRejectionHistory = useCallback(async () => {
-    // TODO: 백엔드 API 구현 후 연동
-    // try {
-    //   const data = await apiFetch('/admin/artist/rejectionList');
-    //   setRejectionHistory((data || []).map(mapRejection));
-    // } catch (err) {
-    //   toast.error(`거절 이력 조회 실패: ${err.message}`);
-    // }
-    setRejectionHistory([]); // 임시 빈 배열
+    try {
+    // 💡 { data } 로 감싸면 Axios 응답 객체에서 실제 데이터 배열만 쏙 빠집니다.
+    const { data } = await adminApi.get('/admin/artist/rejectionList'); 
+    
+    // 이제 data는 배열이므로 .map()이 작동합니다.
+    setRejectionHistory((data || []).map(mapRejection));
+  } catch (err) {
+    console.error("거절 이력 에러:", err);
+    toast.error(`거절 이력 조회 실패: ${err.message}`);
+  }
   }, []);
 
   useEffect(() => {
@@ -584,17 +587,6 @@ export default function AdminArtists() {
             {/* ── 거절 이력 탭 ── */}
             {activeTab === 'history' && (
               <div className="p-8 space-y-4">
-                {/* 백엔드 API 미구현 안내 */}
-                <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl mb-6">
-                  <AlertTriangle className="text-amber-500 shrink-0" size={18} />
-                  <p className="text-sm font-bold text-amber-700">
-                    거절 이력 조회는 백엔드 API 구현이 필요합니다.{' '}
-                    <code className="bg-amber-100 px-1 rounded text-xs">
-                      GET /admin/artist/rejectionList
-                    </code>{' '}
-                    엔드포인트 추가 후 자동 연동됩니다.
-                  </p>
-                </div>
                 {filteredHistory.length === 0 && (
                   <p className="text-center text-muted-foreground py-12 font-medium">
                     거절 이력이 없습니다.
@@ -690,9 +682,7 @@ export default function AdminArtists() {
                         <div>
                           <p className="text-[10px] text-muted-foreground font-bold uppercase">Email</p>
                           <p className="font-bold text-foreground">
-                            {detailArtist.email !== '-'
-                              ? detailArtist.email
-                              : <span className="text-muted-foreground text-sm">백엔드 DTO 추가 필요</span>}
+                            {detailArtist.email !== '-' ? detailArtist.email : '정보 없음'}
                           </p>
                         </div>
                       </div>
@@ -701,9 +691,7 @@ export default function AdminArtists() {
                         <div>
                           <p className="text-[10px] text-muted-foreground font-bold uppercase">Contact</p>
                           <p className="font-bold text-foreground">
-                            {detailArtist.phone !== '-'
-                              ? detailArtist.phone
-                              : <span className="text-muted-foreground text-sm">백엔드 DTO 추가 필요</span>}
+                            {detailArtist.phone !== '-' ? detailArtist.phone : '정보 없음'}
                           </p>
                         </div>
                       </div>
