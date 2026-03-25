@@ -135,7 +135,9 @@ export default function UserArtists() {
                       <p className="text-xs text-muted-foreground">이벤트</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-bold text-foreground truncate px-1">LUMINA</p>
+                      <p className="text-sm font-bold text-foreground truncate px-1">
+                        {artist.fandomName} 
+                      </p>
                       <p className="text-xs text-muted-foreground">팬덤명</p>
                     </div>
                   </div>
