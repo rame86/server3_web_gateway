@@ -10,7 +10,7 @@ import {
   Loader2, Star, Music, User
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { coreApi, payApi } from '@/lib/api';
+import { coreApi, payApi, resApi } from '@/lib/api';
 
 export default function UserDashboard() {
   //**결제 및 포인트 내역 전체 데이터를 통째로 저장하는 상태 변수**/
@@ -33,6 +33,8 @@ export default function UserDashboard() {
 
   //**다른 페이지로 강제 이동시킬 때 사용하는 라우터 함수 (ex: navigate('/path'))**/
   const [, navigate] = useLocation();
+
+  const [reservationData, setReservationData] = useState(null);
 
   //**컴포넌트가 화면에 처음 뜰 때(Mount) 단 한 번만 실행되는 초기화 로직**/
   useEffect(() => {
@@ -69,9 +71,19 @@ export default function UserDashboard() {
       }
     };
 
+    const fetchReserve = async () => {
+      try {
+        const res =await resApi.get(`/dashboard/reservation-count?userId=${storedId}`);
+        setReservationData(res.data.count);
+      } catch (e) {
+        console.error('[Dashboard] 이벤트 내역 오류:', e);
+      }
+    }
+
     // 정의한 두 API 함수를 실제로 실행
     fetchPayment();
     fetchFollowed();
+    fetchReserve();
   }, []);
 
   //**포인트 숫자를 '1,000P' 포맷의 문자열로 변환해주는 헬퍼 함수**/
@@ -90,7 +102,7 @@ export default function UserDashboard() {
     },
     {
       label: '예매 내역',
-      value: '-', // 하드코딩된 임시 데이터 영역
+      value: reservationData === null ? '...' : fmtN(reservationData),
       icon: <Calendar size={18} />, bg: 'bg-violet-50', text: 'text-violet-500'
     },
     {
