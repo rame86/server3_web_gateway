@@ -242,11 +242,11 @@ const fetchMyEvents = async () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="venue">장소명 (Venue)</Label>
-                    <Input name="venue" id="venue" placeholder="예: KSPO DOME" required className="rounded-xl border-teal-100" />
+                    <Input name="venue" id="venue" placeholder="예: 루미나50, 루미나100, 루미나200" required className="rounded-xl border-teal-100" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="address">상세 주소 (Address)</Label>
-                    <Input name="address" id="address" placeholder="서울시 송파구 올림픽로 424" required className="rounded-xl border-teal-100" />
+                    <Input name="address" id="address" placeholder="서울특별시 마포구 백범로 23" required className="rounded-xl border-teal-100" />
                   </div>
                 </div>
 
