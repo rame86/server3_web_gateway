@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { ArrowLeft, Send, Heart, MessageCircle, Eye, AlertCircle, Trash2, Edit, Paperclip, Download, X, Check } from 'lucide-react';
+import { ArrowLeft, Send, Heart, MessageCircle, Eye, AlertCircle, Trash2, Edit, Paperclip, Download, X, Check, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 // 환경 변수 설정
@@ -67,20 +67,61 @@ export default function UserCommunityDetail() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // 권한 체크 (post가 null일 경우를 대비해 Optional Chaining 사용)
+  // 이미지 여부 확인 함수
+  const isImageFile = useMemo(() => {
+    if (!post?.storedFilePath) return false;
+    const ext = post.storedFilePath.split('.').pop().toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+  }, [post?.storedFilePath]);
+
+  // 이미지 URL 생성
+  const imageUrl = useMemo(() => {
+    if (!post?.storedFilePath) return "";
+    // 파일 다운로드 API와 동일한 경로 혹은 이미지 제공용 정적 경로 사용
+    return `${API_BASE_URL}/files/download/${post.storedFilePath.split('/').pop()}`;
+  }, [post?.storedFilePath]);
+
+  // 권한 체크
   const isPostOwner = useMemo(() => {
     if (!post || !loginInfo.memberId) return false;
     return String(loginInfo.memberId) === String(post.memberId) || loginInfo.role === 'ADMIN';
   }, [loginInfo, post]);
 
   // --- [액션 함수들] ---
-
   const handleDelete = async () => {
     if (window.confirm("정말 삭제하시겠습니까?")) {
       const res = await apiFetch(`${API_BASE_URL}/${params.id}`, 'DELETE');
       if (res.ok) { toast.success("삭제되었습니다."); setLocation('/user/community'); }
     }
   };
+
+  // --- [최적화된 파일 다운로드 액션] ---
+  const handleDownload = useCallback(async () => {
+    if (!post?.storedFilePath) return;
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
+      const response = await fetch(imageUrl, {
+        method: 'GET',
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      });
+      if (!response.ok) throw new Error("파일 다운로드 권한이 없거나 파일을 찾을 수 없습니다.");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      // 서버에서 전달받은 원본 파일명으로 설정
+      link.download = post.originalFileName || "download_file";
+      document.body.appendChild(link);
+      link.click();
+      // 클린업: 링크 제거 및 메모리 해제
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err.message || "다운로드 중 오류가 발생했습니다.");
+    }
+  }, [imageUrl, post?.originalFileName, post?.storedFilePath]);
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
@@ -100,52 +141,30 @@ export default function UserCommunityDetail() {
     if(res.ok) { setEditingCommentId(null); fetchData(); }
   };
 
-  // 게시글 신고 (API 경로 및 데이터 구조 수정)
   const handleReport = async () => {
     const reason = window.prompt("게시글 신고 사유를 입력해주세요.");
     if (!reason || reason.trim().length < 2) return;
-
     try {
       const res = await apiFetch(`${API_BASE_URL}/admin/report/board`, 'POST', { 
         boardId: params.id, 
         reason: reason
       });
-
-      if (res.ok) {
-        toast.success("게시글 신고가 접수되었습니다.");
-      } else {
-        const errorText = await res.text();
-        toast.error(errorText || "이미 신고했거나 처리에 실패했습니다.");
-      }
-    } catch (err) {
-      toast.error("신고 처리 중 오류가 발생했습니다.");
-    }
+      if (res.ok) { toast.success("게시글 신고가 접수되었습니다."); }
+    } catch (err) { toast.error("신고 처리 중 오류가 발생했습니다."); }
   };
 
-  // 댓글 신고 (API 경로 및 데이터 구조 수정)
   const handleCommentReport = async (commentId) => {
     const reason = window.prompt("댓글 신고 사유를 입력해주세요.");
     if (!reason || reason.trim().length < 2) return;
-
     try {
-      // 마찬가지로 API_BASE_URL을 사용합니다.
       const res = await apiFetch(`${API_BASE_URL}/admin/report/comment`, 'POST', { 
         commentId: commentId, 
         reason: reason 
       });
-
-      if (res.ok) {
-        toast.success("댓글 신고가 접수되었습니다.");
-      } else {
-        const errorText = await res.text();
-        toast.error(errorText || "이미 신고했거나 처리에 실패했습니다.");
-      }
-    } catch (err) {
-      toast.error("신고 처리 중 오류가 발생했습니다.");
-    }
+      if (res.ok) { toast.success("댓글 신고가 접수되었습니다."); }
+    } catch (err) { toast.error("신고 처리 중 오류가 발생했습니다."); }
   };
 
-  // [중요] 방어 코드: 로딩 중이거나 데이터가 없으면 아래 JSX를 실행하지 않음
   if (loading) return <Layout role="user"><div className="p-20 text-center text-rose-500 font-bold">불러오는 중...</div></Layout>;
   if (!post) return <Layout role="user"><div className="p-20 text-center text-gray-400 font-bold">게시글을 찾을 수 없습니다.</div></Layout>;
 
@@ -180,16 +199,34 @@ export default function UserCommunityDetail() {
             </div>
           </div>
           <h1 className="text-2xl font-black mb-6 text-gray-900">{post.title}</h1>
+
+          {/* 이미지 미리보기 섹션 추가 */}
+          {isImageFile && (
+            <div className="mb-6 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+              <img 
+                src={imageUrl} 
+                alt="미리보기" 
+                className="max-w-full h-auto mx-auto object-contain max-h-[500px]"
+                onError={(e) => { e.target.style.display = 'none'; }} 
+              />
+            </div>
+          )}
+
           <div className="prose max-w-none text-gray-700 mb-10 min-h-[150px] whitespace-pre-wrap font-medium">{post.content}</div>
 
-          {/* 첨부파일 */}
+          {/* 첨부파일 다운로드 바 */}
           {post.storedFilePath && (
             <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3 text-sm font-bold text-gray-600">
-                <Paperclip size={16} className="text-rose-500" />
+                {isImageFile ? <ImageIcon size={16} className="text-rose-500" /> : <Paperclip size={16} className="text-rose-500" />}
                 <span className="truncate max-w-[200px]">{post.originalFileName}</span>
               </div>
-              <button onClick={() => window.location.href = `${API_BASE_URL}/files/download/${post.storedFilePath.split('/').pop()}`} className="text-xs font-black text-rose-500 hover:bg-rose-50 px-3 py-2 rounded-xl"><Download size={14} className="mr-1 inline" /> 다운로드</button>
+              <button 
+                onClick={handleDownload} 
+                className="text-xs font-black text-rose-500 hover:bg-rose-50 px-3 py-2 rounded-xl transition-colors"
+              >
+                <Download size={14} className="mr-1 inline" /> 다운로드
+              </button>
             </div>
           )}
 

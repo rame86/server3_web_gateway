@@ -1,30 +1,72 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { ArrowLeft, Send, Paperclip, X } from 'lucide-react';
-import { toast } from 'sonner'
+import { ArrowLeft, Send, Paperclip, X, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 
-// 환경 변수에서 게이트웨이 URL을 가져옵니다.
-const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost';
+const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL;
 const API_BASE_URL = `${API_GATEWAY}/msa/core/board`;
+const ARTIST_API_URL = `${API_GATEWAY}/msa/core/artist`; // 아티스트 정보용
 
 export default function UserCommunityWrite() {
   const [, setLocation] = useLocation();
   const fileInputRef = useRef(null); 
   const [selectedFile, setSelectedFile] = useState(null); 
   const [loading, setLoading] = useState(false);
+  const [followedArtists, setFollowedArtists] = useState([]); // 팔로우한 목록 저장
+
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    category: '팬레터'
+    category: '팬레터',
+    artistId: '' // 사용자가 선택할 ID
   });
+
+  // 1. 컴포넌트 마운트 시 팔로우한 아티스트 목록 로드
+  useEffect(() => {
+  const fetchMyFandoms = async () => {
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
+      
+      // [중요!] 주소를 반드시 `${API_BASE_URL}/my-fandoms`로 호출해야 합니다.
+      // API_BASE_URL은 위에서 `${API_GATEWAY}/msa/core/board`로 정의되어 있어야 함
+      const response = await fetch(`${API_BASE_URL}/my-fandoms`, {
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      });
+        
+        if (response.ok) {
+        const data = await response.json(); 
+        console.log("받아온 팬덤 데이터:", data); // 데이터가 잘 오는지 콘솔로 확인!
+        setFollowedArtists(data);
+        
+        if (data && data.length > 0) {
+          // 첫 번째 항목 자동 선택 (ID가 숫자형태면 문자열로 변환 권장)
+          setFormData(prev => ({ ...prev, artistId: data[0].artistId.toString() }));
+        }
+      } else {
+        // 404가 뜬다면 API_BASE_URL 변수가 잘못 설정되었을 가능성이 큽니다.
+        console.error("에러 발생 상태코드:", response.status);
+        if (response.status === 401) {
+          toast.error("로그인이 필요합니다.");
+          setLocation('/login');
+        }
+      }
+    } catch (error) {
+      console.error("팬덤 목록 로드 실패:", error);
+      toast.error("가입된 팬덤 정보를 불러오지 못했습니다.");
+    }
+  };
+
+  fetchMyFandoms();
+}, [setLocation]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 파일 선택 핸들러
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -39,13 +81,17 @@ export default function UserCommunityWrite() {
   const removeFile = () => {
     setSelectedFile(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // input value 초기화
+      fileInputRef.current.value = "";
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!formData.artistId) {
+      toast.error("대상 아티스트를 선택해주세요.");
+      return;
+    }
     if (!formData.title.trim() || !formData.content.trim()) {
       toast.error("제목과 내용을 모두 입력해주세요.");
       return;
@@ -54,14 +100,17 @@ export default function UserCommunityWrite() {
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
+      const memberId = localStorage.getItem('memberId');
       
       const sendData = new FormData();
 
-      // 백엔드의 @RequestPart("request") 구조에 맞춤
       const requestBlob = new Blob(
         [JSON.stringify({
-          ...formData,
-          memberId: localStorage.getItem('memberId')
+          title: formData.title,
+          content: formData.content,
+          category: formData.category,
+          artistId: Number(formData.artistId),
+          memberId: memberId ? Number(memberId) : null
         })],
         { type: 'application/json' }
       );
@@ -81,7 +130,7 @@ export default function UserCommunityWrite() {
 
       if (response.ok) {
         toast.success("게시글이 성공적으로 등록되었습니다!");
-        setLocation('/user/community');
+        setLocation(`/user/artists/${formData.artistId}`);
       } else {
         const errorData = await response.json();
         toast.error(errorData.message || "등록에 실패했습니다.");
@@ -108,18 +157,42 @@ export default function UserCommunityWrite() {
           <h1 className="text-2xl font-black text-gray-900 mb-8">새 게시글 작성</h1>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-black text-gray-700 mb-2">카테고리</label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleInputChange}
-                className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 font-bold focus:outline-none focus:ring-2 focus:ring-rose-400 transition-all text-sm"
-              >
-                <option value="팬레터">💌 팬레터</option>
-                <option value="자유게시판">💬 자유게시판</option>
-                <option value="팬덤게시판">🌟 팬덤게시판</option>
-              </select>
+            {/* 아티스트 선택 필드 추가 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-black text-gray-700 mb-2">대상 아티스트</label>
+                <select
+                  name="artistId"
+                  value={formData.artistId}
+                  onChange={handleInputChange}
+                  className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 font-bold focus:outline-none focus:ring-2 focus:ring-rose-400 transition-all text-sm"
+                >
+                  {followedArtists.length > 0 ? (
+                    followedArtists.map(artist => (
+                    <option key={artist.artistId} value={artist.artistId}>
+                      {/* 서버에서 넘어오는 stageName 사용 */}
+                      ✨ {artist.stageName}
+                    </option>
+                    ))
+                  ) : (
+                    <option value="">팔로우한 아티스트가 없습니다.</option>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-black text-gray-700 mb-2">카테고리</label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleInputChange}
+                  className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 font-bold focus:outline-none focus:ring-2 focus:ring-rose-400 transition-all text-sm"
+                >
+                  <option value="팬레터">💌 팬레터</option>
+                  <option value="자유게시판">💬 자유게시판</option>
+                  <option value="팬덤게시판">🌟 팬덤게시판</option>
+                </select>
+              </div>
             </div>
             
             <div>
@@ -148,17 +221,10 @@ export default function UserCommunityWrite() {
               />
             </div>
 
-            {/* 파일 첨부 섹션 추가 */}
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">파일 첨부</label>
               <div className="flex flex-col gap-3">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                 {!selectedFile ? (
                   <button
                     type="button"
@@ -171,18 +237,9 @@ export default function UserCommunityWrite() {
                   <div className="flex items-center justify-between p-4 bg-rose-50 rounded-2xl border border-rose-100">
                     <div className="flex items-center gap-3 truncate">
                       <Paperclip size={18} className="text-rose-500 shrink-0" />
-                      <span className="text-sm font-bold text-rose-700 truncate">
-                        {selectedFile.name}
-                      </span>
-                      <span className="text-xs text-rose-300 font-medium shrink-0">
-                        ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                      </span>
+                      <span className="text-sm font-bold text-rose-700 truncate">{selectedFile.name}</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={removeFile}
-                      className="p-1 hover:bg-rose-200 rounded-full transition-colors text-rose-500"
-                    >
+                    <button type="button" onClick={removeFile} className="p-1 hover:bg-rose-200 rounded-full transition-colors text-rose-500">
                       <X size={18} />
                     </button>
                   </div>
@@ -194,7 +251,7 @@ export default function UserCommunityWrite() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-rose-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-rose-100 hover:bg-rose-600 active:scale-[0.98] transition-all disabled:bg-gray-300 disabled:shadow-none flex items-center justify-center gap-2"
+                className="w-full bg-rose-500 text-white py-4 rounded-2xl font-black shadow-lg shadow-rose-100 hover:bg-rose-600 active:scale-[0.98] transition-all disabled:bg-gray-300 flex items-center justify-center gap-2"
               >
                 {loading ? "등록 중..." : <><Send size={18} /> 게시글 등록하기</>}
               </button>
