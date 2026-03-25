@@ -45,6 +45,7 @@ import ArtistChat from "./pages/artist/ArtistChat";
 import ArtistStore from "./pages/artist/ArtistStore";
 import ArtistBooking from "./pages/artist/ArtistBooking";
 import ArtistSettlement from "./pages/artist/ArtistSettlement";
+import ArtistProfile from "./pages/artist/ArtistProfile";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -138,17 +139,16 @@ function Router() {
       {/* 커뮤니티 경로: 구체적인 경로(write)를 동적 파라미터(:id)보다 먼저 선언해야 합니다. */}
       <Route path="/user/community" component={UserCommunity} />
       <Route path="/user/community/write" component={UserCommunityWrite} />
-        <Route path="/user/community/update/:id" component={UserCommunityUpdate} />
+      <Route path="/user/community/update/:id" component={UserCommunityUpdate} />
       <Route path="/user/community/:id" component={UserCommunityDetail} />
       <Route path="/user/artists" component={UserArtists} />
       {/* 아티스트 상세 페이지 - 동적 라우팅 적용 */}
-      <Route path="/artists/:id" component={UserArtistDetail} />
+      <Route path="/user/artists/:id" component={UserArtistDetail} />
       <Route path="/user/wallet" component={UserWallet} />
       <Route path="/user/wallet/success" component={UserWalletSuccess} />
       <Route path="/user/wallet/fail" component={UserWalletFail} />
       <Route path="/user/wallet/cancel" component={UserWalletCancel} />
       <Route path="/user/profile" component={UserProfile} />
-      <Route path="/artist/profile" component={UserProfile} />{/* 아티스트도 같은 컴포넌트 사용! */}
 
       {/* Artist Routes */}
       <Route path="/artist" component={ArtistDashboard} />
@@ -160,6 +160,7 @@ function Router() {
       <Route path="/artist/events" component={ArtistBooking} />
       <Route path="/artist/donations" component={ArtistSettlement} />
       <Route path="/artist/settlement" component={ArtistSettlement} />
+      <Route path="/artist/profile" component={ArtistProfile} />
 
       {/* Admin Routes */}
       <Route path="/admin" component={() => <AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />

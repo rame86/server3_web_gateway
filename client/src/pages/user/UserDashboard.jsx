@@ -152,7 +152,7 @@ export default function UserDashboard() {
             <h2 className="text-base font-bold text-foreground" style={{ fontFamily: "'Playfair Display', serif" }}>
               내 아티스트
             </h2>
-            <Link href="/artists">
+            <Link href="/user/artists">
               <button className="flex items-center gap-1 text-xs text-rose-500 font-semibold hover:text-rose-600">
                 전체보기 <ArrowRight size={12} />
               </button>
@@ -179,7 +179,7 @@ export default function UserDashboard() {
                 <button
                   key={artist.memberId}
                   // 클릭 시 해당 아티스트의 고유 ID를 이용해 상세 페이지로 강제 이동
-                  onClick={() => navigate(`/artists/${artist.memberId}`)}
+                  onClick={() => navigate(`/user/artists/${artist.memberId}`)}
                   className="flex flex-col items-center gap-2 group"
                 >
                   <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-100 to-pink-200 flex items-center justify-center overflow-hidden border-2 border-white shadow-md group-hover:border-rose-300 transition-all">
