@@ -44,6 +44,7 @@ import ArtistFandom from "./pages/artist/ArtistFandom";
 import ArtistChat from "./pages/artist/ArtistChat";
 import ArtistStore from "./pages/artist/ArtistStore";
 import ArtistBooking from "./pages/artist/ArtistBooking";
+import ArtistDonation from "./pages/artist/ArtistDonation";
 import ArtistSettlement from "./pages/artist/ArtistSettlement";
 import ArtistProfile from "./pages/artist/ArtistProfile";
 
@@ -158,7 +159,7 @@ function Router() {
       <Route path="/artist/booking" component={ArtistBooking} />
       <Route path="/artist/community" component={ArtistFandom} />
       <Route path="/artist/events" component={ArtistBooking} />
-      <Route path="/artist/donations" component={ArtistSettlement} />
+      <Route path="/artist/donations" component={ArtistDonation} />
       <Route path="/artist/settlement" component={ArtistSettlement} />
       <Route path="/artist/profile" component={ArtistProfile} />
 
