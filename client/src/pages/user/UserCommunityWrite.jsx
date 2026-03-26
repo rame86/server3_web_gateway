@@ -4,6 +4,7 @@ import Layout from '@/components/Layout';
 import { ArrowLeft, Send, Paperclip, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+// API 게이트웨이 및 서비스별 기본 URL 설정
 const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL;
 const API_BASE_URL = `${API_GATEWAY}/msa/core/board`;
 
@@ -28,16 +29,19 @@ export default function UserCommunityWrite() {
         const response = await fetch(`${API_BASE_URL}/my-fandoms`, {
           headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
         });
-          
+
         if (response.ok) {
-          const data = await response.json(); 
+          const data = await response.json();
           setFollowedArtists(data);
+          // 데이터가 존재할 경우 첫 번째 아티스트를 기본값으로 설정
           if (data && data.length > 0) {
             setFormData(prev => ({ ...prev, artistId: data[0].artistId.toString() }));
           }
         } else if (response.status === 401) {
           toast.error("로그인이 필요합니다.");
           setLocation('/login');
+        } else {
+          console.error("에러 발생 상태코드:", response.status);
         }
       } catch (error) {
         console.error("팬덤 목록 로드 실패:", error);
@@ -47,11 +51,13 @@ export default function UserCommunityWrite() {
     fetchMyFandoms();
   }, [setLocation]);
 
+  // 입력값 변경 핸들러
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // 파일 선택 핸들러 (10MB 제한)
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -63,14 +69,17 @@ export default function UserCommunityWrite() {
     }
   };
 
+  // 선택된 파일 제거
   const removeFile = () => {
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  // 최종 게시글 등록 함수
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // 필수 입력값 검증: 자유게시판이 아닐 때만 artistId 체크
     if (formData.category !== '자유게시판' && !formData.artistId) {
       toast.error("대상 아티스트를 선택해주세요.");
       return;
@@ -130,7 +139,10 @@ export default function UserCommunityWrite() {
   return (
     <Layout role="user">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
-        <button onClick={() => setLocation('/user/community')} className="flex items-center gap-2 text-sm text-gray-500 hover:text-rose-500 font-bold group">
+        <button 
+          onClick={() => setLocation('/user/community')} 
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-rose-500 font-bold group transition-all"
+        >
           <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> 돌아가기
         </button>
 
@@ -140,29 +152,24 @@ export default function UserCommunityWrite() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
-              {/* [왼쪽] 대상 아티스트 선택 (자유게시판이 아닐 때만 노출) */}
-              {formData.category !== '자유게시판' ? (
-                <div>
-                  <label className="block text-sm font-black text-gray-700 mb-2">대상 아티스트</label>
-                  <select 
-                    name="artistId" 
-                    value={formData.artistId} 
-                    onChange={handleInputChange} 
-                    className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 font-bold focus:ring-2 focus:ring-rose-400 text-sm"
-                  >
-                    {followedArtists.length > 0 ? (
-                      followedArtists.map(artist => (
-                        <option key={artist.artistId} value={artist.artistId}>✨ {artist.stageName}</option>
-                      ))
-                    ) : (
-                      <option value="">팔로우한 아티스트가 없습니다.</option>
-                    )}
-                  </select>
-                </div>
-              ) : (
-                /* 자유게시판일 때 왼쪽을 비워두거나 정렬을 맞추기 위한 빈 태그 (선택사항) */
-                <div className="hidden md:block"></div>
-              )}
+              {/* [왼쪽] 대상 아티스트 선택 (자유게시판일 때는 숨김 처리) */}
+              <div className={formData.category === '자유게시판' ? 'invisible pointer-events-none' : ''}>
+                <label className="block text-sm font-black text-gray-700 mb-2">대상 아티스트</label>
+                <select 
+                  name="artistId" 
+                  value={formData.artistId} 
+                  onChange={handleInputChange} 
+                  className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 font-bold focus:ring-2 focus:ring-rose-400 text-sm outline-none transition-all"
+                >
+                  {followedArtists.length > 0 ? (
+                    followedArtists.map(artist => (
+                      <option key={artist.artistId} value={artist.artistId}>✨ {artist.stageName}</option>
+                    ))
+                  ) : (
+                    <option value="">팔로우한 아티스트가 없습니다.</option>
+                  )}
+                </select>
+              </div>
 
               {/* [오른쪽] 카테고리 선택 */}
               <div>
@@ -171,7 +178,7 @@ export default function UserCommunityWrite() {
                   name="category" 
                   value={formData.category} 
                   onChange={handleInputChange} 
-                  className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 font-bold focus:ring-2 focus:ring-rose-400 text-sm"
+                  className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 font-bold focus:ring-2 focus:ring-rose-400 text-sm outline-none transition-all"
                 >
                   <option value="팬레터">💌 팬레터</option>
                   <option value="자유게시판">💬 자유게시판</option>
@@ -180,23 +187,26 @@ export default function UserCommunityWrite() {
               </div>
 
             </div>
-            
+
+            {/* 제목 입력 */}
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">제목</label>
-              <input type="text" name="title" value={formData.title} onChange={handleInputChange} placeholder="제목을 입력하세요" className="w-full p-4 rounded-2xl border border-gray-100 font-bold text-sm" required />
+              <input type="text" name="title" value={formData.title} onChange={handleInputChange} placeholder="제목을 입력하세요" className="w-full p-4 rounded-2xl border border-gray-100 font-bold text-sm outline-none focus:ring-2 focus:ring-rose-400" required />
             </div>
 
+            {/* 본문 입력 */}
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">내용</label>
-              <textarea name="content" rows="10" value={formData.content} onChange={handleInputChange} placeholder="나만의 소중한 이야기를 들려주세요." className="w-full p-4 rounded-2xl border border-gray-100 resize-none text-sm leading-relaxed" required />
+              <textarea name="content" rows="10" value={formData.content} onChange={handleInputChange} placeholder="나만의 소중한 이야기를 들려주세요." className="w-full p-4 rounded-2xl border border-gray-100 resize-none text-sm leading-relaxed outline-none focus:ring-2 focus:ring-rose-400" required />
             </div>
 
+            {/* 파일 첨부 */}
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">파일 첨부</label>
               <div className="flex flex-col gap-3">
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                 {!selectedFile ? (
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 w-full md:w-max px-6 py-3 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:text-rose-400 text-sm font-bold">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 w-full md:w-max px-6 py-3 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:text-rose-400 text-sm font-bold transition-colors">
                     <Paperclip size={18} /> 파일 선택하기 (최대 10MB)
                   </button>
                 ) : (
@@ -213,8 +223,9 @@ export default function UserCommunityWrite() {
               </div>
             </div>
 
+            {/* 등록 버튼 */}
             <div className="pt-4">
-              <button type="submit" disabled={loading} className="w-full bg-rose-500 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-rose-600 transition-all flex items-center justify-center gap-2">
+              <button type="submit" disabled={loading} className="w-full bg-rose-500 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-rose-600 transition-all flex items-center justify-center gap-2 disabled:bg-gray-300">
                 {loading ? "등록 중..." : <><Send size={18} /> 게시글 등록하기</>}
               </button>
             </div>

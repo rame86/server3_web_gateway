@@ -4,13 +4,17 @@ import Layout from '@/components/Layout';
 import { ArrowLeft, Send, Heart, MessageCircle, Eye, AlertCircle, Trash2, Edit, Paperclip, Download, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
+// API 및 이미지 서버 경로 설정 (환경 변수 활용)
 const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL;
 const API_BASE_URL = `${API_GATEWAY}/msa/core/board`;
 const IMAGE_SERVER_URL = `${API_GATEWAY}/msa/core/board`;
 
 export default function UserCommunityDetail() {
+  // 경로 파라미터(:id) 및 페이지 이동 훅
   const [, params] = useRoute('/user/community/:id');
   const [, setLocation] = useLocation();
+
+  // 상태 관리: 게시글, 댓글, 로딩, 이미지 Blob URL 등
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
@@ -19,16 +23,18 @@ export default function UserCommunityDetail() {
   // [추가] 인증을 통해 가져온 이미지의 Blob URL 상태
   const [imageBlobUrl, setImageBlobUrl] = useState(null);
 
+  // 댓글 수정 관련 상태
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editContent, setEditContent] = useState("");
   
+  // 로컬 스토리지에서 사용자 정보 로드 (로그인 여부 및 권한 확인용)
   const [loginInfo] = useState(() => ({
     memberId: localStorage.getItem('memberId'),
     role: localStorage.getItem('role'),
     userName: localStorage.getItem('userName')
   }));
 
-  // 공통 API 페치 함수
+  // 공통 API 페치 함수 (인증 토큰 포함)
   const apiFetch = useCallback(async (url, method = 'GET', body = null) => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
     const options = {
@@ -42,7 +48,7 @@ export default function UserCommunityDetail() {
     return fetch(url, options);
   }, []);
 
-  // [핵심 추가] 토큰을 담아 이미지를 Blob으로 가져오는 함수
+  // [보안 이미지 로드] 토큰을 담아 이미지를 Blob으로 가져와 미리보기 URL 생성
   const fetchImageWithAuth = useCallback(async (path) => {
     if (!path) return;
     try {
@@ -59,6 +65,7 @@ export default function UserCommunityDetail() {
 
       if (!response.ok) throw new Error("이미지를 불러올 수 없습니다.");
 
+      // 이미지를 Blob(Binary Large Object)으로 변환 후 브라우저용 URL 생성
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
       setImageBlobUrl(objectUrl); // 생성된 Blob URL을 상태에 저장
@@ -67,11 +74,12 @@ export default function UserCommunityDetail() {
     }
   }, []);
 
-  // 데이터 로드
+  // 초기 데이터 로드
   const fetchData = useCallback(async () => {
     if (!params?.id) return;
     try {
       setLoading(true);
+      // 게시글 상세와 댓글 목록을 병렬로 요청
       const [pRes, cRes] = await Promise.all([
         apiFetch(`${API_BASE_URL}/${params.id}`),
         apiFetch(`${API_BASE_URL}/${params.id}/comments`)
@@ -84,7 +92,7 @@ export default function UserCommunityDetail() {
       setPost(postData);
       setComments(Array.isArray(commentData) ? commentData : []);
 
-      // [핵심] 게시글 정보 로드 후 이미지 파일이면 보안 호출 실행
+      // 게시글에 첨부파일이 있고, 이미지 확장자일 경우 보안 호출 실행
       const ext = postData.storedFilePath?.split('.').pop().toLowerCase();
       const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
       if (isImg && postData.storedFilePath) {
@@ -99,6 +107,7 @@ export default function UserCommunityDetail() {
     }
   }, [params?.id, setLocation, apiFetch, fetchImageWithAuth]);
 
+  // 페이지 진입 시 데이터 호출 및 언마운트 시 Blob URL 메모리 해제
   useEffect(() => { 
     fetchData(); 
     // 언마운트 시 생성된 ObjectURL 해제 (메모리 누수 방지)
@@ -107,17 +116,20 @@ export default function UserCommunityDetail() {
     };
   }, [fetchData]);
 
+  // 해당 파일이 이미지인지 확인하는 연산 (캐싱)
   const isImageFile = useMemo(() => {
     if (!post?.storedFilePath) return false;
     const ext = post.storedFilePath.split('.').pop().toLowerCase();
     return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
   }, [post?.storedFilePath]);
 
+  // 현재 사용자가 게시글 작성자인지 확인
   const isPostOwner = useMemo(() => {
     if (!post || !loginInfo.memberId) return false;
     return String(loginInfo.memberId) === String(post.memberId) || loginInfo.role === 'ADMIN';
   }, [loginInfo, post]);
 
+  // 게시글 삭제 처리
   const handleDelete = async () => {
     if (window.confirm("정말 삭제하시겠습니까?")) {
       const res = await apiFetch(`${API_BASE_URL}/${params.id}`, 'DELETE');
@@ -125,6 +137,7 @@ export default function UserCommunityDetail() {
     }
   };
 
+  //첨부파일 다운로드 처리 (인증 토큰 포함)
   const handleDownload = useCallback(async () => {
     if (!post?.storedFilePath) return;
     try {
@@ -155,24 +168,28 @@ export default function UserCommunityDetail() {
     }
   }, [post]);
 
+  // 댓글 등록
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
     const res = await apiFetch(`${API_BASE_URL}/${params.id}/comments`, 'POST', { content: newComment });
     if (res.ok) { setNewComment(""); fetchData(); }
   };
 
+  // 댓글 삭제
   const handleDeleteComment = async (commentId) => {
     if(!window.confirm("댓글을 삭제하시겠습니까?")) return;
     const res = await apiFetch(`${API_BASE_URL}/comments/${commentId}`, 'DELETE');
     if (res.ok) { toast.success("삭제되었습니다."); fetchData(); }
   };
 
+  // 댓글 수정 저장
   const handleUpdateComment = async (commentId) => {
     if(!editContent.trim()) return;
     const res = await apiFetch(`${API_BASE_URL}/comments/${commentId}`, 'PUT', { content: editContent });
     if(res.ok) { setEditingCommentId(null); fetchData(); }
   };
 
+  // 게시글 신고
   const handleReport = async () => {
     const reason = window.prompt("게시글 신고 사유를 입력해주세요.");
     if (!reason || reason.trim().length < 2) return;
@@ -182,6 +199,7 @@ export default function UserCommunityDetail() {
     } catch (err) { toast.error("신고 실패"); }
   };
 
+  // 댓글 신고
   const handleCommentReport = async (commentId) => {
     const reason = window.prompt("댓글 신고 사유를 입력해주세요.");
     if (!reason || reason.trim().length < 2) return;
@@ -191,6 +209,7 @@ export default function UserCommunityDetail() {
     } catch (err) { toast.error("신고 실패"); }
   };
 
+  // 로딩 및 예외 처리 뷰
   if (loading) return <Layout role="user"><div className="p-20 text-center text-rose-500 font-bold">불러오는 중...</div></Layout>;
   if (!post) return <Layout role="user"><div className="p-20 text-center text-gray-400 font-bold">게시글을 찾을 수 없습니다.</div></Layout>;
 
@@ -224,7 +243,7 @@ export default function UserCommunityDetail() {
           </div>
           <h1 className="text-2xl font-black mb-6 text-gray-900">{post.title}</h1>
 
-          {/* [수정] 직접적인 URL 대신 생성된 imageBlobUrl을 src로 사용 */}
+          {/* [이미지 출력] 보안 처리된 가상 URL(imageBlobUrl) 사용 */}
           {isImageFile && imageBlobUrl && (
             <div className="mb-6 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
               <img 
@@ -236,7 +255,7 @@ export default function UserCommunityDetail() {
           )}
 
           <div className="prose max-w-none text-gray-700 mb-10 min-h-[150px] whitespace-pre-wrap font-medium">{post.content}</div>
-
+          {/* 첨부파일 다운로드 섹션 */}
           {post.storedFilePath && (
             <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-3 text-sm font-bold text-gray-600">
@@ -248,7 +267,7 @@ export default function UserCommunityDetail() {
               </button>
             </div>
           )}
-
+          {/* 통계 정보 (좋아요, 댓글수, 조회수) */}
           <div className="flex gap-6 pt-6 border-t border-rose-50 text-gray-400 text-xs font-bold">
             <button onClick={async () => (await apiFetch(`${API_BASE_URL}/${params.id}/like`, 'POST')).ok && fetchData()} className="flex items-center gap-1.5 hover:text-rose-500 transition-colors">
               <Heart size={18} fill={(post.likeCount || 0) > 0 ? "#f43f5e" : "none"} className={(post.likeCount || 0) > 0 ? "text-rose-500" : ""}/> 
@@ -258,12 +277,14 @@ export default function UserCommunityDetail() {
             <span className="flex items-center gap-1.5"><Eye size={18}/> 조회수 {post.viewCount || 0}</span>
           </div>
         </div>
-
+          {/* 댓글 섹션 */}
         <div className="bg-white rounded-[1.5rem] p-6 shadow-sm border border-rose-50">
+          {/* 댓글 입력창 */}
           <div className="relative mb-6">
             <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} className="w-full bg-gray-50 rounded-xl p-4 pr-12 h-24 resize-none border-none text-sm font-medium" placeholder="따뜻한 댓글을 남겨주세요." />
             <button onClick={handleAddComment} className="absolute bottom-3 right-3 bg-rose-500 text-white p-2 rounded-lg hover:bg-rose-600"><Send size={18}/></button>
           </div>
+          {/* 댓글 리스트 */}
           <div className="space-y-4">
             {comments.map((c, index) => {
               const isCommentOwner = String(c.memberId) === String(loginInfo.memberId);
@@ -289,6 +310,7 @@ export default function UserCommunityDetail() {
                       </div>
                     </div>
                   </div>
+                  {/* 댓글 수정 모드 vs 일반 모드 */}
                   {isEditing ? (
                     <div className="space-y-2">
                       <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full p-3 text-sm bg-white border border-rose-200 rounded-lg focus:ring-2 focus:ring-rose-100 outline-none" />
