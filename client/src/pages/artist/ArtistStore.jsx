@@ -3,13 +3,13 @@
  * Soft Bloom Design: Goods listing and registration for artists
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { cn } from "@/lib/utils";
-import { Package, Plus, Search, Filter, Clock, Check, X, MoreVertical, Image as ImageIcon, Tag, DollarSign, Archive } from 'lucide-react';
+import { Package, Plus, Search, Clock, Check, MoreVertical, Image as ImageIcon, DollarSign, Archive, Users } from 'lucide-react';
 import { goodsItems, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
-import { shopApi } from '@/lib/api';
+import { shopApi, coreApi } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,20 @@ export default function ArtistStore() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [isAdding, setIsAdding] = useState(false);
+  const [artistList, setArtistList] = useState([]);
+
+  // 아티스트 목록 로드
+  useEffect(() => {
+    const fetchArtists = async () => {
+      try {
+        const { data } = await coreApi.get('/artist/list');
+        setArtistList(data || []);
+      } catch (err) {
+        console.error('아티스트 목록 로드 실패:', err);
+      }
+    };
+    fetchArtists();
+  }, []);
 
   // My goods filtering (id 3 is Lee Ha-eun's artistId from data.js)
   const myGoods = goodsItems.filter(item => item.artistId === 3);
@@ -53,16 +67,26 @@ export default function ArtistStore() {
     const category = e.target.category.value;
     const price = e.target.price.value;
     const description = e.target.description.value;
+    const artistId = e.target.artistId.value;
+    const stockQuantity = parseInt(e.target.stockQuantity.value || '0', 10);
+
+    if (!artistId) {
+      toast.error('아티스트를 선택해주세요.');
+      return;
+    }
 
     try {
       const endpoint = category === 'OFFICIAL' || category === 'ALBUM' ? '/product/official' : '/product/unofficial';
+      const requesterName = localStorage.getItem('username') || '아티스트';
 
       const formData = new FormData();
       formData.append('goodsName', title);
       formData.append('price', parseFloat(price));
       formData.append('description', description);
       formData.append('goodsType', category);
-      formData.append('requesterName', '아티스트');
+      formData.append('requesterName', requesterName);
+      formData.append('artistId', artistId);
+      formData.append('stockQuantity', stockQuantity);
       if (imageFile) {
         formData.append('imageFile', imageFile);
       }
@@ -126,6 +150,41 @@ export default function ArtistStore() {
                   <Label htmlFor="description">상품 설명 (Description)</Label>
                   <Textarea id="description" placeholder="상세 설명을 적어주세요 (Text)" className="rounded-xl border-violet-100 min-h-[100px]" />
                 </div>
+
+                {/* 아티스트 선택 */}
+                <div className="space-y-2">
+                  <Label htmlFor="artistId" className="flex items-center gap-1.5">
+                    <Users size={14} className="text-violet-400" />
+                    아티스트 선택 *
+                  </Label>
+                  <select
+                    id="artistId"
+                    required
+                    className="w-full h-10 px-3 bg-white border border-violet-100 rounded-xl text-sm focus:ring-2 focus:ring-violet-300 focus:outline-none"
+                  >
+                    <option value="">-- 아티스트를 선택하세요 --</option>
+                    {artistList.map((artist) => (
+                      <option key={artist.memberId} value={artist.memberId}>
+                        {artist.stageName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 판매 수량 */}
+                <div className="space-y-2">
+                  <Label htmlFor="stockQuantity">판매 수량 (Stock Quantity)</Label>
+                  <Input
+                    id="stockQuantity"
+                    type="number"
+                    min="0"
+                    defaultValue="0"
+                    placeholder="0"
+                    required
+                    className="rounded-xl border-violet-100"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label>상품 이미지</Label>
                   <label
@@ -157,12 +216,12 @@ export default function ArtistStore() {
                 </div>
                 <div className="grid grid-cols-2 gap-4 opacity-70">
                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground ml-1">Seller ID (Auto)</p>
-                      <Input disabled value="3" className="h-8 text-xs rounded-lg" />
-                   </div>
-                   <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground ml-1">Seller Type (Auto)</p>
                       <Input disabled value="ARTIST" className="h-8 text-xs rounded-lg" />
+                   </div>
+                   <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground ml-1">Status (Auto)</p>
+                      <Input disabled value="PENDING 승인 대기" className="h-8 text-xs rounded-lg" />
                    </div>
                 </div>
                 <DialogFooter className="pt-4">
