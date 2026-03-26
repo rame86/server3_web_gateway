@@ -191,7 +191,7 @@ export default function UserOrders() {
                         {/* Info */}
                         <div className="flex-1">
                           <div className="flex justify-between items-start gap-2">
-                            <p 
+                            <p
                               className="font-semibold text-sm text-foreground line-clamp-2 cursor-pointer hover:text-rose-600 transition-colors"
                               onClick={() => setLocation(`/user/store/${item.productId || ''}`)}
                             >
@@ -213,20 +213,53 @@ export default function UserOrders() {
                               {item.size && <span>사이즈: {item.size}</span>}
                             </p>
                           )}
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-rose-600 font-bold">{formatPrice(item.unitPrice)}</span>
-                            <span className="text-sm text-muted-foreground font-medium">{item.quantity}개</span>
+                          {/* 원가 × 수량 = 소계 */}
+                          <div className="mt-2 space-y-0.5">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>단가</span>
+                              <span>{formatPrice(item.unitPrice)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>수량</span>
+                              <span>{item.quantity}개</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm font-bold text-rose-600 border-t border-rose-50 pt-1">
+                              <span>소계</span>
+                              <span>{formatPrice(item.subtotal ?? (item.unitPrice * item.quantity))}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Order Footer */}
-                  <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-muted-foreground">총 결제 금액</span>
-                    <span className="text-lg font-bold text-rose-600">{formatPrice(order.totalAmount).replace('원', 'P')}</span>
+                  {/* Order Footer - 배송비 + 총결제금액 */}
+                  <div className="px-4 pb-4 bg-gray-50 border-t border-gray-100 space-y-1.5 pt-3 rounded-b-3xl">
+                    {(() => {
+                      const itemsTotal = order.orderItems
+                        ? order.orderItems.reduce((sum, it) => sum + (it.subtotal ?? (it.unitPrice * it.quantity)), 0)
+                        : 0;
+                      const shipping = order.shippingFee ?? 0;
+                      const grand = order.totalAmount ?? (itemsTotal + shipping);
+                      return (
+                        <>
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>상품 합계</span>
+                            <span>{formatPrice(itemsTotal)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>배송비</span>
+                            <span>{Number(shipping) === 0 ? '무료' : formatPrice(shipping)}</span>
+                          </div>
+                          <div className="flex justify-between text-base font-bold text-rose-600 border-t border-rose-100 pt-2 mt-1">
+                            <span>총 결제금액</span>
+                            <span>{String(formatPrice(grand)).replace('원', 'P')}</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
+
                 </div>
               );
             })}
