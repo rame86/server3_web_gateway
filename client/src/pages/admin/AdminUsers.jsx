@@ -67,7 +67,7 @@ export default function AdminUsers() {
 
   // [새로 추가]: 화면 처음 뜰 때 딱 한 번 실행되는 녀석 (의존성 배열이 [] 빈칸)
   useEffect(() => {
-    const socket = new SockJS(`${import.meta.env.VITE_API_GATEWAY_URL}/ws-admin`); 
+    const socket = new SockJS(`${import.meta.env.VITE_API_GATEWAY_URL}/msa/core/ws-admin`); 
     const stompClient = Stomp.over(socket);
 
     // 시끄러운 디버그 로그 끄기 (선택사항)
