@@ -112,8 +112,8 @@ export default function ArtistProfile() {
       // 핵심 주석: 기존 API를 활용하여 팬덤 정보를 업데이트
       await coreApi.post('/artist/update-fandom', {
         ...formData,
-        fandomName: fandomForm.fandomName || '', 
-        fandomImage: fandomForm.fandomImage || ''
+        fandomName: fandomForm.fandomName, 
+        fandomImage: fandomForm.fandomImage
       });
 
       toast.dismiss();
@@ -268,7 +268,7 @@ export default function ArtistProfile() {
     fileInputRef.current?.click();
   };
 
-  const handleImageUpload = async (e) => {
+  const handleImageUpload = async (e, type) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
