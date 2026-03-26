@@ -6,10 +6,7 @@ import { toast } from 'sonner';
 
 const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL;
 const API_BASE_URL = `${API_GATEWAY}/msa/core/board`;
-
-const isLocal = window.location.hostname === 'localhost';
 const IMAGE_SERVER_URL = `${API_GATEWAY}/msa/core/board`;
-
 
 export default function UserCommunityDetail() {
   const [, params] = useRoute('/user/community/:id');
@@ -18,6 +15,9 @@ export default function UserCommunityDetail() {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
+  
+  // [추가] 인증을 통해 가져온 이미지의 Blob URL 상태
+  const [imageBlobUrl, setImageBlobUrl] = useState(null);
 
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editContent, setEditContent] = useState("");
@@ -28,6 +28,7 @@ export default function UserCommunityDetail() {
     userName: localStorage.getItem('userName')
   }));
 
+  // 공통 API 페치 함수
   const apiFetch = useCallback(async (url, method = 'GET', body = null) => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
     const options = {
@@ -41,6 +42,32 @@ export default function UserCommunityDetail() {
     return fetch(url, options);
   }, []);
 
+  // [핵심 추가] 토큰을 담아 이미지를 Blob으로 가져오는 함수
+  const fetchImageWithAuth = useCallback(async (path) => {
+    if (!path) return;
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
+      const pureFileName = path.split('/').pop();
+      const imageUrl = `${IMAGE_SERVER_URL}/files/${pureFileName}`;
+
+      const response = await fetch(imageUrl, {
+        method: 'GET',
+        headers: { 
+          ...(token && { 'Authorization': `Bearer ${token}` }) 
+        }
+      });
+
+      if (!response.ok) throw new Error("이미지를 불러올 수 없습니다.");
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      setImageBlobUrl(objectUrl); // 생성된 Blob URL을 상태에 저장
+    } catch (err) {
+      console.error("이미지 보안 로드 실패:", err);
+    }
+  }, []);
+
+  // 데이터 로드
   const fetchData = useCallback(async () => {
     if (!params?.id) return;
     try {
@@ -56,30 +83,34 @@ export default function UserCommunityDetail() {
       
       setPost(postData);
       setComments(Array.isArray(commentData) ? commentData : []);
+
+      // [핵심] 게시글 정보 로드 후 이미지 파일이면 보안 호출 실행
+      const ext = postData.storedFilePath?.split('.').pop().toLowerCase();
+      const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+      if (isImg && postData.storedFilePath) {
+        fetchImageWithAuth(postData.storedFilePath);
+      }
+      
     } catch (err) {
       toast.error(err.message || "데이터 로드 실패");
       setLocation('/user/community');
     } finally { 
       setLoading(false); 
     }
-  }, [params?.id, setLocation, apiFetch]);
+  }, [params?.id, setLocation, apiFetch, fetchImageWithAuth]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { 
+    fetchData(); 
+    // 언마운트 시 생성된 ObjectURL 해제 (메모리 누수 방지)
+    return () => {
+      if (imageBlobUrl) URL.revokeObjectURL(imageBlobUrl);
+    };
+  }, [fetchData]);
 
   const isImageFile = useMemo(() => {
     if (!post?.storedFilePath) return false;
     const ext = post.storedFilePath.split('.').pop().toLowerCase();
     return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
-  }, [post?.storedFilePath]);
-
-  // 1. 화면에 보여줄 이미지 (미리보기용: download/ 절대 금지)
-  const imageUrl = useMemo(() => {
-    if (!post?.storedFilePath) return "";
-
-    const pureFileName = post.storedFilePath.split('/').pop(); 
-  
-  // 최종 주소
-  return `${IMAGE_SERVER_URL}/files/${pureFileName}`;
   }, [post?.storedFilePath]);
 
   const isPostOwner = useMemo(() => {
@@ -94,44 +125,35 @@ export default function UserCommunityDetail() {
     }
   };
 
- const handleDownload = useCallback(async () => {
-  if (!post?.storedFilePath) return;
-  try {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
-    
-    // 핵심 수정: 파일명만 추출하지 말고 "board/파일명" 전체 경로를 사용합니다.
-    // post.storedFilePath 값 자체가 "board/uuid_name.jpg" 형태여야 합니다.
-    const downloadApiUrl = `${IMAGE_SERVER_URL}/files/download/${post.storedFilePath}`;
+  const handleDownload = useCallback(async () => {
+    if (!post?.storedFilePath) return;
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
+      const pureFileName = post.storedFilePath.split('/').pop();
+      const downloadApiUrl = `${IMAGE_SERVER_URL}/files/${pureFileName}`;
 
-    const response = await fetch(downloadApiUrl, {
-      method: 'GET',
-      headers: { 
-        ...(token && { 'Authorization': `Bearer ${token}` }) 
-      }
-    });
+      const response = await fetch(downloadApiUrl, {
+        method: 'GET',
+        headers: { 
+          ...(token && { 'Authorization': `Bearer ${token}` }) 
+        }
+      });
 
-    if (!response.ok) {
-      if(response.status === 401) throw new Error("로그인이 만료되었거나 권한이 없습니다.");
-      throw new Error("파일을 찾을 수 없습니다.");
+      if (!response.ok) throw new Error("파일을 찾을 수 없습니다.");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = post.originalFileName || "download_file";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(err.message || "다운로드 실패");
     }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    
-    // 다운로드될 파일명은 원래 파일명으로 지정
-    link.download = post.originalFileName || "download_file";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error("Download Error:", err);
-    toast.error(err.message || "다운로드 실패");
-  }
-}, [post?.originalFileName, post?.storedFilePath]);
-
+  }, [post]);
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
@@ -202,16 +224,13 @@ export default function UserCommunityDetail() {
           </div>
           <h1 className="text-2xl font-black mb-6 text-gray-900">{post.title}</h1>
 
-          {isImageFile && (
+          {/* [수정] 직접적인 URL 대신 생성된 imageBlobUrl을 src로 사용 */}
+          {isImageFile && imageBlobUrl && (
             <div className="mb-6 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
               <img 
-                src={imageUrl} 
+                src={imageBlobUrl} 
                 alt="미리보기" 
                 className="max-w-full h-auto mx-auto object-contain max-h-[500px]"
-                onError={(e) => { 
-                  console.error("이미지 로드 실패 주소:", imageUrl);
-                  e.target.style.display = 'none';
-                }} 
               />
             </div>
           )}
