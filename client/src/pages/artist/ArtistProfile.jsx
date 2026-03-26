@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { User, Phone, MapPin, Lock, Star, Camera, Save, RefreshCw, Mail, Calendar } from 'lucide-react';
+import { 
+  User, Phone, MapPin, Lock, Camera, Save, Mail, 
+  Calendar, Sparkles, Image as ImageIcon, Star
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { coreApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -28,6 +31,7 @@ const ARTIST_CATEGORIES = [
 export default function ArtistProfile() {
   const [, setLocation] = useLocation();
   const fileInputRef = useRef(null);
+  const fandomInputRef = useRef(null); // 🌟 팬덤 이미지 업로드용 Ref
 
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,13 +46,21 @@ export default function ArtistProfile() {
     phone: '',
     age: '',
     address: '',
-    profileImageUrl: ''
+    profileImageUrl: '',
+    fandomName: '',      // 추가
+    fandomImageUrl: ''   // 추가
   });
 
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
     newPasswordConfirm: ''
+  });
+
+  // 🌟 모달에서 수정할 팬덤 전용 임시 상태 (모달 열 때 formData값으로 초기화)
+  const [fandomForm, setFandomForm] = useState({
+    fandomName: '',
+    fandomImageUrl: ''
   });
 
   // 회원 정보 불러오기
@@ -67,6 +79,16 @@ export default function ArtistProfile() {
     fetchMyInfo();
   }, []);
 
+  // 🌟 모달이 열릴 때 메인 화면의 데이터를 복사 (취소했을 때 원본 유지 목적)
+  useEffect(() => {
+    if (isUpgradeModalOpen) {
+      setFandomForm({
+        fandomName: formData.fandomName || '',
+        fandomImageUrl: formData.fandomImageUrl || ''
+      });
+    }
+  }, [isUpgradeModalOpen, formData]);
+
   // DB 컬럼 구조에 맞춰 신청 폼 상태값 최신화
   const [upgradeForm, setUpgradeForm] = useState({
     artistName: '',   // (stageName -> artistName)
@@ -75,6 +97,71 @@ export default function ArtistProfile() {
     profileImageUrl: '',
     communityLink: ''
   });
+
+  // 🌟 모달 내 입력값 변경 처리 함수 (추가)
+  const handleFandomChange = (e) => {
+    setFandomForm({ ...fandomForm, [e.target.name]: e.target.value });
+  };
+
+  // 🌟 팬덤 정보 수정 제출 (모달 전용)
+  const handleFandomSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      toast.loading('팬덤 정보를 업데이트 중이야...');
+
+      // 핵심 주석: 기존 API를 활용하여 팬덤 정보를 업데이트
+      await coreApi.post('/member/update', {
+        ...formData,
+        fandomName: fandomForm.fandomName || '', 
+        fandomImageUrl: fandomForm.fandomImageUrl || ''
+      });
+
+      toast.dismiss();
+      toast.success('팬덤 브랜딩이 변경되었어! ✨');
+
+      // 메인 화면 데이터 즉시 반영
+      setFormData(prev => ({ 
+        ...prev, 
+        fandomName: fandomForm.fandomName, 
+        fandomImageUrl: fandomForm.fandomImageUrl 
+      }));
+      setIsUpgradeModalOpen(false);
+    } catch (error) {
+      toast.dismiss();
+      toast.error('정보 수정에 실패했어.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 🌟 모달 내부 이미지 업로드 함수 (수민 수정내용 API 연결 완료)
+  const handleFandomImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      toast.loading('팬덤 이미지 사전 업로드 중...');
+      const uploadData = new FormData();
+      // 핵심 주석 2: 수민님이 자바에서 설정한 @RequestParam("bgImageFile")과 파라미터명을 맞춤
+      uploadData.append('bgImageFile', file); 
+
+      // 핵심 주석 3: 수민님이 만드신 자바 @PostMapping("/bg-image") 엔드포인트 호출
+      // (coreApi 내부적으로 GATEWAY_URL + '/msa/core'가 베이스로 설정되어 있다고 가정)
+      // 만약 경로가 다르다면 api.js에서 별도 인스턴스를 쓰거나 풀 경로 입력 필요
+      const res = await coreApi.post('/artist/bg-image', uploadData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      // 핵심 주석 4: 서버가 반환한 저장된 URL을 팬덤 폼 상태에 저장 (미리보기 반영)
+      setFandomForm(prev => ({ ...prev, fandomImageUrl: res.data.url }));
+      toast.dismiss();
+      toast.success('이미지 업로드 완료! 하단의 저장 버튼을 눌러주세요.');
+    } catch (error) {
+      toast.dismiss();
+      console.error("❌ 팬덤 이미지 사전 업로드 에러:", error);
+      toast.error('이미지 업로드 실패');
+    }
+  };
 
   // select 박스에서 선택한 값을 추적하기 위한 전용 상태
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -194,7 +281,8 @@ export default function ArtistProfile() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      setFormData(prev => ({ ...prev, profileImageUrl: res.data.url }));
+      const fieldName = type === 'profile' ? 'profileImageUrl' : 'fandomImageUrl';
+      setFormData(prev => ({ ...prev, [fieldName]: res.data.url }));
       toast.dismiss();
       toast.success('이미지 임시 업로드 완료! 하단의 저장 버튼을 눌러주세요.');
     } catch (error) {
@@ -203,6 +291,7 @@ export default function ArtistProfile() {
       toast.error('이미지 업로드에 실패했습니다.');
     }
   };
+  
 
   return (
     <Layout role={userRole}>
@@ -260,10 +349,10 @@ export default function ArtistProfile() {
                 {!isArtist && (
                   <button
                     onClick={() => setIsUpgradeModalOpen(true)} // 팝업 열기
-                    className="w-full py-2.5 text-xs font-bold bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-100 transition-all flex items-center justify-center gap-2 mt-2"
+                    className="w-full py-2.5 text-xs font-bold bg-violet-600 text-white rounded-xl hover:bg-violet-700 active:scale-95 transition-all flex items-center justify-center gap-2 mt-2"
                   >
-                    <Star size={14} fill="currentColor" />
-                    아티스트 전환 신청
+                    <Sparkles size={14} fill="currentColor" />
+                    팬덤 브랜딩 수정
                   </button>
                 )}
               </div>
@@ -352,126 +441,65 @@ export default function ArtistProfile() {
           </div>
         </div>
       </div>
-
-      {/* 🌟 아티스트 전환 신청 팝업(Dialog) */}
+{/* 🌟 모달: 아티스트 전환 신청에서 '팬덤 정보 수정'용으로 내용 변경 */}
       <Dialog open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen}>
-        <DialogContent className="sm:max-w-[460px] rounded-[32px] p-0 border-none shadow-2xl overflow-hidden bg-white outline-none">
+        <DialogContent className="sm:max-w-[460px] rounded-[32px] p-0 overflow-hidden bg-white border-none shadow-2xl">
           <div className="p-8 space-y-6">
-            <DialogHeader className="text-center space-y-2">
+            <DialogHeader className="text-center">
               <div className="w-14 h-14 bg-violet-100 rounded-2xl flex items-center justify-center text-violet-600 mx-auto mb-2">
-                <Star size={28} fill="currentColor" />
+                <Sparkles size={28} fill="currentColor" />
               </div>
               <DialogTitle className="text-2xl font-bold" style={{ fontFamily: "'Playfair Display', serif" }}>
-                Artist Upgrade
+                Fandom Branding
               </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
-                루미나의 아티스트로 활동하기 위한 기본 정보를 입력해 주세요.
+              <DialogDescription className="text-xs">
+                팬덤 커뮤니티와 굿즈에 사용될 브랜딩 정보를 수정하세요.
               </DialogDescription>
             </DialogHeader>
 
-            {/* 🌟 신청 양식 (DTO 기반) */}
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Artist Name</label>
+            <div className="space-y-5">
+              {/* 팬덤명 입력 */}
+              {/* <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Fandom Name</label>
                 <input
-                  name="artistName"
-                  value={upgradeForm.artistName}
-                  onChange={handleUpgradeChange}
-                  placeholder="활동하실 아티스트명을 입력하세요"
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none transition-all"
+                  name="fandomName"
+                  value={fandomForm.fandomName}
+                  onChange={handleFandomChange}
+                  placeholder="팬덤 이름을 입력하세요"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none"
                 />
-              </div>
+              </div> */}
 
+              {/* 팬덤 이미지 수정 (모달 버전) */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Sub Category</label>
-                {/* 핵심 주석: 카테고리 선택 셀렉트 박스 */}
-                <select
-                  value={selectedCategory}
-                  onChange={handleCategorySelect}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none transition-all text-gray-700"
-                >
-                  <option value="" disabled>카테고리를 선택해주세요</option>
-                  {ARTIST_CATEGORIES.map(category => (
-                    <option key={category.value} value={category.value}>
-                      {category.label}
-                    </option>
-                  ))}
-                </select>
-                {/* 핵심 주석: '기타' 선택 시에만 렌더링되는 직접 입력 폼 */}
-                {selectedCategory === '기타' && (
-                  <input
-                    name="subCategory"
-                    value={upgradeForm.subCategory}
-                    onChange={handleUpgradeChange}
-                    placeholder="활동 분야를 직접 입력해주세요"
-                    className="w-full px-4 py-3 mt-2 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none transition-all"
-                  />
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Description</label>
-                <textarea
-                  name="description"
-                  value={upgradeForm.description}
-                  onChange={handleUpgradeChange}
-                  placeholder="팬들에게 보여줄 한 줄 소개를 적어주세요"
-                  rows={2}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none transition-all resize-none"
-                />
-              </div>
-
-              {/* 🌟 핵심 주석: 새로 추가된 커뮤니티 링크 입력창 */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Community Link</label>
-                <input
-                  name="communityLink" // 상태값의 키와 일치
-                  value={upgradeForm.communityLink}
-                  onChange={handleUpgradeChange}
-                  placeholder="팬덤 커뮤니티나 공식 SNS 주소"
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none"
-                />
-              </div>
-
-              {/* 🌟 프로필 이미지 URL 입력창 */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Profile Image URL</label>
-                <div className="relative">
-                  <Camera size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    name="profileImageUrl" // 상태값의 키와 일치
-                    value={upgradeForm.profileImageUrl}
-                    onChange={handleUpgradeChange}
-                    placeholder="이미지 링크 주소"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none"
-                  />
+                <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Fandom Identity Image</label>
+                <div className="flex items-center gap-4 p-4 bg-violet-50/30 rounded-2xl border border-dashed border-violet-200">
+                  <div className="relative cursor-pointer group flex-shrink-0" onClick={() => fandomInputRef.current?.click()}>
+                    <input type="file" ref={fandomInputRef} className="hidden" accept="image/*" onChange={handleFandomImageUpload} />
+                    <img 
+                      src={fandomForm.fandomImageUrl || "https://placehold.co/100x100?text=F"} 
+                      className="w-16 h-16 rounded-xl object-cover shadow-sm border border-violet-100"
+                    />
+                    <div className="absolute inset-0 bg-black/30 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Camera size={16} className="text-white" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] text-violet-600 font-bold mb-1">Identity Image</p>
+                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed">팬덤명과 함께 대표 이미지로 사용됩니다.</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* 안내 문구 */}
-            <div className="bg-violet-50 p-4 rounded-2xl flex items-start gap-3">
-              <Mail size={16} className="text-violet-500 mt-0.5" />
-              <div className="text-[11px] text-violet-700 leading-relaxed">
-                신청하신 정보는 관리자 검토 후 계정 권한이 부여됩니다.
-                추가 계약 서류는 이메일로 발송됩니다.
-                {/* 추가 계약 서류는 <strong>{formData.email}</strong>로 발송됩니다. */}
-              </div>
-            </div>
-
             <DialogFooter className="flex gap-2 pt-2">
+              <button onClick={() => setIsUpgradeModalOpen(false)} className="flex-1 py-3.5 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition-all">취소</button>
               <button
-                onClick={() => setIsUpgradeModalOpen(false)}
-                className="flex-1 py-3.5 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition-all"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleUpgradeSubmit}
+                onClick={handleFandomSubmit}
                 disabled={isSubmitting}
-                className="flex-1 py-3.5 rounded-2xl font-bold bg-violet-600 text-white shadow-lg shadow-violet-100 hover:bg-violet-700 active:scale-95 transition-all disabled:opacity-50"
+                className="flex-[2] py-3.5 rounded-2xl font-bold bg-violet-600 text-white shadow-lg hover:bg-violet-700 transition-all disabled:opacity-50"
               >
-                {isSubmitting ? '신청 중...' : '전환 신청하기'}
+                {isSubmitting ? '수정 중...' : '브랜딩 정보 저장'}
               </button>
             </DialogFooter>
           </div>
