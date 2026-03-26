@@ -22,7 +22,6 @@ export default function UserCommunityWrite() {
     artistId: '' 
   });
 
-  // 1. 컴포넌트 마운트 시 팔로우한 아티스트 목록 로드
   useEffect(() => {
     const fetchMyFandoms = async () => {
       try {
@@ -186,6 +185,7 @@ export default function UserCommunityWrite() {
                   <option value="팬덤게시판">🌟 팬덤게시판</option>
                 </select>
               </div>
+
             </div>
 
             {/* 제목 입력 */}

@@ -34,7 +34,7 @@ jobs:
           username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.GCP_KEY }}
           source: "deploy/frontend.tar.gz"
-          target: "/home/${{ secrets.GCP_USER }}/nginx/frontend/"
+          target: "/home/${{ secrets.GCP_USER }}/frontend/"
           strip_components: 1
 
       - name: Build Container and Refresh Gateway
@@ -44,7 +44,7 @@ jobs:
           username: ${{ secrets.GCP_USER }}
           key: ${{ secrets.GCP_KEY }}
           script: |
-            cd /home/${{ secrets.GCP_USER }}/nginx/frontend
+            cd /home/${{ secrets.GCP_USER }}/frontend
             tar -xzf frontend.tar.gz
             rm frontend.tar.gz
             
