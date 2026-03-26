@@ -126,6 +126,21 @@ export default function AdminUsers() {
     };
   }, []);
 
+  // 날짜 포맷 함수 추가
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '날짜 없음';
+    const date = new Date(dateString);
+    if(isNaN(date.getTime())) return dateString; // 변환 실패 시 원본 반환
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  }
+
   // --- [기능 1: 상세보기] 눈모양 버튼 연동 ---
   const handleViewDetail = async (memberId) => {
     try {
@@ -321,7 +336,7 @@ export default function AdminUsers() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-5 text-sm font-medium text-slate-600">{user.createdAt || '날짜 없음'}</td>
+                      <td className="px-6 py-5 text-sm font-medium text-slate-600">{formatDateTime(user.createdAt)}</td>
                       <td className="px-6 py-5">
                         <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${statusColors[user.status]?.badge}`}>
                           {statusColors[user.status]?.label || user.status}
@@ -439,7 +454,7 @@ export default function AdminUsers() {
                       <div className="space-y-3">
                         {selectedUser.purchaseHistory?.length > 0 ? selectedUser.purchaseHistory.map((h, i) => (
                           <div key={i} className="flex justify-between items-center p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                            <div><p className="text-xs font-bold text-slate-800">{h.itemName}</p><p className="text-[10px] text-slate-400">{h.createdAt?.split('T')[0]}</p></div>
+                            <div><p className="text-xs font-bold text-slate-800">{h.itemName}</p><p className="text-[10px] text-slate-400">{formatDateTime(h.purchasedAt)}</p></div>
                             <p className="text-xs font-black text-primary">₩{h.amount?.toLocaleString()}</p>
                           </div>
                         )) : <p className="text-xs text-muted-foreground text-center py-4 font-bold">구매 이력이 없습니다.</p>}
@@ -450,7 +465,7 @@ export default function AdminUsers() {
                       <div className="space-y-3">
                         {selectedUser.pointHistory?.length > 0 ? selectedUser.pointHistory.map((p, i) => (
                           <div key={i} className="flex justify-between items-center p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                            <div><p className="text-xs font-bold text-slate-800">{p.detail}</p><p className="text-[10px] text-slate-400">{p.createdAt?.split('T')[0]}</p></div>
+                            <div><p className="text-xs font-bold text-slate-800">{p.detail}</p><p className="text-[10px] text-slate-400">{formatDateTime(p.processedAt)}</p></div>
                             <p className={`text-xs font-black ${p.amount > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{p.amount?.toLocaleString()}P</p>
                           </div>
                         )) : <p className="text-xs text-muted-foreground text-center py-4 font-bold">포인트 내역이 없습니다.</p>}
