@@ -163,7 +163,7 @@ export default function UserArtistDetail({ params }) {
       <div className="pb-10 relative">
         {/* 헤더 영역 */}
         <div className="relative h-64 md:h-80 w-full overflow-hidden">
-          <img src={artist.coverImageUrl || "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1200"} alt="cover" className="w-full h-full object-cover" />
+          <img src={artist.fandomImage || "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1200"} alt="cover" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
           <div className="absolute bottom-0 left-0 w-full p-6 lg:px-12 flex flex-col md:flex-row items-end md:items-center justify-between gap-4">
             <div className="flex items-end gap-4 text-white">
