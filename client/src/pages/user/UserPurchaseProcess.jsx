@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'wouter';
 import Layout from '@/components/Layout';
-import { ChevronLeft, CheckCircle2, CreditCard, AlertCircle, Package, Loader2, ShoppingCart } from 'lucide-react';
+import { ChevronLeft, CheckCircle2, CreditCard, AlertCircle, Package, Loader2 } from 'lucide-react';
 import { formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
 import { shopApi, payApi } from '@/lib/api';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog";
 
 export default function UserPurchaseProcess() {
     const [, setLocation] = useLocation();
@@ -20,6 +27,7 @@ export default function UserPurchaseProcess() {
     const [quantity, setQuantity] = useState(initialQty);
     
     const [userPoints, setUserPoints] = useState(0);
+    const [isPayConfirmOpen, setIsPayConfirmOpen] = useState(false);
     const deliveryFee = 3000;
 
     const fetchUserPoints = async () => {
@@ -92,6 +100,19 @@ export default function UserPurchaseProcess() {
     const handleNext = () => {
         if (step === 1 && quantity > 0) setStep(2);
         else if (step === 2 && isEnoughPoints) setStep(3);
+    };
+
+    const handlePayment = async () => {
+        setIsPayConfirmOpen(false);
+        toast.loading('포인트 결제가 진행 중입니다...');
+        try {
+            await shopApi.post('/shop/checkout', { productId: item.id, quantity, usePoint: grandTotal });
+            toast.dismiss();
+            handleNext();
+        } catch (error) {
+            toast.dismiss();
+            toast.error('결제에 실패했습니다.');
+        }
     };
 
     return (
@@ -232,17 +253,7 @@ export default function UserPurchaseProcess() {
                         </div>
 
                         <button
-                            onClick={async () => {
-                                toast.loading('포인트 결제가 진행 중입니다...');
-                                try {
-                                    await shopApi.post('/shop/checkout', { productId: item.id, quantity, usePoint: grandTotal });
-                                    toast.dismiss();
-                                    handleNext();
-                                } catch (error) {
-                                    toast.dismiss();
-                                    toast.error('결제에 실패했습니다.');
-                                }
-                            }}
+                            onClick={() => setIsPayConfirmOpen(true)}
                             disabled={!isEnoughPoints}
                             className="w-full py-4 btn-primary-gradient text-white rounded-2xl font-bold shadow-lg disabled:opacity-50 disabled:grayscale transition-all hover:scale-[1.02]"
                         >
@@ -294,6 +305,49 @@ export default function UserPurchaseProcess() {
                     </div>
                 )}
             </div>
+
+            {/* 결제 확인 모달 */}
+            <Dialog open={isPayConfirmOpen} onOpenChange={setIsPayConfirmOpen}>
+                <DialogContent className="sm:max-w-sm p-0 overflow-hidden bg-white rounded-3xl border-none">
+                    <DialogHeader className="hidden">
+                        <DialogTitle>결제 확인</DialogTitle>
+                        <DialogDescription>결제를 진행하기 전 확인하세요.</DialogDescription>
+                    </DialogHeader>
+                    <div className="p-8 space-y-6 text-center">
+                        <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto">
+                            <CreditCard size={32} className="text-rose-500" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-foreground">결제를 진행할까요?</h3>
+                            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                                {item?.name}<br />
+                                <span className="text-rose-500 font-bold text-lg">
+                                    {formatPrice(grandTotal).replace('원', 'P')}
+                                </span>
+                                이 차감됩니다.
+                            </p>
+                        </div>
+                        <div className="px-4 py-3 bg-rose-50 rounded-2xl text-sm text-rose-600 font-medium">
+                            수량: <span className="font-bold">{quantity}개</span>
+                            {totalPrice >= 50000 ? ' · 배송비 무료' : ` · 배송비 ${formatPrice(deliveryFee)}`}
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => setIsPayConfirmOpen(false)}
+                                className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handlePayment}
+                                className="flex-[1.5] py-3 btn-primary-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all"
+                            >
+                                결제하기
+                            </button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </Layout>
     );
 }
