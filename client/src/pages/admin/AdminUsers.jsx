@@ -3,8 +3,9 @@
  * 기존 디자인을 100% 유지하며 백엔드 API와 모든 기능을 연동 완료함
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect} from 'react';
 import Layout from '@/components/Layout';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 import { 
   Users, User, Search, Download, Eye, Ban, MoreVertical, Filter, 
   TrendingUp, Clock, MapPin, Phone, CreditCard, History, 
@@ -12,9 +13,7 @@ import {
   ShieldCheck, UserCheck, Crown, Check 
 } from 'lucide-react'; 
 import { toast } from 'sonner';
-import { coreApi } from '@/lib/api'; 
-import SockJS from 'sockjs-client';
-import Stomp from 'stompjs';
+import { coreApi } from '@/lib/api';
 
 // [수정]: 백엔드 Enum 상태값(대문자)에 맞춰 매핑 키 수정
 const statusColors = {
@@ -25,6 +24,9 @@ const statusColors = {
 };
 
 export default function AdminUsers() {
+
+  const stompClient = useWebSocket();
+  
   // --- 상태 관리 ---
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -65,66 +67,64 @@ export default function AdminUsers() {
     fetchUsers();
   }, [page]);
 
-  // [새로 추가]: 화면 처음 뜰 때 딱 한 번 실행되는 녀석 (의존성 배열이 [] 빈칸)
   useEffect(() => {
-    const socket = new SockJS(`${import.meta.env.VITE_API_GATEWAY_URL}/msa/core/ws-admin`); 
-    const stompClient = Stomp.over(socket);
+    const fetchInitialData = async () => {
+      try {
+        setIsLoading(true);
+        const res = await coreApi.get('/admin/user?page=0&size=10'); // 초기 목록 조회
+        setUsers(res.data.userList.content);
+        setIsLoading(false);
+      } catch (err) {
+        console.error("초기 로딩 실패:", err);
+        setIsLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, []);
 
-    // 시끄러운 디버그 로그 끄기 (선택사항)
-    stompClient.debug = () => {}; 
+  // --- [웹소켓 구독] 실시간 업데이트 받기 ---
+  useEffect(() => {
+  if (!stompClient || !stompClient.connected) {
+    console.log("⏳ 웹소켓 연결 대기 중...");
+    return;
+  }
 
-    stompClient.connect({}, (frame) => {
-      console.log('✅ 소켓 연결 성공!');
+  console.log("📡 구독 시작: /topic/user-stats");
 
-      stompClient.subscribe('/topic/user-stats', (frame) => {
+  const subscription = stompClient.subscribe('/topic/user-stats', (frame) => {
+      try {
         const response = JSON.parse(frame.body);
-        const { type, payload } = response;
+        // 백엔드에서 socketData.put("type", ...) 로 보냈으므로 type을 꺼냅니다.
+        const { type, payload } = response; 
         
-        // 1. [상세보기 모달 업데이트] type이 USER_DETAIL일 때
-        if (type === 'USER_DETAIL') {
-          console.log("🎯 상세 데이터 수신:", payload);
-          
-          // 현재 열려있는 상세 유저 상태(setSelectedUser 등)를 업데이트합니다.
-          // 님의 코드에서 상세보기에 사용하는 state 함수명을 확인해 보세요!
-          setSelectedUser(prev => {
-            if (!prev) return null; 
-            return {
-              ...prev,    // 기존 이름, 이메일, 주소 등
-              ...payload  // 새 잔액, 구매이력, 포인트이력 덮어쓰기
-            };
+        console.log("🚀 웹소켓 수신 데이터:", type, payload);
+
+        // 1. SUMMARY 데이터 (잔액, 구매건수 업데이트)
+        if (type === 'SUMMARY' || type === 'GETALL') {
+          setUsers(prevUsers => {
+            if (!Array.isArray(payload)) return prevUsers;
+            
+            return prevUsers.map(user => {
+              // memberId가 같은 항목을 찾아 업데이트
+              const updated = payload.find(p => Number(p.memberId) === Number(user.memberId));
+              return updated ? { ...user, ...updated } : user;
+            });
           });
         } 
         
-        // 2. [전체 목록 업데이트] 기존 로직 (배열 데이터일 때)
-        else {
-          setUsers(prevUsers => {
-            // 목록 데이터는 배열로 올 때만 실행
-            if (!Array.isArray(payload)) return prevUsers;
-
-            return prevUsers.map(user => {
-              const updatedData = payload.find(p => Number(p.memberId) === Number(user.memberId));
-              if (updatedData) {
-                return {
-                  ...user,
-                  ...updatedData,
-                  name: updatedData.name || user.name,
-                  email: updatedData.email || user.email,
-                  createdAt: updatedData.createdAt || user.createdAt
-                };
-              }
-              return user;
-            });
-          });
+        // 2. 상세 정보 업데이트
+        else if (type === 'USER_DETAIL') {
+          setSelectedUser(prev => prev ? { ...prev, ...payload } : null);
         }
-      });
-    }, (error) => {
-      console.error('❌ 소켓 연결 실패:', error);
+      } catch (err) {
+        console.error("데이터 파싱 에러:", err);
+      }
     });
 
     return () => {
-      if (stompClient && stompClient.connected) stompClient.disconnect();
+      if (subscription) subscription.unsubscribe();
     };
-  }, []);
+  }, [stompClient]);
 
   // 날짜 포맷 함수 추가
   const formatDateTime = (dateString) => {

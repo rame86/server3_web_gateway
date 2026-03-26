@@ -3,19 +3,19 @@
  * 디자인: Soft Bloom (글래스모피즘 효과 적용된 사이드바)
  * 역할: 권한(User, Artist, Admin)에 따른 차등 UI 및 네비게이션 제공
  */
+import React, { useEffect, useState } from 'react';
 
-import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'wouter'; // wouter: 가벼운 라우팅 라이브러리
+import { Link, useLocation } from 'wouter';
 import {
   Home, ShoppingBag, MessageCircle, Calendar, BookOpen, Music,
   Heart, Wallet, Map, Bell, Settings, LogOut, Menu,
   LayoutDashboard, Users, Package, CheckSquare, FileText,
   BarChart3, Star, Mic2, ChevronRight, Sparkles
-} from 'lucide-react'; // lucide-react: UI 아이콘 라이브러리
-import { cn } from '@/lib/utils'; // cn: 조건부 클래스 결합 유틸리티
-import { toast } from 'sonner'; // sonner: 토스트 알림 라이브러리
-import TopNav from './TopNav'; // 상단 네비게이션 컴포넌트
-import { coreApi } from '@/lib/api'; // Axios 기반 공통 API 모듈
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import TopNav from './TopNav';
+import { coreApi } from '@/lib/api';
 
 // --- 네비게이션 항목 정의 (역할별) ---
 
