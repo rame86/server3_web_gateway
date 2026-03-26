@@ -10,7 +10,7 @@ export const WebSocketProvider = ({ children }) => {
   const [stompClient, setStompClient] = useState(null);
 
   useEffect(() => {
-    const socket = new SockJS(`http://localhost/msa/core/ws-admin`);
+    const socket = new SockJS(`${import.meta.env.VITE_API_GATEWAY_URL}/msa/core/ws-admin`);
     const client = Stomp.over(socket);
     client.debug = (str) => console.log(str);
     client.connect({}, () => {
