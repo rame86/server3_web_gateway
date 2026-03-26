@@ -6,10 +6,10 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { cn } from "@/lib/utils";
-import { Package, Plus, Search, Clock, Check, MoreVertical, Image as ImageIcon, DollarSign, Archive, Users } from 'lucide-react';
+import { Package, Plus, Search, Clock, Check, MoreVertical, Image as ImageIcon, DollarSign, Archive } from 'lucide-react';
 import { goodsItems, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
-import { shopApi, coreApi } from '@/lib/api';
+import { shopApi } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,20 +20,8 @@ export default function ArtistStore() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [isAdding, setIsAdding] = useState(false);
-  const [artistList, setArtistList] = useState([]);
-
-  // 아티스트 목록 로드
-  useEffect(() => {
-    const fetchArtists = async () => {
-      try {
-        const { data } = await coreApi.get('/artist/list');
-        setArtistList(data || []);
-      } catch (err) {
-        console.error('아티스트 목록 로드 실패:', err);
-      }
-    };
-    fetchArtists();
-  }, []);
+  const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState(null);
 
   // My goods filtering (id 3 is Lee Ha-eun's artistId from data.js)
   const myGoods = goodsItems.filter(item => item.artistId === 3);
@@ -60,23 +48,37 @@ export default function ArtistStore() {
     setImagePreview(URL.createObjectURL(file));
   };
 
+  // 폼 제출 시: 데이터 수집 후 확인 모달만 오픈
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     const title = e.target.title.value;
     const category = e.target.category.value;
+    const itemCategory = e.target.itemCategory.value;
     const price = e.target.price.value;
     const description = e.target.description.value;
-    const artistId = e.target.artistId.value;
+    // 아티스트는 본인 ID를 자동으로 사용
+    const artistId = localStorage.getItem('memberId');
     const stockQuantity = parseInt(e.target.stockQuantity.value || '0', 10);
 
     if (!artistId) {
-      toast.error('아티스트를 선택해주세요.');
+      toast.error('로그인 정보를 확인해주세요.');
       return;
     }
 
+    setPendingFormData({ title, category, itemCategory, price, description, artistId, stockQuantity });
+    setIsSubmitConfirmOpen(true);
+  };
+
+  // 확인 후 실제 API 호출
+  const handleConfirmedSubmit = async () => {
+    setIsSubmitConfirmOpen(false);
+    if (!pendingFormData) return;
+
+    const { title, category, itemCategory, price, description, artistId, stockQuantity } = pendingFormData;
+
     try {
-      const endpoint = category === 'OFFICIAL' || category === 'ALBUM' ? '/product/official' : '/product/unofficial';
+      const endpoint = category === 'OFFICIAL' ? '/product/official' : '/product/unofficial';
       const requesterName = localStorage.getItem('username') || '아티스트';
 
       const formData = new FormData();
@@ -84,6 +86,7 @@ export default function ArtistStore() {
       formData.append('price', parseFloat(price));
       formData.append('description', description);
       formData.append('goodsType', category);
+      formData.append('itemCategory', itemCategory);
       formData.append('requesterName', requesterName);
       formData.append('artistId', artistId);
       formData.append('stockQuantity', stockQuantity);
@@ -99,6 +102,7 @@ export default function ArtistStore() {
       setIsAdding(false);
       setImageFile(null);
       setImagePreview(null);
+      setPendingFormData(null);
     } catch (error) {
       console.error(error);
       toast.error('등록 요청에 실패했습니다.');
@@ -134,41 +138,31 @@ export default function ArtistStore() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="category">카테고리 (Category)</Label>
+                    <Label htmlFor="category">판매 유형 (Category)</Label>
                     <select id="category" className="w-full h-10 px-3 bg-white border border-violet-100 rounded-xl text-sm focus:ring-2 focus:ring-violet-300 focus:outline-none">
                       <option value="OFFICIAL">공식 굿즈 (OFFICIAL)</option>
                       <option value="UNOFFICIAL">팬메이드 (UNOFFICIAL)</option>
-                      <option value="ALBUM">앨범 (ALBUM)</option>
+                      <option value="SECONDHAND">중고 (SECONDHAND)</option>
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="price">판매 가격 (Price - Numeric)</Label>
-                    <Input id="price" type="number" step="0.01" placeholder="0.00" required className="rounded-xl border-violet-100" />
+                    <Label htmlFor="itemCategory">상품 카테고리</Label>
+                    <select id="itemCategory" className="w-full h-10 px-3 bg-white border border-violet-100 rounded-xl text-sm focus:ring-2 focus:ring-violet-300 focus:outline-none">
+                      <option value="GOODS">굿즈</option>
+                      <option value="ALBUM">앤범</option>
+                      <option value="PHOTOBOOK">포토북</option>
+                      <option value="CLOTHING">의류</option>
+                      <option value="ACCESSORY">액세서리</option>
+                    </select>
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="price">판매 가격</Label>
+                  <Input id="price" type="number" step="1" placeholder="0" required className="rounded-xl border-violet-100" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">상품 설명 (Description)</Label>
                   <Textarea id="description" placeholder="상세 설명을 적어주세요 (Text)" className="rounded-xl border-violet-100 min-h-[100px]" />
-                </div>
-
-                {/* 아티스트 선택 */}
-                <div className="space-y-2">
-                  <Label htmlFor="artistId" className="flex items-center gap-1.5">
-                    <Users size={14} className="text-violet-400" />
-                    아티스트 선택 *
-                  </Label>
-                  <select
-                    id="artistId"
-                    required
-                    className="w-full h-10 px-3 bg-white border border-violet-100 rounded-xl text-sm focus:ring-2 focus:ring-violet-300 focus:outline-none"
-                  >
-                    <option value="">-- 아티스트를 선택하세요 --</option>
-                    {artistList.map((artist) => (
-                      <option key={artist.memberId} value={artist.memberId}>
-                        {artist.stageName}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 {/* 판매 수량 */}
@@ -331,6 +325,49 @@ export default function ArtistStore() {
           )}
         </div>
       </div>
+
+      {/* 상품 등록 확인 모달 */}
+      <Dialog open={isSubmitConfirmOpen} onOpenChange={setIsSubmitConfirmOpen}>
+        <DialogContent className="sm:max-w-sm p-0 overflow-hidden bg-white rounded-3xl border-none">
+          <DialogHeader className="hidden">
+            <DialogTitle>등록 확인</DialogTitle>
+          </DialogHeader>
+          <div className="p-8 space-y-5 text-center">
+            <div className="w-16 h-16 bg-violet-50 rounded-2xl flex items-center justify-center mx-auto">
+              <Package size={32} className="text-violet-500" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-foreground">상품을 등록 신청할까요?</h3>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                <span className="font-semibold text-foreground">{pendingFormData?.title}</span><br />
+                관리자 승인 후 스토어에 게시됩니다.
+              </p>
+            </div>
+            {pendingFormData && (
+              <div className="px-4 py-3 bg-violet-50 rounded-2xl text-sm text-violet-700 font-medium text-left space-y-1">
+                <div className="flex justify-between"><span className="text-muted-foreground">판매 유형</span><span>{pendingFormData.category}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">상품 카테고리</span><span>{pendingFormData.itemCategory}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">판매가</span><span>{Number(pendingFormData.price).toLocaleString()}원</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">수량</span><span>{pendingFormData.stockQuantity}개</span></div>
+              </div>
+            )}
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setIsSubmitConfirmOpen(false)}
+                className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleConfirmedSubmit}
+                className="flex-[1.5] py-3 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all"
+              >
+                등록 신청
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
