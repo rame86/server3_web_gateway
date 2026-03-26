@@ -231,12 +231,15 @@ export default function Layout({ children, role }) {
 
           {/* 사이드바 하단 (설정/로그아웃) */}
           <div className="p-3 border-t border-rose-100">
-            <button
-              onClick={() => setLocation(`/${role}/profile`)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-muted-foreground hover:bg-rose-50/80 hover:text-foreground transition-all">
-              <Settings size={18} />
-              <span className="text-sm font-medium">설정</span>
-            </button>
+            {/* 🌟 핵심 수정: role이 admin이 아닐 때만 설정 버튼을 렌더링 */}
+            {currentRole !== 'admin' && (
+              <button
+                onClick={() => setLocation(`/${role}/profile`)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-muted-foreground hover:bg-rose-50/80 hover:text-foreground transition-all">
+                <Settings size={18} />
+                <span className="text-sm font-medium">설정</span>
+              </button>
+            )}
             <button
               onClick={handleLogout}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl w-full text-muted-foreground hover:bg-rose-50/80 hover:text-foreground transition-all">
