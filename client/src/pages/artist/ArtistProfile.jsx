@@ -48,7 +48,7 @@ export default function ArtistProfile() {
     address: '',
     profileImageUrl: '',
     fandomName: '',      // 추가
-    fandomImageUrl: ''   // 추가
+    fandomImage: ''   // 추가
   });
 
   const [passwordForm, setPasswordForm] = useState({
@@ -60,7 +60,7 @@ export default function ArtistProfile() {
   // 🌟 모달에서 수정할 팬덤 전용 임시 상태 (모달 열 때 formData값으로 초기화)
   const [fandomForm, setFandomForm] = useState({
     fandomName: '',
-    fandomImageUrl: ''
+    fandomImage: ''
   });
 
   // 회원 정보 불러오기
@@ -84,7 +84,7 @@ export default function ArtistProfile() {
     if (isUpgradeModalOpen) {
       setFandomForm({
         fandomName: formData.fandomName || '',
-        fandomImageUrl: formData.fandomImageUrl || ''
+        fandomImage: formData.fandomImage || ''
       });
     }
   }, [isUpgradeModalOpen, formData]);
@@ -110,10 +110,10 @@ export default function ArtistProfile() {
       toast.loading('팬덤 정보를 업데이트 중이야...');
 
       // 핵심 주석: 기존 API를 활용하여 팬덤 정보를 업데이트
-      await coreApi.post('/member/update', {
+      await coreApi.post('/artist/update-fandom', {
         ...formData,
         fandomName: fandomForm.fandomName || '', 
-        fandomImageUrl: fandomForm.fandomImageUrl || ''
+        fandomImage: fandomForm.fandomImage || ''
       });
 
       toast.dismiss();
@@ -123,7 +123,7 @@ export default function ArtistProfile() {
       setFormData(prev => ({ 
         ...prev, 
         fandomName: fandomForm.fandomName, 
-        fandomImageUrl: fandomForm.fandomImageUrl 
+        fandomImage: fandomForm.fandomImage 
       }));
       setIsUpgradeModalOpen(false);
     } catch (error) {
@@ -153,7 +153,7 @@ export default function ArtistProfile() {
       });
 
       // 핵심 주석 4: 서버가 반환한 저장된 URL을 팬덤 폼 상태에 저장 (미리보기 반영)
-      setFandomForm(prev => ({ ...prev, fandomImageUrl: res.data.url }));
+      setFandomForm(prev => ({ ...prev, fandomImage: res.data.url }));
       toast.dismiss();
       toast.success('이미지 업로드 완료! 하단의 저장 버튼을 눌러주세요.');
     } catch (error) {
@@ -281,7 +281,7 @@ export default function ArtistProfile() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      const fieldName = type === 'profile' ? 'profileImageUrl' : 'fandomImageUrl';
+      const fieldName = type === 'profile' ? 'profileImageUrl' : 'fandomImage';
       setFormData(prev => ({ ...prev, [fieldName]: res.data.url }));
       toast.dismiss();
       toast.success('이미지 임시 업로드 완료! 하단의 저장 버튼을 눌러주세요.');
@@ -477,7 +477,7 @@ export default function ArtistProfile() {
                   <div className="relative cursor-pointer group flex-shrink-0" onClick={() => fandomInputRef.current?.click()}>
                     <input type="file" ref={fandomInputRef} className="hidden" accept="image/*" onChange={handleFandomImageUpload} />
                     <img 
-                      src={fandomForm.fandomImageUrl || "https://placehold.co/100x100?text=F"} 
+                      src={fandomForm.fandomImage || "https://placehold.co/100x100?text=F"} 
                       className="w-16 h-16 rounded-xl object-cover shadow-sm border border-violet-100"
                     />
                     <div className="absolute inset-0 bg-black/30 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">

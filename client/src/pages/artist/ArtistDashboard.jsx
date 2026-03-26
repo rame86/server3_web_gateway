@@ -98,18 +98,23 @@ export default function ArtistDashboard() {
 
         // 4. 내 이벤트
         try {
-          const resEvents = await resApi.get('/events');
+          const resEvents = await resApi.get(`/events/my?artistId=${myId}`);
           const allEvents = Array.isArray(resEvents.data?.events) ? resEvents.data.events : (Array.isArray(resEvents.data) ? resEvents.data : []);
           
-          if (fetchedArtistName !== '이름 없음') {
-            const myEvents = allEvents.filter(e => e.artist_name === fetchedArtistName);
-            setEvents(myEvents.slice(0, 3).map(e => ({
-              id: e.event_id,
-              title: e.title,
-              date: e.event_date ? `${e.event_date[0]}.${String(e.event_date[1]).padStart(2,'0')}.${String(e.event_date[2]).padStart(2,'0')}` : 'TBD',
-              remaining: e.ticket_inventory ?? 99
-            })));
-          }
+          // 🌟 승인 완료(CONFIRMED) & 오늘 이후(미래) 일정만 필터링
+          const upcomingEvents = allEvents.filter(e => {
+            const isConfirmed = e.approval_status === 'CONFIRMED' || e.status === 'CONFIRMED';
+            const eventDate = new Date(e.event_date || e.date);
+            return isConfirmed && eventDate > new Date();
+          });
+
+          // 🌟 slice(0, 3)을 빼고 전체 예정 이벤트를 저장! (상단 통계용)
+          setEvents(upcomingEvents.map(e => ({
+            id: e.event_id || e.id,
+            title: e.title || e.eventTitle,
+            date: e.event_date ? new Date(e.event_date).toLocaleDateString().replace(/\.\s/g, '.').replace(/\.$/, '') : 'TBD',
+            remaining: e.available_seats ?? e.availableSeats ?? e.total_capacity ?? 0
+          })));
         } catch (e) {
           console.error("이벤트 정보를 불러오는데 실패:", e);
         }
@@ -328,7 +333,7 @@ export default function ArtistDashboard() {
                       내 이벤트
                     </h3>
                   </div>
-                  {events.length > 0 ? events.map((event) =>
+                  {events.length > 0 ? events.slice(0, 3).map((event) =>
                   <div key={event.id} className="p-3 rounded-xl bg-violet-50 border border-violet-100 mb-2">
                       <p className="text-sm font-semibold text-foreground line-clamp-1">{event.title}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{event.date}</p>
