@@ -28,14 +28,29 @@ export default function UserWallet() {
         setBalance(res.data.currentBalance || 0);
 
         // Map backend DTO to frontend transaction format
-        const mappedTxs = (res.data.transactions || []).map((tx, index) => ({
-          id: index,
-          type: tx.transactionType === 'CHARGE' ? 'charge' : tx.transactionType === 'SPEND' ? 'spend' : 'donate',
-          desc: tx.description || (tx.transactionType === 'CHARGE' ? '포인트 충전' : '포인트 사용'),
-          amount: tx.amount,
-          date: dayjs(tx.createdAt).format('YYYY-MM-DD HH:mm'),
-          balance: tx.balanceAfter
-        }));
+        const mappedTxs = (res.data.transactions || []).map((tx, index) => {
+          const getType = (t) => {
+            if (t === 'CHARGE') return 'charge';
+            if (t === 'REFUND') return 'refund';
+            if (t === 'DONATION') return 'donate';
+            return 'spend'; // PAYMENT, SPEND 등
+          };
+          const getDesc = (t, description) => {
+            if (description) return description;
+            if (t === 'CHARGE') return '포인트 충전';
+            if (t === 'REFUND') return '환불';
+            if (t === 'DONATION') return '아티스트 후원';
+            return '결제';
+          };
+          return {
+            id: index,
+            type: getType(tx.transactionType),
+            desc: getDesc(tx.transactionType, tx.description),
+            amount: tx.amount,
+            date: dayjs(tx.createdAt).format('YYYY-MM-DD HH:mm'),
+            balance: tx.balanceAfter
+          };
+        });
         setTransactions(mappedTxs);
       }
     } catch (error) {
@@ -162,6 +177,7 @@ export default function UserWallet() {
                   <div key={tx.id} className="flex items-center gap-4 py-3 border-b border-rose-50 last:border-0 hover:bg-rose-50/30 transition-colors px-2 rounded-xl -mx-2">
                     <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center flex-shrink-0 ${tx.type === 'charge' ? 'bg-teal-50 text-teal-600' :
                       tx.type === 'donate' ? 'bg-violet-50 text-violet-600' :
+                      tx.type === 'refund' ? 'bg-amber-50 text-amber-600' :
                         'bg-rose-50 text-rose-600'}`
                     }>
                       {tx.type === 'charge' ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}

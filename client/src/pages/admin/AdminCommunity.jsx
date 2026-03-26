@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 
 export default function AdminCommunity() {
+  // --- 상태 관리 ---
   const [activeTab, setActiveTab] = useState('posts'); 
   const [reportSubTab, setReportSubTab] = useState('boards'); 
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,23 +20,24 @@ export default function AdminCommunity() {
   const [commentCount, setcommentCount] = useState(0);
   const [boardCount, setBoardCount] = useState(0);
 
-  // [주소 수정] /board 위치를 컨트롤러 구조에 맞게 조정했습니다.
+  // --- API 경로 설정 (MSA 구조 대응) ---
   const ADMIN_API_BASE = "/msa/core/admin/board"; 
   const BOARD_API_BASE = "/msa/core/board";
   const BOARD_ADMIN_API_BASE = "/msa/core/board/admin";
   
-
+  // 컴포넌트 마운트 시 초기 데이터 로드
   useEffect(() => {
     fetchPosts();
     fetchReports();
   }, []);
-  
+  // 신고 서브 탭이 변경되거나 신고 관리 탭으로 진입할 때 목록 새로고침
   useEffect(() => {
     if (activeTab === 'reports') {
       fetchReports();
     }
   }, [reportSubTab, activeTab]);
 
+  // 전체 게시글 목록 로드
   const fetchPosts = async () => {
     try {
       setLoading(true);
@@ -49,14 +51,14 @@ export default function AdminCommunity() {
     } finally { setLoading(false); }
   };
 
-  // 2. 신고 목록 로드 (URL 경로 중복 해결)
+  // 2. 신고 목록 로드
   const fetchReports = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      // 사진에서 확인된 404 에러의 원인인 /board 중복을 제거한 요청입니다.
+      // [병렬 처리] 게시글 신고와 댓글 신고 목록을 한 번에 호출
       const [boardRes, commentRes] = await Promise.all([
         axios.get(`${ADMIN_API_BASE}/reports`, { headers }), // -> /msa/core/admin/board/reports
         axios.get(`${ADMIN_API_BASE}/reports/comments`, { headers }) // -> /msa/core/admin/board/reports/comments
@@ -69,7 +71,6 @@ export default function AdminCommunity() {
       setBoardCount(boards.length);
       setcommentCount(comments.length);
       setTotalReportCount(boards.length + comments.length);
-      
       setReportList(reportSubTab === 'boards' ? boards : comments);
 
     } catch (error) {
@@ -78,13 +79,13 @@ export default function AdminCommunity() {
       setReportList([]); 
     } finally { setLoading(false); }
   };
-
+  //상세 내용 확인 (모달 띄우기)
   const handleShowDetail = async (item, type) => {
     if (item.content) {
       setSelectedItem({ ...item, type });
       return;
     }
-
+    // 본문이 없는 경우(목록형 데이터) 서버에 단건 상세 조회 요청
     try {
       const token = localStorage.getItem('accessToken');
       // DB 이미지 확인 결과 필드명이 report_id, board_id 등으로 되어 있으므로 카멜케이스 대응
@@ -99,7 +100,7 @@ export default function AdminCommunity() {
       toast.error("상세 내용을 불러올 수 없습니다.");
     }
   };
-
+  // 신고 승인 처리
   const handleApprove = async (e, reportId, targetId) => {
     if (e) e.stopPropagation();
     if (!window.confirm("신고를 승인하시겠습니까?")) return;
@@ -107,7 +108,7 @@ export default function AdminCommunity() {
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
-      
+      // 서브 탭에 따라 호출할 엔드포인트 결정
       const url = reportSubTab === 'boards'
         ? `${ADMIN_API_BASE}/report/${reportId}/approve`
         : `${ADMIN_API_BASE}/report/comment/${reportId}/approve`;
@@ -124,7 +125,7 @@ export default function AdminCommunity() {
       setLoading(false);
     }
   };
-
+  // 영구 삭제 처리 (DB에서 완전히 삭제)
   const handleDeleteItem = async (e, id, type) => {
     if (e) e.stopPropagation();
     if (!window.confirm("정말로 영구 삭제하시겠습니까?")) return;
@@ -143,7 +144,7 @@ export default function AdminCommunity() {
       toast.error("삭제 실패");
     }
   };
-
+  // 검색 로직: 제목 또는 작성자명에 검색어가 포함된 항목 필터링
   const filteredPosts = postList.filter((p) =>
     p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
     p.authorName?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -163,7 +164,7 @@ export default function AdminCommunity() {
             <Flag size={16} className="inline mr-2" /> 신고 관리 ({totalReportCount})
           </button>
         </div>
-
+        {/* 신고 관리 선택 시에만 나타나는 서브 탭 */}
         {activeTab === 'reports' && (
           <div className="flex gap-6 border-b border-slate-100 mb-4 px-2">
             <button onClick={() => setReportSubTab('boards')} className={`pb-3 text-sm font-black transition-all ${reportSubTab === 'boards' ? 'text-rose-500 border-b-2 border-rose-500' : 'text-slate-400'}`}>게시글 신고 ({boardCount})</button>
@@ -174,6 +175,7 @@ export default function AdminCommunity() {
         {/* 리스트 영역 */}
         {activeTab === 'posts' ? (
           <div className="space-y-4">
+            {/* 검색바 */}
             <div className="relative">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" placeholder="제목 또는 작성자 검색..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm outline-none shadow-sm focus:border-rose-300 transition-all" />
@@ -212,6 +214,7 @@ export default function AdminCommunity() {
             </div>
           </div>
         ) : (
+          /* 신고 관리 탭 뷰 (카드 형태) */
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {loading ? <div className="col-span-full text-center py-20 text-slate-400 font-bold animate-pulse uppercase tracking-widest">Loading Reports...</div> : (
               reportList.length === 0 ? <div className="col-span-full text-center py-20 text-slate-400 font-bold bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">현재 대기 중인 신고 건이 없습니다.</div> :
@@ -226,6 +229,7 @@ export default function AdminCommunity() {
                     </div>
                     <span className="text-[9px] bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg font-black uppercase tracking-tighter">PENDING</span>
                   </div>
+                  {/* 신고 사유 섹션 */}
                   <div className="bg-slate-50 p-4 rounded-2xl mb-5 border border-slate-100">
                     <p className="text-[10px] text-slate-400 font-black mb-1.5 flex items-center gap-1 uppercase tracking-wider"><AlertCircle size={12}/> Reason</p>
                     <p className="text-xs text-slate-700 font-bold leading-relaxed">{report.reason}</p>
