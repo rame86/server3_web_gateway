@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ShoppingBag, Search, Filter, Star, Heart, ShoppingCart, Tag, Loader2, Package, Plus, Image as ImageIcon } from 'lucide-react';
+import { ShoppingBag, Search, Filter, Star, Heart, ShoppingCart, Tag, Loader2, Package, Plus, Image as ImageIcon, Users } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
@@ -136,18 +136,27 @@ export default function UserStore() {
     const category = e.target.category.value;
     const price = e.target.price.value;
     const description = e.target.description.value;
+    const artistId = e.target.artistId.value;
+    const stockQuantity = parseInt(e.target.stockQuantity.value || '0', 10);
+
+    if (!artistId) {
+      toast.error('아티스트를 선택해주세요.');
+      return;
+    }
 
     try {
-      const isOfficial = category === 'OFFICIAL';
-      const endpoint = isOfficial ? '/product/official' :
+      const endpoint = category === 'OFFICIAL' ? '/product/official' :
         category === 'SECONDHAND' ? '/product/secondhand' : '/product/unofficial';
+      const requesterName = localStorage.getItem('username') || (userRole === 'ARTIST' ? '아티스트' : '일반유저');
 
       const formData = new FormData();
       formData.append('goodsName', title);
       formData.append('price', parseFloat(price));
       formData.append('description', description);
       formData.append('goodsType', category);
-      formData.append('requesterName', userRole === 'ARTIST' ? '아티스트' : '일반유저');
+      formData.append('requesterName', requesterName);
+      formData.append('artistId', artistId);
+      formData.append('stockQuantity', stockQuantity);
       if (imageFile) {
         formData.append('imageFile', imageFile);
       }
@@ -156,11 +165,10 @@ export default function UserStore() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      toast.success('굿즈 등록 요청이 완료되었습니다.');
+      toast.success('굿즈 등록 요청이 완료되었습니다. 관리자 승인 후 게시됩니다.');
       setIsAdding(false);
       setImageFile(null);
       setImagePreview(null);
-      // 등록 후 목록 새로고침 가능
     } catch (error) {
       console.error(error);
       toast.error('등록 요청에 실패했습니다.');
@@ -338,6 +346,41 @@ export default function UserStore() {
                   <Label htmlFor="description">상품 설명</Label>
                   <Textarea id="description" placeholder="상세 설명을 적어주세요" className="rounded-xl border-rose-100 min-h-[100px]" />
                 </div>
+
+                {/* 아티스트 선택 */}
+                <div className="space-y-2">
+                  <Label htmlFor="artistId" className="flex items-center gap-1.5">
+                    <Users size={14} className="text-rose-400" />
+                    아티스트 선택 *
+                  </Label>
+                  <select
+                    id="artistId"
+                    required
+                    className="w-full h-10 px-3 bg-white border border-rose-100 rounded-xl text-sm focus:ring-2 focus:ring-rose-300 focus:outline-none"
+                  >
+                    <option value="">-- 아티스트를 선택하세요 --</option>
+                    {dbArtists.map((artist) => (
+                      <option key={artist.artistId} value={artist.artistId}>
+                        {artist.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 판매 수량 */}
+                <div className="space-y-2">
+                  <Label htmlFor="stockQuantity">판매 수량</Label>
+                  <Input
+                    id="stockQuantity"
+                    type="number"
+                    min="0"
+                    defaultValue="0"
+                    placeholder="0"
+                    required
+                    className="rounded-xl border-rose-100"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label>상품 이미지</Label>
                   <label htmlFor="imageFile" className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-rose-200 rounded-2xl cursor-pointer bg-rose-50 hover:bg-rose-100 transition-colors relative overflow-hidden">
