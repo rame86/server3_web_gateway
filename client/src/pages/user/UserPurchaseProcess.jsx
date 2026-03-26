@@ -18,13 +18,15 @@ export default function UserPurchaseProcess() {
     const params = useParams();
     const productId = params.id;
     const [item, setItem] = useState(null);
+    const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [step, setStep] = useState(1);
     
-    // Extract quantity from URL query params
+    // Check if we are checking out from cart
     const queryParams = new URLSearchParams(window.location.search);
+    const isFromCart = queryParams.get('fromCart') === 'true';
     const initialQty = parseInt(queryParams.get('qty') || '1', 10);
-    const [quantity, setQuantity] = useState(initialQty);
+    const [singleQuantity, setSingleQuantity] = useState(initialQty);
     
     const [userPoints, setUserPoints] = useState(0);
     const [isPayConfirmOpen, setIsPayConfirmOpen] = useState(false);
@@ -40,36 +42,60 @@ export default function UserPurchaseProcess() {
     };
 
     useEffect(() => {
-        const fetchProduct = async () => {
+        const loadCheckoutData = async () => {
             try {
                 setLoading(true);
-                const response = await shopApi.get(`shop/detail/${productId}`);
-                let data = response.data;
-                if (data && data.data) data = data.data; // Handle potential API wrappers
-                
-                const mappedItem = {
-                    id: data.productId || data.id,
-                    name: data.title || data.name || '알 수 없는 상품',
-                    artistId: data.artistId,
-                    artistName: data.sellerType === 'ARTIST' ? '아티스트' : (data.artistName || '유저'),
-                    price: data.basePrice || data.price || 0,
-                    image: data.imageUrl || '',
-                    stock: 100, // Placeholder
-                };
-                setItem(mappedItem);
+                if (isFromCart) {
+                    // 장바구니 데이터 불러오기
+                    const res = await shopApi.get('/shop/cart');
+                    const cartData = res.data;
+                    if (cartData && cartData.items && cartData.items.length > 0) {
+                        const mappedItems = cartData.items.map(item => ({
+                            id: item.productId,
+                            variantId: item.productId, // 이 예제에서는 productId를 variantId처럼 사용
+                            name: item.title,
+                            artistId: null, // 장바구니 DTO에는 없을 수 있음
+                            artistName: '아티스트', // 장바구니 DTO에는 없을 수 있음
+                            price: item.unitPrice,
+                            image: item.imageUrl,
+                            quantity: item.quantity,
+                            stock: 100
+                        }));
+                        setItems(mappedItems);
+                    } else {
+                        toast.error('장바구니가 비어 있습니다.');
+                        setLocation('/user/store');
+                    }
+                } else if (productId && productId !== 'cart') {
+                    // 단일 상품 데이터 불러오기
+                    const response = await shopApi.get(`shop/detail/${productId}`);
+                    let data = response.data;
+                    if (data && data.data) data = data.data; // Handle potential API wrappers
+                    
+                    const mappedItem = {
+                        id: data.productId || data.id,
+                        variantId: data.productId || data.id, // 이 예제에서는 productId를 variantId처럼 사용
+                        name: data.title || data.name || '알 수 없는 상품',
+                        artistId: data.artistId,
+                        artistName: data.sellerType === 'ARTIST' ? '아티스트' : (data.artistName || '유저'),
+                        price: data.basePrice || data.price || 0,
+                        image: data.imageUrl || '',
+                        quantity: singleQuantity,
+                        stock: 100, // Placeholder
+                    };
+                    setItems([mappedItem]);
+                }
             } catch (error) {
-                console.error('Failed to fetch product:', error);
+                console.error('Failed to load checkout data:', error);
                 toast.error('상품 정보를 가져오는 데 실패했습니다.');
             } finally {
                 setLoading(false);
             }
         };
 
-        if (productId) {
-            fetchProduct();
-            fetchUserPoints();
-        }
-    }, [productId]);
+        loadCheckoutData();
+        fetchUserPoints();
+    }, [productId, isFromCart]);
 
     if (loading) {
         return (
@@ -82,23 +108,31 @@ export default function UserPurchaseProcess() {
         );
     }
 
-    if (!item) {
+    if (items.length === 0) {
         return (
             <Layout role="user">
                 <div className="text-center py-20">
-                    <p className="text-muted-foreground">상품을 찾을 수 없습니다.</p>
+                    <p className="text-muted-foreground">결제할 상품이 없습니다.</p>
                     <button onClick={() => setLocation('/user/store')} className="mt-4 text-rose-500 font-medium">스토어로 돌아가기</button>
                 </div>
             </Layout>
         );
     }
 
-    const totalPrice = item.price * quantity;
-    const grandTotal = totalPrice + (totalPrice >= 50000 || totalPrice === 0 ? 0 : deliveryFee);
+    // 단일 상품 결제일 경우, quantity 상태 동기화 처리
+    const totalItemsPrice = isFromCart 
+        ? items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+        : items[0].price * singleQuantity;
+
+    const totalQuantity = isFromCart 
+        ? items.reduce((sum, item) => sum + item.quantity, 0)
+        : singleQuantity;
+
+    const grandTotal = totalItemsPrice + (totalItemsPrice >= 50000 || totalItemsPrice === 0 ? 0 : deliveryFee);
     const isEnoughPoints = userPoints >= grandTotal;
 
     const handleNext = () => {
-        if (step === 1 && quantity > 0) setStep(2);
+        if (step === 1 && totalQuantity > 0) setStep(2);
         else if (step === 2 && isEnoughPoints) setStep(3);
     };
 
@@ -122,14 +156,14 @@ export default function UserPurchaseProcess() {
                 {/* Header */}
                 <div className="flex items-center gap-3 border-b border-rose-100 pb-4">
                     <button
-                        onClick={() => step > 1 ? setStep(step - 1) : setLocation(`/user/store/${item.id}`)}
+                        onClick={() => step > 1 ? setStep(step - 1) : setLocation(isFromCart ? '/user/store/cart' : `/user/store/${items[0].id}`)}
                         className="p-2 -ml-2 text-muted-foreground hover:bg-rose-50 rounded-full transition-colors"
                     >
                         <ChevronLeft size={20} />
                     </button>
                     <div>
                         <h1 className="text-xl font-bold" style={{ fontFamily: "'Playfair Display', serif" }}>주문 진행</h1>
-                        <p className="text-sm text-muted-foreground line-clamp-1">{item.name}</p>
+                        <p className="text-sm text-muted-foreground line-clamp-1">{isFromCart ? `장바구니 상품 ${items.length}건` : items[0]?.name}</p>
                     </div>
                 </div>
 
@@ -163,37 +197,48 @@ export default function UserPurchaseProcess() {
                         <div className="glass-card p-6 rounded-3xl soft-shadow space-y-4">
                             <h2 className="font-bold text-lg mb-4">주문 상품 정보</h2>
 
-                            <div className="flex gap-4 bg-white p-4 rounded-2xl border border-rose-50">
-                                <img src={item.image} alt={item.name} className="w-20 h-20 rounded-xl object-cover" />
-                                <div className="flex-1">
-                                    <p className="text-xs text-rose-500 font-bold mb-1">{item.artistName}</p>
-                                    <p className="font-semibold text-sm line-clamp-2">{item.name}</p>
-                                    <p className="font-bold mt-2">{formatPrice(item.price)}</p>
-                                </div>
+                            <div className="space-y-3">
+                                {items.map((item, idx) => (
+                                    <div key={idx} className="flex gap-4 bg-white p-4 rounded-2xl border border-rose-50">
+                                        <img src={item.image} alt={item.name} className="w-20 h-20 rounded-xl object-cover" />
+                                        <div className="flex-1 flex flex-col justify-between">
+                                            <div>
+                                                <p className="text-xs text-rose-500 font-bold mb-1">{item.artistName}</p>
+                                                <p className="font-semibold text-sm line-clamp-2">{item.name}</p>
+                                            </div>
+                                            <div className="flex items-center justify-between mt-2">
+                                                <p className="font-bold">{formatPrice(item.price)}</p>
+                                                <div className="text-sm text-muted-foreground">수량: {isFromCart ? item.quantity : singleQuantity}개</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
 
-                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                                <span className="font-medium text-muted-foreground">수량</span>
-                                <div className="flex items-center gap-4 bg-white rounded-xl p-1 shadow-sm border border-gray-200">
-                                    <button
-                                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                                        className="w-8 h-8 flex items-center justify-center bg-white rounded-lg hover:bg-gray-100 text-gray-600"
-                                    >
-                                        -
-                                    </button>
-                                    <span className="font-bold w-6 text-center">{quantity}</span>
-                                    <button
-                                        onClick={() => setQuantity(Math.min(10, Math.min(item.stock || 100, quantity + 1)))}
-                                        className="w-8 h-8 flex items-center justify-center bg-white rounded-lg hover:bg-gray-100 text-gray-600"
-                                    >
-                                        +
-                                    </button>
+                            {!isFromCart && (
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                                    <span className="font-medium text-muted-foreground">수량</span>
+                                    <div className="flex items-center gap-4 bg-white rounded-xl p-1 shadow-sm border border-gray-200">
+                                        <button
+                                            onClick={() => setSingleQuantity(Math.max(1, singleQuantity - 1))}
+                                            className="w-8 h-8 flex items-center justify-center bg-white rounded-lg hover:bg-gray-100 text-gray-600"
+                                        >
+                                            -
+                                        </button>
+                                        <span className="font-bold w-6 text-center">{singleQuantity}</span>
+                                        <button
+                                            onClick={() => setSingleQuantity(Math.min(10, Math.min(items[0].stock || 100, singleQuantity + 1)))}
+                                            className="w-8 h-8 flex items-center justify-center bg-white rounded-lg hover:bg-gray-100 text-gray-600"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                            
-                            <div className="flex justify-between items-center p-4 bg-rose-50 rounded-2xl">
+                            )}
+
+                            <div className="flex justify-between items-center p-4 bg-rose-50 rounded-2xl mt-4">
                                 <span className="font-medium text-muted-foreground">총 주문 금액 (배송비 제외)</span>
-                                <span className="text-xl font-bold text-rose-600">{formatPrice(totalPrice)}</span>
+                                <span className="text-xl font-bold text-rose-600">{formatPrice(totalItemsPrice)}</span>
                             </div>
                         </div>
 
@@ -241,10 +286,10 @@ export default function UserPurchaseProcess() {
 
                         <div className="glass-card p-6 rounded-3xl soft-shadow space-y-3">
                             <h3 className="font-semibold text-sm text-muted-foreground mb-4">결제 요약</h3>
-                            <div className="flex justify-between text-sm"><span>상품 금액</span> <span>{formatPrice(totalPrice)}</span></div>
+                            <div className="flex justify-between text-sm"><span>상품 금액</span> <span>{formatPrice(totalItemsPrice)}</span></div>
                             <div className="flex justify-between text-sm">
                                 <span>배송비</span>
-                                <span>{totalPrice >= 50000 ? '무료' : formatPrice(deliveryFee)}</span>
+                                <span>{totalItemsPrice >= 50000 ? '무료' : formatPrice(deliveryFee)}</span>
                             </div>
                             <div className="flex justify-between text-lg font-bold pt-3 border-t border-rose-100 mt-2 text-rose-600">
                                 <span>총 차감 포인트</span>
@@ -253,7 +298,38 @@ export default function UserPurchaseProcess() {
                         </div>
 
                         <button
-                            onClick={() => setIsPayConfirmOpen(true)}
+                            onClick={async () => {
+                                toast.loading('포인트 결제가 진행 중입니다...');
+                                try {
+                                    if (isFromCart) {
+                                        // 장바구니 결제: /shop/order 호출 (다중 아이템)
+                                        const orderItems = items.map(i => ({ variantId: i.variantId.toString(), quantity: i.quantity }));
+                                        await shopApi.post('/shop/order', {
+                                            shippingAddress: '기본 배송지 (체크아웃)',
+                                            items: orderItems,
+                                            shippingFee: totalItemsPrice >= 50000 ? 0 : deliveryFee,
+                                            totalAmount: grandTotal
+                                        });
+                                        
+                                        // 장바구니 비우기 호출 (각각 삭제)
+                                        const res = await shopApi.get('/shop/cart');
+                                        const cartData = res.data;
+                                        if (cartData && cartData.items) {
+                                            for (const cItem of cartData.items) {
+                                                await shopApi.delete(`/shop/cart/${cItem.cartItemId}`);
+                                            }
+                                        }
+                                    } else {
+                                        // 단일 결제: /shop/checkout 호출
+                                        await shopApi.post('/shop/checkout', { productId: items[0].id, quantity: singleQuantity, usePoint: grandTotal });
+                                    }
+                                    toast.dismiss();
+                                    handleNext();
+                                } catch (error) {
+                                    toast.dismiss();
+                                    toast.error('결제에 실패했습니다. (같은 아티스트 상품만 담았는지 확인해 주세요)');
+                                }
+                            }}
                             disabled={!isEnoughPoints}
                             className="w-full py-4 btn-primary-gradient text-white rounded-2xl font-bold shadow-lg disabled:opacity-50 disabled:grayscale transition-all hover:scale-[1.02]"
                         >
@@ -280,8 +356,13 @@ export default function UserPurchaseProcess() {
                                 <span className="font-bold text-rose-500 tracking-widest font-mono">ORDER ID: {Math.floor(Math.random() * 10000) + 90000}</span>
                             </div>
                             <div className="space-y-2 text-sm">
-                                <div className="flex justify-between"><span className="text-muted-foreground">상품명</span> <span className="font-semibold line-clamp-1 flex-1 text-right ml-4">{item.name}</span></div>
-                                <div className="flex justify-between"><span className="text-muted-foreground">구입수량</span> <span className="font-semibold">{quantity}개</span></div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">상품명</span>
+                                    <span className="font-semibold line-clamp-1 flex-1 text-right ml-4">
+                                        {isFromCart ? `${items[0]?.name} 외 ${items.length - 1}건` : items[0]?.name}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between"><span className="text-muted-foreground">총 구입수량</span> <span className="font-semibold">{totalQuantity}개</span></div>
                                 <div className="flex justify-between"><span className="text-muted-foreground">사용 포인트</span> <span className="font-semibold text-rose-500">{formatPrice(grandTotal).replace('원', 'P')}</span></div>
                             </div>
                         </div>
