@@ -41,6 +41,7 @@ export default function ArtistSettlement() {
       try {
         setIsLoading(true);
         const response = await payApi.get('/artist/settlement');
+        console.log("서버 데이터 확인:", response.data);
         setData(response.data);
       } catch (error) {
         toast.error('정산 데이터를 불러오는데 실패했습니다.');
@@ -53,9 +54,37 @@ export default function ArtistSettlement() {
     fetchSettlementData();
   }, []);
 
+  // 🌟 핵심 기능 1: 정산 내역 CSV 다운로드
+  const handleDownload = () => {
+    if (!data.settlements || data.settlements.length === 0) {
+      toast.error('다운로드할 내역이 없습니다.');
+      return;
+    }
+
+    const headers = ['정산기간,정산일,금액,상태\n'];
+    const rows = data.settlements.map(s => 
+      `${s.period},${s.date || '미정'},${s.amount},${s.status}`
+    ).join('\n');
+    
+    const blob = new Blob(['\ufeff' + headers + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Settlement_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('정산 내역 다운로드가 완료되었습니다.');
+  };
+
+  // 수익 구성 데이터 가공 (퍼센트 계산 로직 추가)
+  const totalRevenue = data.revenueComposition?.reduce((sum, item) => sum + (item.amount || 0), 0) || 1;
+
   // 수익 구성 데이터에 컬러 추가
   const revenueBreakdown = data.revenueComposition?.map((item, index) => ({
     ...item,
+    // 실제 퍼센트 계산: (내 금액 / 전체 금액) * 100
+    percent: ((item.amount / totalRevenue) * 100).toFixed(1),
     color: item.color || defaultColors[index % defaultColors.length]
   })) || [];
 
@@ -70,7 +99,7 @@ export default function ArtistSettlement() {
             <p className="text-sm text-muted-foreground">굿즈, 이벤트, 후원 수익 정산 현황</p>
           </div>
           <button
-            onClick={() => toast.info('정산 내역 다운로드 기능 준비 중입니다')}
+            onClick={handleDownload}
             className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-rose-600 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors"
           >
             <Download size={14} />
@@ -118,14 +147,16 @@ export default function ArtistSettlement() {
                     <stop offset="95%" stopColor="oklch(0.65 0.18 290)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="yearMonth" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis hide />
                 <Tooltip
                   contentStyle={{ background: 'white', border: '1px solid #fce7f3', borderRadius: '12px', fontSize: '12px' }}
                   formatter={(value) => [`₩${(value / 10000).toFixed(0)}만`, '']}
                 />
-                <Area type="monotone" dataKey="events" stroke="oklch(0.65 0.18 290)" fill="url(#eventsGrad)" strokeWidth={2} name="이벤트" />
-                <Area type="monotone" dataKey="goods" stroke="oklch(0.70 0.18 10)" fill="url(#goodsGrad)" strokeWidth={2} name="굿즈" />
+                {/* Area의 dataKey를 events -> eventRevenue, goods -> goodsRevenue로 변경 확인 */}
+                <Area type="monotone" dataKey="eventRevenue" stroke="oklch(0.65 0.18 290)" fill="url(#eventsGrad)" strokeWidth={2} name="이벤트" />
+                <Area type="monotone" dataKey="goodsRevenue" stroke="oklch(0.70 0.18 10)" fill="url(#goodsGrad)" strokeWidth={2} name="굿즈" />
+                <Area type="monotone" dataKey="donationRevenue" stroke="oklch(0.72 0.15 200)" fill="url(#donationGrad)" strokeWidth={2} name="후원" />
               </AreaChart>
             </ResponsiveContainer>
             <div className="flex items-center gap-4 mt-2 justify-center">
@@ -137,6 +168,10 @@ export default function ArtistSettlement() {
                 <div className="w-3 h-3 rounded-full" style={{ background: 'oklch(0.70 0.18 10)' }} />
                 <span className="text-xs text-muted-foreground">굿즈</span>
               </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full" style={{ background: 'oklch(0.72 0.15 200)' }} />
+                <span className="text-xs text-muted-foreground">후원</span>
+              </div>
             </div>
           </div>
 
@@ -147,9 +182,17 @@ export default function ArtistSettlement() {
             </h2>
             <div className="flex justify-center mb-4">
               <PieChart width={160} height={160}>
-                <Pie data={revenueBreakdown} cx={80} cy={80} innerRadius={50} outerRadius={75} dataKey="value" paddingAngle={3}>
+                {/* Pie의 dataKey를 value -> amount로 변경 확인 */}
+                <Pie 
+                  data={revenueBreakdown} 
+                  dataKey="amount" // 🌟 value 대신 실제 금액 키값 사용
+                  nameKey="type" 
+                  innerRadius={50} 
+                  outerRadius={75} 
+                  paddingAngle={3}
+                >
                   {revenueBreakdown.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
+                    <Cell key={index} fill={entry.color} stroke="none" />
                   ))}
                 </Pie>
               </PieChart>
@@ -159,10 +202,10 @@ export default function ArtistSettlement() {
                 <div key={i} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full" style={{ background: item.color }} />
-                    <span className="text-xs text-muted-foreground">{item.name}</span>
+                    <span className="text-xs text-muted-foreground">{item.type}</span>
                   </div>
-                  <span className="text-xs font-bold text-foreground">{item.value}%</span>
-                </div>
+<span className="text-xs font-bold text-foreground">{item.percent}%</span>                
+</div>
               ))}
             </div>
           </div>

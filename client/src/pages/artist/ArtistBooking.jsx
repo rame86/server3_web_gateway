@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { Calendar, Plus, Search, MapPin, Users, Ticket, Clock, Check, X, MoreVertical, Image as ImageIcon, Sparkles, Map, MessageSquareX } from 'lucide-react';
 import { events, formatPrice, eventTypeLabel, eventTypeBadgeClass } from '@/lib/data';
 import { toast } from 'sonner';
-import { resApi } from '@/lib/api'; // 🌟 백엔드 통신을 위한 API 추가
+import { resApi, adminApi } from '@/lib/api'; // 🌟 백엔드 통신을 위한 API 추가
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -190,6 +190,24 @@ const fetchMyEvents = async () => {
       toast.dismiss();
       console.error('다운로드 에러:', error);
       toast.error('명단 다운로드에 실패했습니다.');
+    }
+  };
+
+  // 🌟 [수정] 상세 보기 클릭 시 처리 함수
+  const handleOpenDetail = async (event) => {
+    setSelectedEvent(event);
+    setBookingStart(toLocalDatetime(event.bookingStartDate));
+    setBookingEnd(toLocalDatetime(event.bookingEndDate));
+    
+    // 루미나 공연장일 때만 실시간 예매 좌석 가져오기
+    if (event.location?.includes('루미나')) {
+      try {
+        const res = await resApi.get(`/events/${event.eventId || event.approvalId}`);
+        setReservedSeats(res.data.reservedSeats || []);
+      } catch (err) {
+        console.error("좌석 정보 로드 실패:", err);
+        setReservedSeats([]);
+      }
     }
   };
 
@@ -524,29 +542,25 @@ const fetchMyEvents = async () => {
       {/* 🌟 실시간 좌석 현황 모달 (Dialog) */}
       <Dialog open={!!selectedManageEvent} onOpenChange={() => {
         setSelectedManageEvent(null);
-        setReservedSeats([]); // ✅ 추가
+        setReservedSeats([]);
       }}>
         <DialogContent className="sm:max-w-[600px] rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
           {(() => {
-            // 1. 🔍 데이터 정밀 판별 (대소문자, 공백 무시)
             const rawStatus = (selectedManageEvent?.approval_status || selectedManageEvent?.status || 'PENDING').toString().trim().toUpperCase();
-            
-            // 2. 🚦 상태값 확정
             const isConfirmed = rawStatus === 'CONFIRMED';
             const isFailed = rawStatus === 'FAILED' || rawStatus === 'REJECTED';
             
-            // 3. 📊 수치 계산 (데이터 필드명 유연하게 대응)
             const total = selectedManageEvent?.total_capacity || selectedManageEvent?.totalCapacity || 0;
             const available = selectedManageEvent?.available_seats || selectedManageEvent?.availableSeats || selectedManageEvent?.stock || 0;
             const reservedCount = total - available;
 
-            // 콘솔에서 데이터 확인 (F12 눌러서 확인해봐!)
-            console.log("현재 모달 데이터:", selectedManageEvent);
-            console.log("판별된 상태:", rawStatus);
-
+            // 🌟 여기서 변수를 정의해줘야 에러가 안 나!
+            const venueName = selectedManageEvent?.venue || 
+                      selectedManageEvent?.location || 
+                      selectedManageEvent?.event_locations?.venue || 
+                      "";
             return (
               <>
-                {/* 헤더: 상태에 따라 색상 변경 (승인이면 Teal, 그 외엔 Rose) */}
                 <DialogHeader className={cn(
                   "p-6 text-white transition-colors duration-300",
                   isConfirmed ? "bg-teal-600" : "bg-rose-600"
@@ -565,7 +579,7 @@ const fetchMyEvents = async () => {
 
                 <div className="p-8 bg-white min-h-[300px] flex flex-col justify-center">
                   {isConfirmed ? (
-                    /* ✅ [승인 완료] 좌석표 모드 */
+                    /* ✅ [승인 완료] 상태 */
                     <div className="space-y-6 animate-in fade-in zoom-in duration-300">
                       <div className="flex justify-around items-center bg-slate-50 p-5 rounded-2xl border border-slate-100 shadow-inner">
                         <div className="text-center">
@@ -584,21 +598,41 @@ const fetchMyEvents = async () => {
                         </div>
                       </div>
 
-                      <div className="bg-slate-50 rounded-[2rem] border border-dashed border-slate-200 p-6 flex justify-center items-center overflow-auto max-h-[400px] custom-scrollbar">
-                        <div className="transform scale-90 origin-center">
-                          <SeatSelection 
-                            {...getSeatLayoutConfig(total, selectedManageEvent?.venue || selectedManageEvent?.location)} 
-                            ticketCount={0} 
-                            reservedSeats={reservedSeats}
-                            onSeatSelect={() => {}} 
-                          />
+                      {/* 🌟 핵심: 루미나 공연장 여부 체크 */}
+                      {venueName.includes('루미나') ? (
+                        <>
+                          <div className="bg-slate-50 rounded-[2rem] border border-dashed border-slate-200 p-6 flex flex-col items-center overflow-auto max-h-[400px] custom-scrollbar">
+                            <div className="mb-4 px-3 py-1 bg-white border border-teal-200 text-teal-600 text-[10px] font-bold rounded-full uppercase">STAGE</div>
+                            {/* 🌟 pointer-events-none으로 클릭 방지, reservedSeats로 예매된 좌석 표시 */}
+                            <div className="transform scale-90 origin-center pointer-events-none select-none">
+                              <SeatSelection 
+                                {...getSeatLayoutConfig(total, venueName)} 
+                                ticketCount={0} 
+                                reservedSeats={reservedSeats}
+                                onSeatSelect={() => {}} 
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-6 justify-center text-[11px] text-gray-400 font-bold">
+                            <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-white border border-gray-300 rounded-sm"></div> 빈 좌석</span>
+                            <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-gray-800 rounded-sm"></div> 예매 완료</span>
+                          </div>
+                        </>
+                      ) : (
+                        /* 🌟 외부 공연장 안내 UI */
+                        <div className="bg-slate-50 rounded-[2rem] border border-slate-100 p-10 text-center space-y-4">
+                          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm border border-slate-100">
+                            <MapPin size={32} className="text-slate-300" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-700">외부 공연장 모니터링</h4>
+                            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                              해당 공연장은 외부 시설로 실시간 좌석 배치도를 지원하지 않습니다.<br/>
+                              정확한 현황은 예매 명단을 통해 확인해 주세요.
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex gap-6 justify-center text-[11px] text-gray-400 font-bold">
-                        <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-white border border-gray-300 rounded-sm"></div> 빈 좌석</span>
-                        <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-gray-800 rounded-sm"></div> 예매 완료</span>
-                      </div>
+                      )}
                     </div>
                   ) : (
                     /* ❌ [반려됨 또는 대기] 사유 안내 모드 */
@@ -614,21 +648,10 @@ const fetchMyEvents = async () => {
                       </h4>
                       <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-slate-600 text-sm leading-relaxed whitespace-pre-wrap font-medium">
                         {isFailed 
-                          ? (
-                              // 🌟 Prisma 관계명을 통해 들어온 반려 사유를 먼저 확인
-                              selectedManageEvent?.event_approvals_events_approval_idToevent_approvals?.rejection_reason || 
-                              selectedManageEvent?.rejection_reason || 
-                              selectedManageEvent?.rejectionReason || 
-                              "상세 반려 사유가 등록되지 않았습니다."
-                            )
+                          ? (selectedManageEvent?.event_approvals_events_approval_idToevent_approvals?.rejection_reason || "상세 반려 사유가 등록되지 않았습니다.")
                           : "승인이 완료되면 실시간 좌석 현황을 모니터링할 수 있습니다."
                         }
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-4">
-                        현재 상태: <span className="font-bold text-rose-500">
-                          {statusMap[rawStatus]?.label || rawStatus}
-                        </span>
-                      </p>
                     </div>
                   )}
                 </div>
