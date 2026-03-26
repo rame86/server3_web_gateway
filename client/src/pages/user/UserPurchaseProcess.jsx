@@ -50,7 +50,7 @@ export default function UserPurchaseProcess() {
                 const mappedItem = {
                     id: data.productId || data.id,
                     name: data.title || data.name || '알 수 없는 상품',
-                    artistId: data.sellerId,
+                    artistId: data.artistId,
                     artistName: data.sellerType === 'ARTIST' ? '아티스트' : (data.artistName || '유저'),
                     price: data.basePrice || data.price || 0,
                     image: data.imageUrl || '',
