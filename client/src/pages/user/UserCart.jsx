@@ -150,10 +150,11 @@ export default function UserCart() {
             {/* Checkout */}
             <button
               onClick={() => {
-                if (items.length === 1) {
-                  setLocation(`/user/store/purchase/${items[0].productId}?qty=${items[0].quantity}`);
+                if (items.length > 0) {
+                  // Pass a special flag 'cart=true' to indicate this is a cart checkout
+                  setLocation(`/user/store/purchase/cart?fromCart=true`);
                 } else {
-                  toast.info('현재 다중 상품 결제는 개별 상품 페이지에서 바로 구매로 진행해 주세요.');
+                  toast.info('장바구니에 상품이 없습니다.');
                 }
               }}
               className="w-full py-4 btn-primary-gradient text-white rounded-2xl font-bold shadow-md hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
