@@ -4,6 +4,7 @@ import Layout from '@/components/Layout';
 import { ArrowLeft, Send, Paperclip, X, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
+// API 게이트웨이 및 서비스별 기본 URL 설정
 const API_GATEWAY = import.meta.env.VITE_API_GATEWAY_URL;
 const API_BASE_URL = `${API_GATEWAY}/msa/core/board`;
 const ARTIST_API_URL = `${API_GATEWAY}/msa/core/artist`; // 아티스트 정보용
@@ -22,7 +23,7 @@ export default function UserCommunityWrite() {
     artistId: '' // 사용자가 선택할 ID
   });
 
-  // 1. 컴포넌트 마운트 시 팔로우한 아티스트 목록 로드
+  // 1. 컴포넌트 마운트 시 팔로우한 아티스트 목록 초기 로드
   useEffect(() => {
   const fetchMyFandoms = async () => {
     try {
@@ -41,6 +42,7 @@ export default function UserCommunityWrite() {
         console.log("받아온 팬덤 데이터:", data); // 데이터가 잘 오는지 콘솔로 확인!
         setFollowedArtists(data);
         
+        // 데이터가 존재할 경우 첫 번째 아티스트를 기본 선택값으로 설정
         if (data && data.length > 0) {
           // 첫 번째 항목 자동 선택 (ID가 숫자형태면 문자열로 변환 권장)
           setFormData(prev => ({ ...prev, artistId: data[0].artistId.toString() }));
@@ -58,15 +60,16 @@ export default function UserCommunityWrite() {
       toast.error("가입된 팬덤 정보를 불러오지 못했습니다.");
     }
   };
-
   fetchMyFandoms();
 }, [setLocation]);
 
+  // 입력값 변경 핸들러 (제목, 내용, 카테고리, 아티스트 선택)
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // 파일 선택 핸들러 : 용량 제한(10MB) 체크 포함
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -78,6 +81,7 @@ export default function UserCommunityWrite() {
     }
   };
 
+  // 선택된 파일 제거
   const removeFile = () => {
     setSelectedFile(null);
     if (fileInputRef.current) {
@@ -85,9 +89,11 @@ export default function UserCommunityWrite() {
     }
   };
 
+  //최종 게시글 등록 함수 (Multipart/form-data 처리)
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // 필수 입력값 검증
     if (!formData.artistId) {
       toast.error("대상 아티스트를 선택해주세요.");
       return;
@@ -104,6 +110,7 @@ export default function UserCommunityWrite() {
       
       const sendData = new FormData();
 
+      // [핵심] JSON 데이터를 Blob으로 만들어 'request'라는 이름으로 추가 (Spring @RequestPart와 대응)
       const requestBlob = new Blob(
         [JSON.stringify({
           title: formData.title,
@@ -116,6 +123,7 @@ export default function UserCommunityWrite() {
       );
       sendData.append('request', requestBlob);
 
+      // 파일이 선택되었다면 'file'이라는 이름으로 추가
       if (selectedFile) {
         sendData.append('file', selectedFile);
       }
@@ -130,6 +138,7 @@ export default function UserCommunityWrite() {
 
       if (response.ok) {
         toast.success("게시글이 성공적으로 등록되었습니다!");
+        // 등록 후 해당 아티스트 페이지로 이동
         setLocation(`/user/artists/${formData.artistId}`);
       } else {
         const errorData = await response.json();
@@ -146,6 +155,7 @@ export default function UserCommunityWrite() {
   return (
     <Layout role="user">
       <div className="max-w-4xl mx-auto p-6 space-y-6">
+        {/* 뒤로 가기 버튼 */}
         <button
           onClick={() => setLocation('/user/community')}
           className="flex items-center gap-2 text-sm text-gray-500 hover:text-rose-500 transition-all font-bold group"
@@ -153,6 +163,7 @@ export default function UserCommunityWrite() {
           <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> 돌아가기
         </button>
 
+      {/* 작성 폼 컨테이너 */}
         <div className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-rose-50">
           <h1 className="text-2xl font-black text-gray-900 mb-8">새 게시글 작성</h1>
 
@@ -179,7 +190,7 @@ export default function UserCommunityWrite() {
                   )}
                 </select>
               </div>
-
+              {/* 카테고리 선택 셀렉트 박스 */}
               <div>
                 <label className="block text-sm font-black text-gray-700 mb-2">카테고리</label>
                 <select
@@ -194,7 +205,7 @@ export default function UserCommunityWrite() {
                 </select>
               </div>
             </div>
-            
+            {/* 제목 입력 */}
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">제목</label>
               <input
@@ -207,7 +218,7 @@ export default function UserCommunityWrite() {
                 required
               />
             </div>
-
+            {/* 본문 입력 */}
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">내용</label>
               <textarea
@@ -220,7 +231,7 @@ export default function UserCommunityWrite() {
                 required
               />
             </div>
-
+            {/* 파일 첨부 섹션 */}
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">파일 첨부</label>
               <div className="flex flex-col gap-3">
@@ -246,7 +257,7 @@ export default function UserCommunityWrite() {
                 )}
               </div>
             </div>
-
+            {/* 제출 버튼 */}
             <div className="pt-4">
               <button
                 type="submit"
