@@ -6,10 +6,10 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { cn } from "@/lib/utils";
-import { Package, Plus, Search, Clock, Check, MoreVertical, Image as ImageIcon, DollarSign, Archive, Users } from 'lucide-react';
+import { Package, Plus, Search, Clock, Check, MoreVertical, Image as ImageIcon, DollarSign, Archive } from 'lucide-react';
 import { goodsItems, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
-import { shopApi, coreApi } from '@/lib/api';
+import { shopApi } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,22 +20,8 @@ export default function ArtistStore() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [isAdding, setIsAdding] = useState(false);
-  const [artistList, setArtistList] = useState([]);
   const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false);
   const [pendingFormData, setPendingFormData] = useState(null);
-
-  // 아티스트 목록 로드
-  useEffect(() => {
-    const fetchArtists = async () => {
-      try {
-        const { data } = await coreApi.get('/artist/list');
-        setArtistList(data || []);
-      } catch (err) {
-        console.error('아티스트 목록 로드 실패:', err);
-      }
-    };
-    fetchArtists();
-  }, []);
 
   // My goods filtering (id 3 is Lee Ha-eun's artistId from data.js)
   const myGoods = goodsItems.filter(item => item.artistId === 3);
@@ -71,11 +57,12 @@ export default function ArtistStore() {
     const itemCategory = e.target.itemCategory.value;
     const price = e.target.price.value;
     const description = e.target.description.value;
-    const artistId = e.target.artistId.value;
+    // 아티스트는 본인 ID를 자동으로 사용
+    const artistId = localStorage.getItem('memberId');
     const stockQuantity = parseInt(e.target.stockQuantity.value || '0', 10);
 
     if (!artistId) {
-      toast.error('아티스트를 선택해주세요.');
+      toast.error('로그인 정보를 확인해주세요.');
       return;
     }
 
@@ -176,26 +163,6 @@ export default function ArtistStore() {
                 <div className="space-y-2">
                   <Label htmlFor="description">상품 설명 (Description)</Label>
                   <Textarea id="description" placeholder="상세 설명을 적어주세요 (Text)" className="rounded-xl border-violet-100 min-h-[100px]" />
-                </div>
-
-                {/* 아티스트 선택 */}
-                <div className="space-y-2">
-                  <Label htmlFor="artistId" className="flex items-center gap-1.5">
-                    <Users size={14} className="text-violet-400" />
-                    아티스트 선택 *
-                  </Label>
-                  <select
-                    id="artistId"
-                    required
-                    className="w-full h-10 px-3 bg-white border border-violet-100 rounded-xl text-sm focus:ring-2 focus:ring-violet-300 focus:outline-none"
-                  >
-                    <option value="">-- 아티스트를 선택하세요 --</option>
-                    {artistList.map((artist) => (
-                      <option key={artist.memberId} value={artist.memberId}>
-                        {artist.stageName}
-                      </option>
-                    ))}
-                  </select>
                 </div>
 
                 {/* 판매 수량 */}
