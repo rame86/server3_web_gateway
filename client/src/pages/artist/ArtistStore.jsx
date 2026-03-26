@@ -29,7 +29,10 @@ export default function ArtistStore() {
     if (activeTab === 'all') return matchesSearch;
     const categoryMap = {
       official: 'OFFICIAL',
-      unofficial: 'unofficial'
+
+      unofficial: 'UNOFFICIAL',
+      secondhand: 'SECONDHAND'
+
     };
     return matchesSearch && (item.category === activeTab || item.category === categoryMap[activeTab]);
   });
@@ -111,7 +114,9 @@ export default function ArtistStore() {
                     <Label htmlFor="category">카테고리 (Category)</Label>
                     <select id="category" className="w-full h-10 px-3 bg-white border border-violet-100 rounded-xl text-sm focus:ring-2 focus:ring-violet-300 focus:outline-none">
                       <option value="OFFICIAL">공식 굿즈 (OFFICIAL)</option>
-                      <option value="unofficial">팬메이드 (unofficial)</option>
+
+            <option value="UNOFFICIAL">팬메이드 (UNOFFICIAL)</option>
+
                       <option value="ALBUM">앨범 (ALBUM)</option>
                     </select>
                   </div>

@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import Layout from '@/components/Layout';
-import { Calendar, MapPin, Users, Ticket, Search, Filter, Heart } from 'lucide-react';
+import { Calendar, MapPin, Users, Ticket, Search, Filter, Heart, Sparkles } from 'lucide-react';
 import { formatPrice, eventTypeLabel, eventTypeBadgeClass } from '@/lib/data';
 import { toast } from 'sonner';
 import { resApi } from '@/lib/api';
@@ -340,31 +340,52 @@ export default function UserEvents() {
                             />  
                         </button>
                       </div>
-                      <div className="p-4 flex-1">
-                        <h3 className="font-bold text-foreground mb-2">{event.title}</h3>
-                        <div className="space-y-1.5 mb-3">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar size={14} className="text-rose-400" />
-                            {event.date} {event.time}
+                      <div className="p-4 flex-1 flex flex-col justify-between">
+                        <div>
+                          {/* 🌟 1. 깔끔하고 힙한 가로 배치 (아티스트는 예쁜 태그로, 제목은 굵고 선명하게) */}
+                          <div className="flex items-center gap-2.5 mb-4">
+                            {/* 🌟 아티스트: 반짝이 아이콘 + 그라데이션 텍스트 */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Sparkles size={16} className="text-violet-500" />
+                              <span className="text-[17px] font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-rose-500 tracking-wide">
+                                {event.artistName}
+                              </span>
+                            </div>
+                            
+                            <span className="text-gray-200">|</span>
+                            
+                            {/* 공연 제목 */}
+                            <h3 className="text-[15px] font-bold text-foreground truncate">
+                              {event.title}
+                            </h3>
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <MapPin size={14} className="text-rose-400" />
-                            {event.venue}
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Users size={14} className="text-rose-400" />
-                            잔여석 {event.remaining}석 / {event.capacity}석
+                          
+                          {/* 🌟 2. 상세 정보 (아이콘과 텍스트 정렬) */}
+                          <div className="space-y-1.5 mb-4">
+                            <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                              <Calendar size={14} className="text-rose-400" />
+                              <span className="font-medium">{event.date} {event.time}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                              <MapPin size={14} className="text-rose-400" />
+                              <span className="font-medium truncate">{event.venue}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                              <Users size={14} className="text-rose-400" />
+                              <span className="font-medium">잔여석 {event.remaining}석 / {event.capacity}석</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between">
+                        
+                        {/* 🌟 3. 하단 영역 (선을 하나 그어서 위아래 정보를 깔끔하게 분리) */}
+                        <div className="flex items-end justify-between mt-2 pt-4 border-t border-gray-100">
                           <div>
-                            <span className="text-xl font-bold text-rose-600">{formatPrice(event.price)}</span>
-                            <span className="text-xs text-muted-foreground ml-1">/ 1인</span>
+                            <span className="text-[18px] font-black text-rose-600">{formatPrice(event.price)}</span>
+                            <span className="text-[11px] text-muted-foreground ml-1 font-medium">/ 1인</span>
                           </div>
                           <button
                             onClick={() => setLocation(`/user/events/${event.id}`)}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl btn-primary-gradient shadow-sm">
-
+                            className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white rounded-xl bg-rose-500 hover:bg-rose-600 shadow-sm transition-colors">
                             <Ticket size={14} />
                             예매하기
                           </button>
