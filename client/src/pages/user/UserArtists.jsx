@@ -34,8 +34,12 @@ export default function UserArtists() {
   useEffect(() => {
     const fetchArtists = async () => {
       try {
-        const artistList = await coreApi.get('/artist/list');
-        setArtistList(artistList.data);
+        const [artistRes, followRes] = await Promise.all([
+          coreApi.get('/artist/list'),
+          coreApi.get('/artist/my-follows')
+        ]);
+        setArtistList(artistRes.data);
+        setFollowed(followRes.data.map(item => item.memberId || item)); 
       } catch (err) {
         toast.error("아티스트 목록을 불러오지 못했습니다.");
       }
@@ -57,9 +61,18 @@ export default function UserArtists() {
     }
   };
 
-  const filtered = artistList.filter((a) =>
-    (a.stageName || "").includes(searchQuery) || (a.category || "").includes(searchQuery)
-  );
+  const filtered = artistList
+    .filter((a) =>
+      (a.stageName || "").includes(searchQuery) || (a.category || "").includes(searchQuery)
+    )
+    .sort((a, b) => {
+      // 팔로우한 아티스트를 맨 앞(-1)으로 보내는 정렬 로직
+      const isAFollowed = followed.includes(a.memberId);
+      const isBFollowed = followed.includes(b.memberId);
+      if (isAFollowed && !isBFollowed) return -1;
+      if (!isAFollowed && isBFollowed) return 1;
+      return 0;
+    });
 
   return (
     <Layout role="user">
@@ -91,7 +104,7 @@ export default function UserArtists() {
                 {/* Cover - 🌟 높이 28 복구 */}
                 <div className="relative h-28">
                   <img
-                    src={resolveImageUrl(artist.profileImageUrl)}
+                    src={resolveImageUrl(artist.fandomImage)}
                     className="w-full h-full object-cover" />
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
