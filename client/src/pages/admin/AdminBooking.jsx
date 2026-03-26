@@ -120,10 +120,11 @@ export default function AdminBooking() {
   const handlePublishBooking = async () => {
     if (!bookingStart || !bookingEnd) return toast.error('예매 시작/종료 시간을 설정해주세요.');
     try {
-      await adminApi.post('/admin/event/booking/open', {  // ← 큐 발송 API (백엔드 확인 필요)
+      await adminApi.post('/admin/event/confirm', {  // ← 큐 발송 API (백엔드 확인 필요)
         eventId: selectedEvent.approvalId || selectedEvent.eventId,
-        bookingStartDate: bookingStart,
-        bookingEndDate: bookingEnd,
+        status: 'CONFIRMED',
+        eventStartDate: bookingStart,
+        eventEndDate: bookingEnd,
       });
       toast.success('예매 일정이 발송되었습니다.');
       setSelectedEvent(null);
