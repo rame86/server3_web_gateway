@@ -35,7 +35,7 @@ export default function UserStoreDetail() {
                 image: data.imageUrl,
                 category: data.category === 'OFFICIAL' ? 'official' :
                     data.category === 'UNOFFICIAL' ? 'unofficial' : 'used',
-                stock: 100, // Placeholder
+                stock: data.stockQuantity ?? 0,
                 rating: data.averageRating || 0.0,
                 reviewCount: data.reviewCount || 0,
                 badge: data.category === 'OFFICIAL' ? 'OFFICIAL' : null
