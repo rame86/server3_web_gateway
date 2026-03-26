@@ -3,7 +3,7 @@ import Layout from '@/components/Layout';
 import { Calendar, Check, X, Eye, Clock, MapPin, Users, Ticket, MessageSquareX } from 'lucide-react';
 import { formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
-import { adminApi } from '@/lib/api';
+import { resApi, adminApi } from '@/lib/api';
 
 // 🌟 네가 만든 좌석표 컴포넌트 불러오기 (경로는 네 폴더 구조에 맞게 수정해!)
 import SeatSelection from '../user/UserBookingSeatSelection'; 
@@ -29,6 +29,8 @@ export default function AdminBooking() {
 
   const [rejectingEvent, setRejectingEvent] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
+
+  const [reservedSeats, setReservedSeats] = useState([]); // 🌟 예매된 좌석 보관용
 
   // 🌟 [추가] 게이트웨이 주소 설정 (포트 강제 주입 로직)
   const rawUrl = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost';
@@ -231,10 +233,35 @@ export default function AdminBooking() {
                               {event.createdAt ? new Date(event.createdAt).toLocaleDateString() : 'N/A'}
                             </div>
                             <button 
-                              onClick={() => {                               
+                              onClick={async () => {                               
                                 setBookingStart(''); 
                                 setBookingEnd('');
                                 setSelectedEvent(event);
+
+                                // 1. 루미나 전용관인지 판별
+                                const isLumina = event.location?.includes('루미나') || 
+                                                event.location?.toLowerCase().includes('lumina') || 
+                                                [50, 100, 200].includes(Number(event.totalCapacity));
+
+                                // 🌟 핵심: 어드민 API에서 내려주는 targetId가 실제 eventId!
+                                const eventId = event.targetId;
+
+                                // 2. 루미나 공연장이면서, 실제 이벤트 ID(targetId)가 있을 때만 좌석 조회
+                                if (isLumina && eventId) {
+                                  try {
+                                    // 🌟 찾아낸 targetId를 파라미터로 쏴주기
+                                    const res = await resApi.get(`/reserveSeat/${eventId}`);
+                                    
+                                    // 백엔드에서 내려준 예매된 좌석 배열 세팅
+                                    setReservedSeats(res.data.reservedSeats || []);
+                                  } catch (err) {
+                                    console.error('좌석 조회 실패:', err);
+                                    setReservedSeats([]);
+                                  }
+                                } else {
+                                  // 이벤트 ID가 없거나 외부 공연장이면 빈 배열 처리
+                                  setReservedSeats([]);
+                                }
                               }}
                               className="p-2 bg-slate-100 hover:bg-amber-100 text-amber-600 rounded-xl transition-all shadow-sm"
                               title="상세보기 및 시간 설정"
@@ -322,11 +349,36 @@ export default function AdminBooking() {
 
                     {/* 🌟 눈 모양 아이콘: 상태 뱃지 바로 앞으로 이동! */}
                     <button 
-                      onClick={() => {                               
+                      onClick={ async () => {                               
                         // 💡 주의: 파일 윗부분에 toLocalDatetime 함수가 꼭 있어야 해!
                         setBookingStart(toLocalDatetime(event.bookingStartDate)); 
                         setBookingEnd(toLocalDatetime(event.bookingEndDate));
                         setSelectedEvent(event);
+
+                        // 1. 루미나 전용관인지 판별
+                        const isLumina = event.location?.includes('루미나') || 
+                                        event.location?.toLowerCase().includes('lumina') || 
+                                        [50, 100, 200].includes(Number(event.totalCapacity));
+
+                        // 🌟 핵심: 어드민 API에서 내려주는 targetId가 실제 eventId!
+                        const eventId = event.targetId;
+
+                        // 2. 루미나 공연장이면서, 실제 이벤트 ID(targetId)가 있을 때만 좌석 조회
+                        if (isLumina && eventId) {
+                          try {
+                            // 🌟 찾아낸 targetId를 파라미터로 쏴주기
+                            const res = await resApi.get(`/reserveSeat/${eventId}`);
+                            
+                            // 백엔드에서 내려준 예매된 좌석 배열 세팅
+                            setReservedSeats(res.data.reservedSeats || []);
+                          } catch (err) {
+                            console.error('좌석 조회 실패:', err);
+                            setReservedSeats([]);
+                          }
+                        } else {
+                          // 이벤트 ID가 없거나 외부 공연장이면 빈 배열 처리
+                          setReservedSeats([]);
+                        }
                       }}
                       className="p-2 bg-slate-50 hover:bg-amber-100 text-amber-600 rounded-xl transition-all flex-shrink-0 shadow-sm"
                       title="상세보기"
@@ -412,8 +464,10 @@ export default function AdminBooking() {
                 <h4 className="text-xs font-black text-primary uppercase tracking-[0.2em] ml-1">Seat Layout Plan</h4>
                 <div className="p-6 border-2 border-dashed border-slate-200 rounded-[2.5rem] bg-slate-50/30">
                   
-                  {/* 🌟 '루미나'가 포함된 공연장일 때만 좌석표 노출 */}
-                  {selectedEvent.location?.includes('루미나') ? (
+                  {/* 🌟 수정 1: 판별 로직 강화 (정원이 50, 100, 200이면 무조건 좌석표 노출) */}
+                  {selectedEvent.location?.includes('루미나') || 
+                   selectedEvent.location?.toLowerCase().includes('lumina') || 
+                   [50, 100, 200].includes(Number(selectedEvent.totalCapacity)) ? (
                     <>
                       <div className="flex justify-between items-center mb-4">
                         <span className="text-sm font-bold text-slate-600">공연장: {selectedEvent.location}</span>
@@ -427,7 +481,7 @@ export default function AdminBooking() {
                         <SeatSelection 
                           {...getSeatLayoutConfig(selectedEvent.totalCapacity, selectedEvent.location)} 
                           ticketCount={0} 
-                          reservedSeats={[]} 
+                          reservedSeats={reservedSeats}
                           onSeatSelect={() => {}} 
                         />
                       </div>

@@ -441,7 +441,7 @@ export default function ArtistProfile() {
           </div>
         </div>
       </div>
-{/* 🌟 모달: 아티스트 전환 신청에서 '팬덤 정보 수정'용으로 내용 변경 */}
+      {/* 🌟 모달: 아티스트 전환 신청에서 '팬덤 정보 수정'용으로 내용 변경 */}
       <Dialog open={isUpgradeModalOpen} onOpenChange={setIsUpgradeModalOpen}>
         <DialogContent className="sm:max-w-[460px] rounded-[32px] p-0 overflow-hidden bg-white border-none shadow-2xl">
           <div className="p-8 space-y-6">
@@ -459,7 +459,7 @@ export default function ArtistProfile() {
 
             <div className="space-y-5">
               {/* 팬덤명 입력 */}
-              {/* <div className="space-y-1.5">
+              <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-gray-400 ml-1 uppercase">Fandom Name</label>
                 <input
                   name="fandomName"
@@ -468,7 +468,7 @@ export default function ArtistProfile() {
                   placeholder="팬덤 이름을 입력하세요"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-violet-200 outline-none"
                 />
-              </div> */}
+              </div>
 
               {/* 팬덤 이미지 수정 (모달 버전) */}
               <div className="space-y-1.5">
