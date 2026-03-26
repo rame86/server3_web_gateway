@@ -8,12 +8,13 @@ import { coreApi } from '@/lib/api';
 // 스타일 파일 임포트
 import { styles, typeConfig } from './UserCommunityStyles';
 
-// 환경 변수에서 게이트웨이 URL을 가져옵니다.
+// API 게이트웨이 주소 설정
 const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL;
 
 // 1. PostCard 컴포넌트
 function PostCard({ post, onDetail }) {
   const [liked, setLiked] = useState(false);
+  // 카테고리별 설정(색상, 라벨)을 가져오고 없으면 기본값 적용
   const config = typeConfig[post.category] || typeConfig['자유게시판'];
   const isArtist = post.artistPost === true;
   const authorName = post.authorName || `사용자${post.memberId}`;
@@ -87,6 +88,7 @@ export default function UserCommunity() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
+  //서버로부터 카테고리에 맞는 게시글 목록을 가져오는 함수
   const fetchPosts = useCallback(async (category) => {
     try {
       setLoading(true);
@@ -101,7 +103,7 @@ export default function UserCommunity() {
           'Content-Type': 'application/json'
         }
       });
-
+      // 401 에러 시 로그아웃 처리
       if (response.status === 401) {
         localStorage.removeItem('TOKEN');
         toast.error("인증이 만료되었습니다.");
@@ -111,8 +113,9 @@ export default function UserCommunity() {
       if (!response.ok) throw new Error("데이터 로드 실패");
 
       const data = await response.json();
+      // 페이징 객체(data.content) 또는 일반 배열(data) 처리
       const rawResult = Array.isArray(data) ? data : (data.content || []);
-
+      // 데이터 정제: null 값이나 유효하지 않은 숫자 보정
       const result = rawResult.map(post => ({
         ...post,
         likeCount: (post.likeCount === null || isNaN(post.likeCount)) ? 0 : Number(post.likeCount),
@@ -130,10 +133,12 @@ export default function UserCommunity() {
     }
   }, [setLocation]);
 
+  // 컴포넌트 마운트 시 최초 데이터 로드
   useEffect(() => {
     fetchPosts('all');
   }, [fetchPosts]);
 
+  // 탭 변경 시 호출되는 로직
   useEffect(() => {
     if (activeBoard !== 'all') {
       fetchPosts(activeBoard);
@@ -142,6 +147,7 @@ export default function UserCommunity() {
     }
   }, [activeBoard, fetchPosts, allPosts]);
 
+  // 상세 페이지 이동 핸들러
   const handleDetail = (boardId) => {
     if (!boardId) {
       toast.error("존재하지 않는 게시글입니다.");
@@ -150,6 +156,7 @@ export default function UserCommunity() {
     setLocation(`/user/community/${boardId}`);
   };
 
+  // 검색어에 따른 게시글 실시간 필터링
   const filteredDisplayPosts = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
     if (!term) return posts;
@@ -159,6 +166,7 @@ export default function UserCommunity() {
     );
   }, [posts, searchQuery]);
 
+  // 사이드바용 데이터 가공 (최신 공지사항 3개 / 좋아요 순 인기글 5개)
   const noticePosts = useMemo(() => allPosts.filter(p => p.category === '공지사항').slice(0, 3), [allPosts]);
   const popularPosts = useMemo(() => [...allPosts].sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0)).slice(0, 5), [allPosts]);
 
@@ -166,7 +174,7 @@ export default function UserCommunity() {
     <Layout role="user">
       <div className={styles.container}>
         
-        {/* 🌟 수정된 상단 배너 영역: 기억하신 공연장 이미지 + 핑크 필터 */}
+        {/* 🌟 상단 비주얼 배너 섹션 */}
         <div className="mb-10 text-center">
           <div className="relative h-44 w-full rounded-[2rem] overflow-hidden shadow-xl shadow-rose-100/50 group">
             <img 
@@ -206,7 +214,7 @@ export default function UserCommunity() {
           </button>
         </div>
 
-        {/* 탭 영역 */}
+        {/* 카테고리 탭 영역 */}
         <div className={styles.tabWrapper}>
           {boardTabs.map((tab) => (
             <button key={tab.key} onClick={() => setActiveBoard(tab.key)} className={styles.tabBtn(activeBoard === tab.key)}>
@@ -215,6 +223,7 @@ export default function UserCommunity() {
           ))}
         </div>
 
+          {/* 메인 콘텐츠 그리드 (게시글 목록 + 사이드바) */}
         <div className={styles.grid}>
           <div className={styles.mainCol}>
             <div className="flex items-center gap-2 mb-3 px-1 text-sm font-bold text-gray-700">
@@ -242,7 +251,7 @@ export default function UserCommunity() {
                 <p key={n.boardId} className="text-xs text-gray-600 truncate cursor-pointer hover:text-rose-500 mb-2" onClick={() => handleDetail(n.boardId)}>• {n.title}</p>
               ))}
             </div>
-
+              {/* 실시간 인기 포스트 위젯 */}
             <div className={styles.glassCard}>
               <div className="flex items-center gap-2 mb-3 text-sm font-bold"><TrendingUp size={16} className="text-rose-500" />인기 포스트</div>
               {popularPosts.map((p, i) => (
@@ -252,7 +261,7 @@ export default function UserCommunity() {
                 </div>
               ))}
             </div>
-
+              {/* 팬레터 작성 유도 배너 */}
             <div className={styles.letterCard} onClick={() => setLocation('/user/community/write')}>
               <div className="flex items-center gap-2 mb-2 text-sm font-bold"><Heart size={16} className="text-rose-500" fill="currentColor" />팬레터 작성</div>
               <button className="w-full py-2.5 text-xs font-bold text-white bg-rose-500 rounded-xl hover:bg-rose-600 transition-all">지금 작성하기</button>
