@@ -1,0 +1,15 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: frontend
+    networks:
+      - msa-network
+    ports:
+      - "88:88" # 기존 EXPOSE 88에 맞춤
+    restart: always
+
+networks:
+  msa-network:
+    external: true # 기존에 생성된 msa-network 활용
