@@ -1,4 +1,3 @@
-# /web/ .github/workflows/ci-cd.yml
 name: Frontend CI/CD Pipeline
 
 on:
@@ -14,18 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-
       - name: Package for Docker Build
         run: |
           mkdir -p deploy
-          cp -r client deploy/client
-          cp -r patches deploy/patches
-          cp package.json deploy/
-          cp pnpm-lock.yaml deploy/
-          cp vite.config.js deploy/
-          cp nginx.conf deploy/
-          cp client/Dockerfile deploy/
-          cd deploy && tar -czf frontend.tar.gz client/ patches/ package.json pnpm-lock.yaml vite.config.js nginx.conf Dockerfile
+          # 누락되는 설정 파일이 없도록 node_modules, .git을 제외하고 전체 압축
+          tar --exclude='./node_modules' --exclude='./.git' --exclude='./deploy' -czf deploy/frontend.tar.gz .
 
       - name: Copy to GCP
         uses: appleboy/scp-action@master
@@ -37,7 +29,7 @@ jobs:
           target: "/home/${{ secrets.GCP_USER }}/frontend/"
           strip_components: 1
 
-      - name: Build Container and Refresh Gateway
+      - name: Deploy via Docker Compose
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.GCP_HOST }}
@@ -48,10 +40,8 @@ jobs:
             tar -xzf frontend.tar.gz
             rm frontend.tar.gz
             
-            # 1. 프론트엔드 컨테이너 빌드 및 재실행
-            docker build -t lumina-frontend .
-            docker rm -f frontend || true
-            docker run -d --name frontend --network msa-network lumina-frontend
+            # BuildKit 활성화로 빌드 속도 극대화
+            DOCKER_BUILDKIT=1 docker compose up -d --build
             
-            # 2. 게이트웨이 재시작 (연결 갱신)
-            docker restart nginx-gateway
+            # [수정] 모든 이미지를 지우지 말고, 태그가 없는 이미지만 정리 (캐시 보존)
+            docker image prune -f

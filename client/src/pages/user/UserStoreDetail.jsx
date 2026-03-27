@@ -206,9 +206,29 @@ export default function UserStoreDetail() {
                             <button
                                 onClick={async () => {
                                     try {
+                                        // 1. 현재 장바구니 확인
+                                        const cartRes = await shopApi.get('/shop/cart');
+                                        const cartItems = cartRes.data?.items || [];
+
+                                        // 2. 다른 아티스트 상품이 있는지 확인
+                                        if (cartItems.length > 0) {
+                                            const firstItemArtistId = cartItems[0].artistId;
+                                            if (firstItemArtistId !== item.artistId) {
+                                                const confirmClear = window.confirm(
+                                                    '장바구니에는 같은 아티스트의 상품만 담을 수 있습니다.\n기존 상품을 삭제하고 현재 상품을 담으시겠습니까?'
+                                                );
+                                                if (!confirmClear) return;
+
+                                                // 장바구니 비우기
+                                                await shopApi.delete('/shop/cart');
+                                            }
+                                        }
+
+                                        // 3. 상품 담기
                                         await shopApi.post('/shop/cart', { productId: item.id, quantity });
                                         toast.success(`${item.name} ${quantity}개를 장바구니에 담았습니다`);
                                     } catch (error) {
+                                        console.error('Cart error:', error);
                                         toast.error('장바구니 담기에 실패했습니다.');
                                     }
                                 }}

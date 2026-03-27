@@ -4,7 +4,7 @@ import Layout from '@/components/Layout';
 import { Star, Heart, Search, ChevronRight } from 'lucide-react';
 import { formatNumber } from '@/lib/data';
 import { toast } from 'sonner';
-import { coreApi } from '@/lib/api';
+import { coreApi, resApi } from '@/lib/api';
 
 export default function UserArtists() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,15 +30,24 @@ export default function UserArtists() {
       return url.startsWith('/') ? url : `/${url}`; 
   };
 
-  // 1. 아티스트 목록 가져오기
+  // 1. 데이터 가져오기 (아티스트 + 전체 이벤트 딱 1번)
   useEffect(() => {
     const fetchArtists = async () => {
       try {
+        // 1-1. 아티스트 목록 & 팔로우 가져오기
         const [artistRes, followRes] = await Promise.all([
           coreApi.get('/artist/list'),
           coreApi.get('/artist/my-follows')
         ]);
-        setArtistList(artistRes.data);
+        
+        const baseArtists = artistRes.data || [];
+        
+        // 핵심 주석: 이벤트 통신을 삭제했으므로 모든 아티스트의 이벤트 개수는 0으로 매핑됨
+        const artistsWithEvents = baseArtists.map(artist => {
+          return { ...artist, eventCount: 0 };
+        });
+
+        setArtistList(artistsWithEvents);
         setFollowed(followRes.data.map(item => item.memberId || item)); 
       } catch (err) {
         toast.error("아티스트 목록을 불러오지 못했습니다.");

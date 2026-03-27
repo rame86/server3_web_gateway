@@ -6,10 +6,10 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { cn } from "@/lib/utils";
-import { Package, Plus, Search, Clock, Check, MoreVertical, Image as ImageIcon, DollarSign, Archive } from 'lucide-react';
+import { Package, Plus, Search, Clock, Check, MoreVertical, Image as ImageIcon, DollarSign, Archive, Loader2 } from 'lucide-react';
 import { goodsItems, formatPrice } from '@/lib/data';
 import { toast } from 'sonner';
-import { shopApi } from '@/lib/api';
+import { shopApi, coreApi } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,25 +22,64 @@ export default function ArtistStore() {
   const [isAdding, setIsAdding] = useState(false);
   const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false);
   const [pendingFormData, setPendingFormData] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  
+  const memberId = localStorage.getItem('memberId');
 
-  // My goods filtering (id 3 is Lee Ha-eun's artistId from data.js)
-  const myGoods = goodsItems.filter(item => item.artistId === 3);
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // 1. 아티스트 목록 조회 (이름 매칭용)
+        const artistRes = await coreApi.get('/artist/list');
+        const artistsData = artistRes.data || [];
 
-  const filteredGoods = myGoods.filter(item => {
+        // 2. 전체 상품 조회
+        const shopRes = await shopApi.get('shop/');
+        
+        // 내 상품만 필터링
+        const myProducts = shopRes.data.filter(item => String(item.sellerId) === String(memberId));
+        
+        const mapped = myProducts.map(item => {
+          const artist = artistsData.find(a => String(a.memberId) === String(item.sellerId));
+          return {
+            id: item.productId,
+            name: item.title,
+            artistId: item.sellerId,
+            artistName: artist ? artist.stageName : '아티스트',
+            price: item.basePrice,
+            image: item.imageUrl,
+            category: item.category, // OFFICIAL, UNOFFICIAL, SECONDHAND
+            stock: 100, // 임시 기입
+            status: item.isActive,
+            rating: 4.5,
+            reviews: 10
+          };
+        });
+        setProducts(mapped);
+      } catch (error) {
+        console.error('Failed to fetch artist store data:', error);
+        toast.error('데이터를 가져오는 데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [memberId]);
+
+  const filteredGoods = products.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
     if (activeTab === 'all') return matchesSearch;
     const categoryMap = {
       official: 'OFFICIAL',
-
       unofficial: 'UNOFFICIAL',
       secondhand: 'SECONDHAND'
-
     };
-    return matchesSearch && (item.category === activeTab || item.category === categoryMap[activeTab]);
+    return matchesSearch && (item.category === categoryMap[activeTab] || item.category === activeTab);
   });
-
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -109,6 +148,17 @@ export default function ArtistStore() {
       toast.error('등록 요청에 실패했습니다.');
     }
   };
+
+  if (loading) {
+    return (
+      <Layout role="artist">
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <Loader2 size={40} className="text-violet-500 animate-spin" />
+          <p className="text-muted-foreground font-medium">상품 목록을 불러오는 중입니다...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout role="artist">

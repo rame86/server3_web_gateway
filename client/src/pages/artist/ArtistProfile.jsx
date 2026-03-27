@@ -268,29 +268,35 @@ export default function ArtistProfile() {
     fileInputRef.current?.click();
   };
 
-  const handleImageUpload = async (e, type) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // 수정된 이미지 업로드 함수
+  // 오직 프로필 이미지 업로드만 담당
+const handleImageUpload = async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    try {
-      toast.loading('이미지 업로드 중...');
-      const uploadData = new FormData();
-      uploadData.append('profileImage', file);
+  try {
+    toast.loading('프로필 이미지 업로드 중...');
+    const uploadData = new FormData();
+    
+    // 핵심 주석: MemberController의 @RequestParam("profileImage")와 일치시킴
+    uploadData.append('profileImage', file);
 
-      const res = await coreApi.post('/member/profile/image', uploadData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+    // 핵심 주석: 프로필 전용 엔드포인트 호출
+    const res = await coreApi.post('/member/profile/image', uploadData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
 
-      const fieldName = type === 'profile' ? 'profileImageUrl' : 'fandomImage';
-      setFormData(prev => ({ ...prev, [fieldName]: res.data.url }));
-      toast.dismiss();
-      toast.success('이미지 임시 업로드 완료! 하단의 저장 버튼을 눌러주세요.');
-    } catch (error) {
-      toast.dismiss();
-      console.error(error);
-      toast.error('이미지 업로드에 실패했습니다.');
-    }
-  };
+    // 서버가 리턴한 URL을 프로필 상태에 저장
+    setFormData(prev => ({ ...prev, profileImageUrl: res.data.url }));
+    
+    toast.dismiss();
+    toast.success('프로필 이미지가 변경되었어! 하단의 저장 버튼을 눌러줘.');
+  } catch (error) {
+    toast.dismiss();
+    console.error("❌ 프로필 업로드 에러:", error);
+    toast.error('이미지 업로드에 실패했습니다.');
+  }
+};
   
 
   return (
@@ -316,7 +322,7 @@ export default function ArtistProfile() {
                   ref={fileInputRef}
                   className="hidden"
                   accept="image/*"
-                  onChange={handleImageUpload}
+                  onChange={(e) => handleImageUpload(e, 'profile')}
                 />
                 <img
                   src={formData.profileImageUrl || (isArtist

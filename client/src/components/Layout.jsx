@@ -37,7 +37,7 @@ const artistNavItems = [
   { label: '굿즈 관리', icon: <Package size={18} />, href: '/artist/store' },
   { label: '팬 채팅', icon: <MessageCircle size={18} />, href: '/artist/chat', badge: 12 },
   { label: '예매 관리', icon: <Calendar size={18} />, href: '/artist/booking' },
-  { label: '커뮤니티', icon: <BookOpen size={18} />, href: '/artist/community' },
+  // { label: '커뮤니티', icon: <BookOpen size={18} />, href: '/artist/community' },
   { label: '후원 내역', icon: <Sparkles size={18} />, href: '/artist/donations' },
   { label: '정산 내역', icon: <BarChart3 size={18} />, href: '/artist/settlement' }
 ];

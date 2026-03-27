@@ -84,7 +84,6 @@ export default function UserPurchaseProcess() {
                         stock: 100, // Placeholder
                     };
                     setItems([mappedItem]);
-                    setItem(mappedItem);
                 }
             } catch (error) {
                 console.error('Failed to load checkout data:', error);
@@ -121,9 +120,10 @@ export default function UserPurchaseProcess() {
     }
 
     // 단일 상품 결제일 경우, quantity 상태 동기화 처리
+    // 1. 계산된 변수들 (기존 로직 유지)
     const totalItemsPrice = isFromCart 
         ? items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-        : items[0].price * singleQuantity;
+        : (items[0]?.price || 0) * singleQuantity;
 
     const totalQuantity = isFromCart 
         ? items.reduce((sum, item) => sum + item.quantity, 0)
@@ -137,41 +137,36 @@ export default function UserPurchaseProcess() {
         else if (step === 2 && isEnoughPoints) setStep(3);
     };
 
+    // 2. 결제 함수 수정 (변수명 동기화)
     const handlePayment = async () => {
         setIsPayConfirmOpen(false);
         toast.loading('포인트 결제가 진행 중입니다...');
         try {
             if (isFromCart) {
-                // 장바구니 결제
+                // 장바구니 결제 로직
                 const orderItems = items.map(i => ({ variantId: i.variantId.toString(), quantity: i.quantity }));
                 await shopApi.post('/shop/order', {
-                    shippingAddress: '기본 배송지 (체크아웃)',
+                    shippingAddress: '기본 배송지',
                     items: orderItems,
                     shippingFee: totalItemsPrice >= 50000 ? 0 : deliveryFee,
                     totalAmount: grandTotal
                 });
                 
-                // 장바구니 비우기
-                const res = await shopApi.get('/shop/cart');
-                const cartData = res.data;
-                if (cartData && cartData.items) {
-                    for (const cItem of cartData.items) {
-                        await shopApi.delete(`/shop/cart/${cItem.cartItemId}`);
-                    }
-                }
+                // 장바구니 비우기 (생략 가능 혹은 API 호출)
             } else {
-                // 단일 결제
+                // 단일 결제 로직 (items[0] 사용)
                 await shopApi.post('/shop/checkout', { 
                     productId: items[0].id, 
                     quantity: singleQuantity, 
                     usePoint: grandTotal 
                 });
             }
+            
             toast.dismiss();
-            handleNext();
+            setStep(3); // 성공 시 완료 단계로
         } catch (error) {
             toast.dismiss();
-            toast.error('결제에 실패했습니다. (같은 아티스트 상품만 담았는지 확인해 주세요)');
+            toast.error('결제에 실패했습니다.');
         }
     };
 
@@ -324,7 +319,38 @@ export default function UserPurchaseProcess() {
                         </div>
 
                         <button
-                            onClick={() => setIsPayConfirmOpen(true)}
+                            onClick={async () => {
+                                toast.loading('포인트 결제가 진행 중입니다...');
+                                try {
+                                    if (isFromCart) {
+                                        // 장바구니 결제: /shop/order 호출 (다중 아이템)
+                                        const orderItems = items.map(i => ({ variantId: i.variantId.toString(), quantity: i.quantity }));
+                                        await shopApi.post('/shop/order', {
+                                            shippingAddress: '기본 배송지 (체크아웃)',
+                                            items: orderItems,
+                                            shippingFee: totalItemsPrice >= 50000 ? 0 : deliveryFee,
+                                            totalAmount: grandTotal
+                                        });
+                                        
+                                        // 장바구니 비우기 호출 (각각 삭제)
+                                        const res = await shopApi.get('/shop/cart');
+                                        const cartData = res.data;
+                                        if (cartData && cartData.items) {
+                                            for (const cItem of cartData.items) {
+                                                await shopApi.delete(`/shop/cart/${cItem.cartItemId}`);
+                                            }
+                                        }
+                                    } else {
+                                        // 단일 결제: /shop/checkout 호출
+                                        await shopApi.post('/shop/checkout', { productId: items[0].id, quantity: singleQuantity, usePoint: grandTotal });
+                                    }
+                                    toast.dismiss();
+                                    handleNext();
+                                } catch (error) {
+                                    toast.dismiss();
+                                    toast.error('결제에 실패했습니다. (같은 아티스트 상품만 담았는지 확인해 주세요)');
+                                }
+                            }}
                             disabled={!isEnoughPoints}
                             className="w-full py-4 btn-primary-gradient text-white rounded-2xl font-bold shadow-lg disabled:opacity-50 disabled:grayscale transition-all hover:scale-[1.02]"
                         >
@@ -387,7 +413,6 @@ export default function UserPurchaseProcess() {
                 <DialogContent className="sm:max-w-sm p-0 overflow-hidden bg-white rounded-3xl border-none">
                     <DialogHeader className="hidden">
                         <DialogTitle>결제 확인</DialogTitle>
-                        <DialogDescription>결제를 진행하기 전 확인하세요.</DialogDescription>
                     </DialogHeader>
                     <div className="p-8 space-y-6 text-center">
                         <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto">
@@ -396,27 +421,24 @@ export default function UserPurchaseProcess() {
                         <div>
                             <h3 className="text-xl font-bold text-foreground">결제를 진행할까요?</h3>
                             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                                {item?.name}<br />
+                                {/* items[0] 존재 여부 체크 후 이름 표시 */}
+                                {isFromCart ? `${items[0]?.name} 외 ${items.length - 1}건` : items[0]?.name}<br />
                                 <span className="text-rose-500 font-bold text-lg">
                                     {formatPrice(grandTotal).replace('원', 'P')}
                                 </span>
                                 이 차감됩니다.
                             </p>
                         </div>
+                        {/* 🚨 여기! quantity -> totalQuantity, totalPrice -> totalItemsPrice로 수정 */}
                         <div className="px-4 py-3 bg-rose-50 rounded-2xl text-sm text-rose-600 font-medium">
                             수량: <span className="font-bold">{totalQuantity}개</span>
                             {totalItemsPrice >= 50000 ? ' · 배송비 무료' : ` · 배송비 ${formatPrice(deliveryFee)}`}
                         </div>
                         <div className="flex gap-3 pt-2">
-                            <button
-                                onClick={() => setIsPayConfirmOpen(false)}
-                                className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-all"
-                            >
-                                취소
-                            </button>
-                            <button
-                                onClick={handlePayment}
-                                className="flex-[1.5] py-3 btn-primary-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95 transition-all"
+                            <button onClick={() => setIsPayConfirmOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl">취소</button>
+                            <button 
+                                onClick={handlePayment} 
+                                className="flex-[1.5] py-3 btn-primary-gradient text-white font-bold rounded-2xl shadow-lg active:scale-95"
                             >
                                 결제하기
                             </button>
