@@ -16,18 +16,22 @@ jobs:
       - name: Package for Docker Build
         run: |
           mkdir -p deploy
-          # 의존성 설치 및 빌드에 필요한 모든 파일 복사
+          
+          # 1. 빌드에 필요한 디렉터리 복사 (shared 폴더 포함)
           cp -r client deploy/client
-          cp -r patches deploy/patches || true # patches가 없을 경우 예외 처리
+          cp -r shared deploy/shared || true
+          cp -r patches deploy/patches || true
+          
+          # 2. 빌드에 필요한 설정 파일 복사 (루트 기준)
           cp package.json deploy/
           cp pnpm-lock.yaml deploy/
           cp vite.config.js deploy/
           cp nginx.conf deploy/
           cp Dockerfile deploy/
-          cp docker-compose.yml deploy/ # 컴포즈 파일 추가
+          cp docker-compose.yml deploy/
           
-          # 압축 시 컴포즈 파일 포함
-          cd deploy && tar -czf frontend.tar.gz client/ patches/ package.json pnpm-lock.yaml vite.config.js nginx.conf Dockerfile docker-compose.yml
+          # 3. 배포 폴더 압축
+          cd deploy && tar -czf frontend.tar.gz client/ shared/ patches/ package.json pnpm-lock.yaml vite.config.js nginx.conf Dockerfile docker-compose.yml
 
       - name: Copy to GCP
         uses: appleboy/scp-action@master
@@ -39,7 +43,7 @@ jobs:
           target: "/home/${{ secrets.GCP_USER }}/frontend/"
           strip_components: 1
 
-      - name: Deploy via Docker Compose and Refresh Gateway
+      - name: Deploy via Docker Compose
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.GCP_HOST }}
@@ -50,11 +54,11 @@ jobs:
             tar -xzf frontend.tar.gz
             rm frontend.tar.gz
             
-            # 1. Docker Compose로 빌드 및 컨테이너 무중단 재시작 (변경사항이 있을 경우만 새로 빌드)
+            # Docker Compose 빌드 및 무중단 실행
             docker compose up -d --build
             
-            # 2. 불필요해진 이전 버전의 dangling 이미지 제거 (디스크 용량 최적화)
+            # 잉여(dangling) 이미지 삭제로 서버 용량 확보
             docker image prune -f
             
-            # 3. 게이트웨이 재시작 (연결 갱신)
+            # Nginx Gateway 연결 갱신을 위한 재시작
             docker restart nginx-gateway
