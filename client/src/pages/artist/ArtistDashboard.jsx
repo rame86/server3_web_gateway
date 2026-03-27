@@ -349,6 +349,8 @@ export default function ArtistDashboard() {
                   )}
                 </div>
 
+
+                
                 {/* Donation Summary */}
                 <div
                   className="rounded-2xl p-5 text-white shadow-lg"
