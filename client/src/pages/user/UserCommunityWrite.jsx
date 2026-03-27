@@ -14,6 +14,9 @@ export default function UserCommunityWrite() {
   const [selectedFile, setSelectedFile] = useState(null); 
   const [loading, setLoading] = useState(false);
   const [followedArtists, setFollowedArtists] = useState([]);
+  
+  // 관리자 여부 상태 관리
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -23,6 +26,12 @@ export default function UserCommunityWrite() {
   });
 
   useEffect(() => {
+    // [수정] 권한 체크: 'ADMIN' 문자열과 일치하는지 확인
+    const userRole = localStorage.getItem('role'); 
+    if (userRole === 'ADMIN') {
+      setIsAdmin(true);
+    }
+
     const fetchMyFandoms = async () => {
       try {
         const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
@@ -33,15 +42,12 @@ export default function UserCommunityWrite() {
         if (response.ok) {
           const data = await response.json();
           setFollowedArtists(data);
-          // 데이터가 존재할 경우 첫 번째 아티스트를 기본값으로 설정
           if (data && data.length > 0) {
             setFormData(prev => ({ ...prev, artistId: data[0].artistId.toString() }));
           }
         } else if (response.status === 401) {
           toast.error("로그인이 필요합니다.");
           setLocation('/login');
-        } else {
-          console.error("에러 발생 상태코드:", response.status);
         }
       } catch (error) {
         console.error("팬덤 목록 로드 실패:", error);
@@ -51,13 +57,11 @@ export default function UserCommunityWrite() {
     fetchMyFandoms();
   }, [setLocation]);
 
-  // 입력값 변경 핸들러
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 파일 선택 핸들러 (10MB 제한)
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -69,17 +73,20 @@ export default function UserCommunityWrite() {
     }
   };
 
-  // 선택된 파일 제거
   const removeFile = () => {
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // 최종 게시글 등록 함수
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 필수 입력값 검증: 자유게시판이 아닐 때만 artistId 체크
+    // 보안 로직: 관리자가 아닌데 공지사항을 선택한 경우 차단
+    if (formData.category === '공지사항' && !isAdmin) {
+      toast.error("공지사항 작성 권한이 없습니다.");
+      return;
+    }
+
     if (formData.category !== '자유게시판' && !formData.artistId) {
       toast.error("대상 아티스트를 선택해주세요.");
       return;
@@ -152,8 +159,7 @@ export default function UserCommunityWrite() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               
-              {/* [왼쪽] 대상 아티스트 선택 (자유게시판일 때는 숨김 처리) */}
-              <div className={formData.category === '자유게시판' ? 'invisible pointer-events-none' : ''}>
+              <div className={formData.category === '자유게시판' || formData.category === '공지사항' ? 'invisible pointer-events-none' : ''}>
                 <label className="block text-sm font-black text-gray-700 mb-2">대상 아티스트</label>
                 <select 
                   name="artistId" 
@@ -171,7 +177,6 @@ export default function UserCommunityWrite() {
                 </select>
               </div>
 
-              {/* [오른쪽] 카테고리 선택 */}
               <div>
                 <label className="block text-sm font-black text-gray-700 mb-2">카테고리</label>
                 <select 
@@ -180,6 +185,8 @@ export default function UserCommunityWrite() {
                   onChange={handleInputChange} 
                   className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 font-bold focus:ring-2 focus:ring-rose-400 text-sm outline-none transition-all"
                 >
+                  {/* [수정] 'ADMIN' 권한일 때만 공지사항 활성화 */}
+                  {isAdmin && <option value="공지사항">📢 공지사항 (Admin)</option>}
                   <option value="팬레터">💌 팬레터</option>
                   <option value="자유게시판">💬 자유게시판</option>
                   <option value="팬덤게시판">🌟 팬덤게시판</option>
@@ -188,19 +195,16 @@ export default function UserCommunityWrite() {
 
             </div>
 
-            {/* 제목 입력 */}
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">제목</label>
               <input type="text" name="title" value={formData.title} onChange={handleInputChange} placeholder="제목을 입력하세요" className="w-full p-4 rounded-2xl border border-gray-100 font-bold text-sm outline-none focus:ring-2 focus:ring-rose-400" required />
             </div>
 
-            {/* 본문 입력 */}
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">내용</label>
               <textarea name="content" rows="10" value={formData.content} onChange={handleInputChange} placeholder="나만의 소중한 이야기를 들려주세요." className="w-full p-4 rounded-2xl border border-gray-100 resize-none text-sm leading-relaxed outline-none focus:ring-2 focus:ring-rose-400" required />
             </div>
 
-            {/* 파일 첨부 */}
             <div>
               <label className="block text-sm font-black text-gray-700 mb-2">파일 첨부</label>
               <div className="flex flex-col gap-3">
@@ -223,7 +227,6 @@ export default function UserCommunityWrite() {
               </div>
             </div>
 
-            {/* 등록 버튼 */}
             <div className="pt-4">
               <button type="submit" disabled={loading} className="w-full bg-rose-500 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-rose-600 transition-all flex items-center justify-center gap-2 disabled:bg-gray-300">
                 {loading ? "등록 중..." : <><Send size={18} /> 게시글 등록하기</>}
