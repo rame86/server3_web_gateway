@@ -11,13 +11,43 @@ import { styles, typeConfig } from './UserCommunityStyles';
 // API 게이트웨이 주소 설정
 const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL;
 
-// 1. PostCard 컴포넌트
+// 1. PostCard 컴포넌트 (개별 게시글 카드)
 function PostCard({ post, onDetail }) {
-  const [liked, setLiked] = useState(false);
-  // 카테고리별 설정(색상, 라벨)을 가져오고 없으면 기본값 적용
+  const [liked, setLiked] = useState(post.liked || false);
+  const [currentLikeCount, setCurrentLikeCount] = useState(post.likeCount || 0);
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const config = typeConfig[post.category] || typeConfig['자유게시판'];
   const isArtist = post.artistPost === true;
   const authorName = post.authorName || `사용자${post.memberId}`;
+
+  // 부모로부터 post 데이터가 갱신될 때 로컬 상태 동기화
+  useEffect(() => {
+    setLiked(post.liked || false);
+    setCurrentLikeCount(post.likeCount || 0);
+  }, [post.liked, post.likeCount]);
+
+  // 좋아요 클릭 핸들러
+  const handleLike = async (e) => {
+    e.stopPropagation();
+    if (isProcessing) return;
+
+    setIsProcessing(true);
+    try {
+      const response = await coreApi.post(`/board/${post.boardId}/like`);
+      if (response.status === 200) {
+        const updatedCount = response.data; // 서버에서 반환된 최신 총 좋아요 수
+        setCurrentLikeCount(updatedCount);
+        setLiked(!liked);
+        toast.success(!liked ? '좋아요!' : '좋아요를 취소했습니다');
+      }
+    } catch (error) {
+      console.error("Like Error:", error);
+      toast.error('요청 처리에 실패했습니다.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div
@@ -25,9 +55,12 @@ function PostCard({ post, onDetail }) {
       onClick={() => onDetail(post.boardId)}
     >
       <div className="flex items-start gap-3">
+        {/* 아티스트/유저 아바타 표시 */}
         <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ring-2 ring-white shadow-sm text-[9px] font-black ${isArtist ? 'bg-gradient-to-tr from-purple-600 to-indigo-400 text-white' : 'bg-rose-100 text-rose-400'}`}>
           {isArtist ? 'ARTIST' : 'USER'}
         </div>
+
+        {/* 게시글 요약 내용 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${config.badgeClass}`}>{config.label}</span>
@@ -48,24 +81,23 @@ function PostCard({ post, onDetail }) {
         </div>
       </div>
 
+      {/* 하단 통계 정보 (좋아요, 댓글, 조회수) */}
       <div className="flex items-center gap-4 mt-3 pt-3 border-t border-rose-100">
         <button
-          onClick={async (e) => {
-            e.stopPropagation();
-            try {
-              await coreApi.post(`/board/${post.boardId}/like`);
-              setLiked(!liked);
-              toast.success(liked ? '좋아요를 취소했습니다' : '좋아요!');
-            } catch (error) {
-              toast.error('요청 처리에 실패했습니다.');
-            }
-          }}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-rose-500 transition-colors">
-          <Heart size={13} className={liked ? 'text-rose-500' : ''} fill={liked ? 'currentColor' : 'none'} />
-          {(post.likeCount || 0) + (liked ? 1 : 0)}
+          onClick={handleLike}
+          disabled={isProcessing}
+          className={`flex items-center gap-1 text-xs transition-colors ${liked ? 'text-rose-500 font-bold' : 'text-muted-foreground hover:text-rose-500'}`}
+        >
+          <Heart size={13} fill={liked ? 'currentColor' : 'none'} className={liked ? 'text-rose-500' : ''} />
+          {/* 수동 계산을 없애고 서버 기반 상태값만 출력하여 중복 누적 방지 */}
+          {currentLikeCount}
         </button>
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground"><MessageCircle size={13} /> {post.commentCount || 0}</div>
-        <div className="flex items-center gap-1 text-[11px] text-muted-foreground"><Eye size={13} /> {(post.viewCount || 0).toLocaleString()}</div>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <MessageCircle size={13} /> {post.commentCount || 0}
+        </div>
+        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <Eye size={13} /> {(post.viewCount || 0).toLocaleString()}
+        </div>
       </div>
     </div>
   );
@@ -80,6 +112,7 @@ const boardTabs = [
   { key: '자유게시판', label: '자유게시판' }
 ];
 
+// 2. 메인 UserCommunity 컴포넌트
 export default function UserCommunity() {
   const [, setLocation] = useLocation();
   const [activeBoard, setActiveBoard] = useState('all');
@@ -88,7 +121,7 @@ export default function UserCommunity() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  //서버로부터 카테고리에 맞는 게시글 목록을 가져오는 함수
+  // 게시글 데이터 페칭
   const fetchPosts = useCallback(async (category) => {
     try {
       setLoading(true);
@@ -103,7 +136,7 @@ export default function UserCommunity() {
           'Content-Type': 'application/json'
         }
       });
-      // 401 에러 시 로그아웃 처리
+
       if (response.status === 401) {
         localStorage.removeItem('TOKEN');
         toast.error("인증이 만료되었습니다.");
@@ -113,9 +146,7 @@ export default function UserCommunity() {
       if (!response.ok) throw new Error("데이터 로드 실패");
 
       const data = await response.json();
-      // 페이징 객체(data.content) 또는 일반 배열(data) 처리
       const rawResult = Array.isArray(data) ? data : (data.content || []);
-      // 데이터 정제: null 값이나 유효하지 않은 숫자 보정
       const result = rawResult.map(post => ({
         ...post,
         likeCount: (post.likeCount === null || isNaN(post.likeCount)) ? 0 : Number(post.likeCount),
@@ -133,12 +164,10 @@ export default function UserCommunity() {
     }
   }, [setLocation]);
 
-  // 컴포넌트 마운트 시 최초 데이터 로드
   useEffect(() => {
     fetchPosts('all');
   }, [fetchPosts]);
 
-  // 탭 변경 시 호출되는 로직
   useEffect(() => {
     if (activeBoard !== 'all') {
       fetchPosts(activeBoard);
@@ -147,7 +176,6 @@ export default function UserCommunity() {
     }
   }, [activeBoard, fetchPosts, allPosts]);
 
-  // 상세 페이지 이동 핸들러
   const handleDetail = (boardId) => {
     if (!boardId) {
       toast.error("존재하지 않는 게시글입니다.");
@@ -156,7 +184,6 @@ export default function UserCommunity() {
     setLocation(`/user/community/${boardId}`);
   };
 
-  // 검색어에 따른 게시글 실시간 필터링
   const filteredDisplayPosts = useMemo(() => {
     const term = searchQuery.toLowerCase().trim();
     if (!term) return posts;
@@ -166,15 +193,13 @@ export default function UserCommunity() {
     );
   }, [posts, searchQuery]);
 
-  // 사이드바용 데이터 가공 (최신 공지사항 3개 / 좋아요 순 인기글 5개)
   const noticePosts = useMemo(() => allPosts.filter(p => p.category === '공지사항').slice(0, 3), [allPosts]);
   const popularPosts = useMemo(() => [...allPosts].sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0)).slice(0, 5), [allPosts]);
 
   return (
     <Layout role="user">
       <div className={styles.container}>
-        
-        {/* 🌟 상단 비주얼 배너 섹션 */}
+        {/* 상단 배너 섹션 */}
         <div className="mb-10 text-center">
           <div className="relative h-44 w-full rounded-[2rem] overflow-hidden shadow-xl shadow-rose-100/50 group">
             <img 
@@ -182,9 +207,7 @@ export default function UserCommunity() {
               alt="Community Banner"
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
-            {/* 핑크색이 살짝 도는 어두운 그라데이션 오버레이 */}
             <div className="absolute inset-0 bg-gradient-to-b from-rose-400/20 via-black/40 to-black/70 flex flex-col justify-center items-center text-white p-6">
-              {/* "팬 계정 포털" 삭제됨 */}
               <h1 className="text-3xl font-black mb-2 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
                 종합 커뮤니티
               </h1>
@@ -197,7 +220,7 @@ export default function UserCommunity() {
           </div>
         </div>
 
-        {/* 검색 및 글쓰기 버튼 */}
+        {/* 검색 및 글쓰기 영역 */}
         <div className="flex justify-between items-center gap-4 mb-6">
           <div className={`${styles.searchWrapper} flex-1 mb-0`}>
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -214,7 +237,7 @@ export default function UserCommunity() {
           </button>
         </div>
 
-        {/* 카테고리 탭 영역 */}
+        {/* 카테고리 탭 */}
         <div className={styles.tabWrapper}>
           {boardTabs.map((tab) => (
             <button key={tab.key} onClick={() => setActiveBoard(tab.key)} className={styles.tabBtn(activeBoard === tab.key)}>
@@ -223,7 +246,7 @@ export default function UserCommunity() {
           ))}
         </div>
 
-          {/* 메인 콘텐츠 그리드 (게시글 목록 + 사이드바) */}
+        {/* 메인 콘텐츠 그리드 */}
         <div className={styles.grid}>
           <div className={styles.mainCol}>
             <div className="flex items-center gap-2 mb-3 px-1 text-sm font-bold text-gray-700">
@@ -251,7 +274,7 @@ export default function UserCommunity() {
                 <p key={n.boardId} className="text-xs text-gray-600 truncate cursor-pointer hover:text-rose-500 mb-2" onClick={() => handleDetail(n.boardId)}>• {n.title}</p>
               ))}
             </div>
-              {/* 실시간 인기 포스트 위젯 */}
+            
             <div className={styles.glassCard}>
               <div className="flex items-center gap-2 mb-3 text-sm font-bold"><TrendingUp size={16} className="text-rose-500" />인기 포스트</div>
               {popularPosts.map((p, i) => (
@@ -261,7 +284,7 @@ export default function UserCommunity() {
                 </div>
               ))}
             </div>
-              {/* 팬레터 작성 유도 배너 */}
+
             <div className={styles.letterCard} onClick={() => setLocation('/user/community/write')}>
               <div className="flex items-center gap-2 mb-2 text-sm font-bold"><Heart size={16} className="text-rose-500" fill="currentColor" />팬레터 작성</div>
               <button className="w-full py-2.5 text-xs font-bold text-white bg-rose-500 rounded-xl hover:bg-rose-600 transition-all">지금 작성하기</button>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'; // useRef 추가
+import { useState, useEffect, useRef } from 'react';
 import Layout from '@/components/Layout';
 import { AlertCircle, Eye, Trash2, Search, Flag, X, Clock, User, Layers3, MessageSquare, Megaphone, Send, Paperclip, Globe, Star } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,7 +15,7 @@ export default function AdminCommunity() {
   const [selectedItem, setSelectedItem] = useState(null); 
   const [loading, setLoading] = useState(false);
 
-  // 개별 카운트 상태
+  // 카운트 상태
   const [totalReportCount, setTotalReportCount] = useState(0);
   const [commentCount, setcommentCount] = useState(0);
   const [boardCount, setBoardCount] = useState(0);
@@ -24,36 +24,33 @@ export default function AdminCommunity() {
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [allArtists, setAllArtists] = useState([]);
-  const [noticeType, setNoticeType] = useState('ALL'); // ALL(전체) | ARTIST(아티스트별)
+  const [noticeType, setNoticeType] = useState('ALL'); 
   const [noticeData, setNoticeData] = useState({
     title: '',
     content: '',
     category: '공지사항',
-    artistId: '0' // 기본값 0 (전체공지)
+    artistId: '0' 
   });
   
-  // --- API 경로 설정 (MSA 구조 대응) ---
+  // --- API 경로 설정 (백엔드 ArtistController 구조에 맞춤) ---
   const ADMIN_API_BASE = "/msa/core/admin/board"; 
   const BOARD_API_BASE = "/msa/core/board";
   const BOARD_ADMIN_API_BASE = "/msa/core/board/admin";
-  const ARTIST_API_BASE = "/msa/core/artist";
+  const ARTIST_API_BASE = "/msa/core/artist"; // 백엔드 @RequestMapping("/artist")
   
-  // 컴포넌트 마운트 시 초기 데이터 로드
   useEffect(() => {
     fetchPosts();
     fetchReports();
-    fetchAllArtists();
+    fetchAllArtists(); // 컴포넌트 마운트 시 실행
   }, []);
 
-  
-  // 신고 서브 탭이 변경되거나 신고 관리 탭으로 진입할 때 목록 새로고침
   useEffect(() => {
     if (activeTab === 'reports') {
       fetchReports();
     }
   }, [reportSubTab, activeTab]);
 
-  // 전체 게시글 목록 로드
+  // 1. 전체 게시글 목록 로드
   const fetchPosts = async () => {
     try {
       setLoading(true);
@@ -71,46 +68,50 @@ export default function AdminCommunity() {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
       const headers = { 'Authorization': `Bearer ${token}` };
-      // [병렬 처리] 게시글 신고와 댓글 신고 목록을 한 번에 호출
       const [boardRes, commentRes] = await Promise.all([
-        axios.get(`${ADMIN_API_BASE}/reports`, { headers }), // -> /msa/core/admin/board/reports
-        axios.get(`${ADMIN_API_BASE}/reports/comments`, { headers }) // -> /msa/core/admin/board/reports/comments
+        axios.get(`${ADMIN_API_BASE}/reports`, { headers }),
+        axios.get(`${ADMIN_API_BASE}/reports/comments`, { headers })
       ]);
       const boards = Array.isArray(boardRes.data) ? boardRes.data : [];
       const comments = Array.isArray(commentRes.data) ? commentRes.data : [];
-      // 카운트 업데이트
+      
       setBoardCount(boards.length);
       setcommentCount(comments.length);
       setTotalReportCount(boards.length + comments.length);
       setReportList(reportSubTab === 'boards' ? boards : comments);
     } catch (error) {
       console.error("신고 목록 로드 실패:", error);
-      // 에러가 나더라도 리스트를 비워줌으로써 '데이터 없음' 메시지가 뜨게 합니다.
       setReportList([]); 
     } finally { setLoading(false); }
   };
   
-  // 아티스트 목록 로드 (공지사항용)
+  // 3. [중요] 아티스트 목록 로드 (백엔드 /artist/list 경로로 수정)
   const fetchAllArtists = async () => {
     try {
       const token = localStorage.getItem('accessToken');
-      const response = await axios.get(`${ARTIST_API_BASE}/all`, {
+      // 백엔드 컨트롤러의 @GetMapping("/list") 경로를 사용해야 함
+      const response = await axios.get(`${ARTIST_API_BASE}/list`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      setAllArtists(response.data || []);
-    } catch (error) { console.error("아티스트 목록 로드 실패"); }
+      
+      console.log("-----> [ARTIST LIST RESPONSE]", response.data);
+      
+      // ArtistResponse 리스트가 바로 오는지 확인 후 세팅
+      const artistData = Array.isArray(response.data) ? response.data : [];
+      setAllArtists(artistData);
+    } catch (error) { 
+      console.error("아티스트 목록 로드 실패:", error.response || error);
+      toast.error("아티스트 목록을 불러오지 못했습니다.");
+    }
   };
   
-  //상세 내용 확인 (모달 띄우기)
   const handleShowDetail = async (item, type) => {
     if (item.content) {
       setSelectedItem({ ...item, type });
       return;
     }
-    // 본문이 없는 경우(목록형 데이터) 서버에 단건 상세 조회 요청
     try {
       const token = localStorage.getItem('accessToken');
-      // DB 이미지 확인 결과 필드명이 report_id, board_id 등으로 되어 있으므로 카멜케이스 대응
       const id = type === 'board' ? (item.boardId || item.id) : (item.commentId || item.id);
       const url = type === 'board' ? `${BOARD_API_BASE}/${id}` : `${BOARD_API_BASE}/comment/${id}`;
       
@@ -122,7 +123,7 @@ export default function AdminCommunity() {
       toast.error("상세 내용을 불러올 수 없습니다.");
     }
   };
-  // 신고 승인 처리
+
   const handleApprove = async (e, reportId, targetId) => {
     if (e) e.stopPropagation();
     if (!window.confirm("신고를 승인하시겠습니까?")) return;
@@ -130,7 +131,6 @@ export default function AdminCommunity() {
     try {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
-      // 서브 탭에 따라 호출할 엔드포인트 결정
       const url = reportSubTab === 'boards'
         ? `${ADMIN_API_BASE}/report/${reportId}/approve`
         : `${ADMIN_API_BASE}/report/comment/${reportId}/approve`;
@@ -147,7 +147,7 @@ export default function AdminCommunity() {
       setLoading(false);
     }
   };
-  // 영구 삭제 처리 (DB에서 완전히 삭제)
+
   const handleDeleteItem = async (e, id, type) => {
     if (e) e.stopPropagation();
     if (!window.confirm("정말로 영구 삭제하시겠습니까?")) return;
@@ -157,7 +157,7 @@ export default function AdminCommunity() {
         ? `${BOARD_ADMIN_API_BASE}/boards/${id}` 
         : `${BOARD_ADMIN_API_BASE}/comments/${id}`;
 
-        await axios.delete(url, { headers: { 'Authorization': `Bearer ${token}` } });
+      await axios.delete(url, { headers: { 'Authorization': `Bearer ${token}` } });
       toast.success('영구 삭제되었습니다.');
       setSelectedItem(null);
       activeTab === 'posts' ? fetchPosts() : fetchReports();
@@ -166,7 +166,6 @@ export default function AdminCommunity() {
     }
   };
 
-  // 공지사항 제출 핸들러
   const handleNoticeSubmit = async (e) => {
     e.preventDefault();
     if (!noticeData.title.trim() || !noticeData.content.trim()) {
@@ -183,9 +182,10 @@ export default function AdminCommunity() {
 
       const requestBlob = new Blob(
         [JSON.stringify({
-          ...noticeData,
+          title: noticeData.title,
+          content: noticeData.content,
+          category: noticeData.category,
           artistId: finalArtistId,
-          isAdmin: true
         })],
         { type: 'application/json' }
       );
@@ -193,23 +193,23 @@ export default function AdminCommunity() {
       formData.append('request', requestBlob);
       if (selectedFile) formData.append('file', selectedFile);
 
-      await axios.post(`${BOARD_ADMIN_API_BASE}/write`, formData, {
+      await axios.post(`${BOARD_API_BASE}/write`, formData, {
         headers: { 
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         }
       });
-
       toast.success('공지사항이 등록되었습니다.');
-      setNoticeData({ ...noticeData, title: '', content: '' });
+      
+      setNoticeData({ title: '', content: '', category: '공지사항', artistId: '0' });
       setSelectedFile(null);
       setActiveTab('posts');
       fetchPosts();
-    } catch (error) { toast.error("공지사항 등록 실패"); } finally { setLoading(false); }
+    } catch (error) { 
+      toast.error("공지사항 등록 실패"); 
+    } finally { setLoading(false); }
   };
 
-
-  // 검색 로직: 제목 또는 작성자명에 검색어가 포함된 항목 필터링
   const filteredPosts = postList.filter((p) =>
     p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
     p.authorName?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -233,7 +233,6 @@ export default function AdminCommunity() {
           </button>
         </div>
         
-        {/* 신고 관리 선택 시에만 나타나는 서브 탭 */}
         {activeTab === 'reports' && (
           <div className="flex gap-6 border-b border-slate-100 mb-4 px-2">
             <button onClick={() => setReportSubTab('boards')} className={`pb-3 text-sm font-black transition-all ${reportSubTab === 'boards' ? 'text-rose-500 border-b-2 border-rose-500' : 'text-slate-400'}`}>게시글 신고 ({boardCount})</button>
@@ -246,10 +245,10 @@ export default function AdminCommunity() {
           <div className="space-y-4">
             <div className="relative">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input type="text" placeholder="제목 또는 작성자 검색..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm outline-none shadow-sm focus:border-rose-300 transition-all" />
+              <input type="text" placeholder="제목 검색..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm outline-none shadow-sm focus:border-rose-300" />
             </div>
             <div className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-slate-100">
-              {loading ? <div className="text-center py-20 text-slate-400 font-bold animate-pulse">데이터 로딩 중...</div> : (
+              {loading ? <div className="text-center py-20 text-slate-400 font-bold animate-pulse">로딩 중...</div> : (
                 <table className="w-full text-left">
                   <thead className="bg-slate-50/50">
                     <tr className="border-b border-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-widest">
@@ -270,7 +269,7 @@ export default function AdminCommunity() {
                         </td>
                         <td className="p-5 text-right">
                           <div className="flex justify-end gap-2">
-                            <button onClick={() => handleShowDetail(post, 'board')} className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-white transition-all"><Eye size={15}/></button>
+                            <button onClick={() => handleShowDetail(post, 'board')} className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-white"><Eye size={15}/></button>
                             <button onClick={(e) => handleDeleteItem(e, post.boardId, 'board')} className="p-2.5 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all"><Trash2 size={15}/></button>
                           </div>
                         </td>
@@ -286,8 +285,8 @@ export default function AdminCommunity() {
         {/* --- 2. 신고 관리 --- */}
         {activeTab === 'reports' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {loading ? <div className="col-span-full text-center py-20 text-slate-400 font-bold animate-pulse uppercase tracking-widest">Loading Reports...</div> : (
-              reportList.length === 0 ? <div className="col-span-full text-center py-20 text-slate-400 font-bold bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">현재 대기 중인 신고 건이 없습니다.</div> :
+            {loading ? <div className="col-span-full text-center py-20 text-slate-400 font-bold animate-pulse">로딩 중...</div> : (
+              reportList.length === 0 ? <div className="col-span-full text-center py-20 text-slate-400 font-bold bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">현재 신고 건이 없습니다.</div> :
               reportList.map((report) => (
                 <div key={report.reportId} className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all group">
                   <div className="flex justify-between items-start mb-4">
@@ -297,7 +296,7 @@ export default function AdminCommunity() {
                       </div>
                       <p className="font-black text-slate-800 text-sm line-clamp-1">{report.postTitle || (reportSubTab === 'comments' ? '신고된 댓글' : '신고된 게시글')}</p>
                     </div>
-                    <span className="text-[9px] bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg font-black uppercase tracking-tighter">PENDING</span>
+                    <span className="text-[9px] bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg font-black uppercase">PENDING</span>
                   </div>
                   <div className="bg-slate-50 p-4 rounded-2xl mb-5 border border-slate-100">
                     <p className="text-[10px] text-slate-400 font-black mb-1.5 flex items-center gap-1 uppercase tracking-wider"><AlertCircle size={12}/> Reason</p>
@@ -324,7 +323,7 @@ export default function AdminCommunity() {
               <form onSubmit={handleNoticeSubmit} className="space-y-6">
                 <div className="flex gap-3 p-1.5 bg-slate-50 rounded-2xl border border-slate-100">
                   <button type="button" onClick={() => setNoticeType('ALL')} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${noticeType === 'ALL' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-400'}`}>
-                    <Globe size={14}/> 전체 공지 (자유게시판)
+                    <Globe size={14}/> 전체 공지
                   </button>
                   <button type="button" onClick={() => setNoticeType('ARTIST')} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${noticeType === 'ARTIST' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-400'}`}>
                     <Star size={14}/> 아티스트별 공지
@@ -332,9 +331,17 @@ export default function AdminCommunity() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <select disabled={noticeType === 'ALL'} value={noticeData.artistId} onChange={(e) => setNoticeData(p => ({...p, artistId: e.target.value}))} className="w-full p-3.5 rounded-xl border border-slate-100 font-bold text-xs bg-slate-50">
+                  <select 
+                    disabled={noticeType === 'ALL'} 
+                    value={noticeData.artistId} 
+                    onChange={(e) => setNoticeData(p => ({...p, artistId: e.target.value}))} 
+                    className="w-full p-3.5 rounded-xl border border-slate-100 font-bold text-xs bg-slate-50"
+                  >
                     <option value="0">아티스트 선택</option>
-                    {allArtists.map(a => <option key={a.artistId} value={a.artistId}>{a.stageName}</option>)}
+                    {/* [수정] 백엔드 DTO 필드명에 맞춰 key와 name 처리 */}
+                    {allArtists.map(a => (
+                      <option key={a.id} value={a.id}>{a.stageName || a.name}</option>
+                    ))}
                   </select>
                   <select value={noticeData.category} onChange={(e) => setNoticeData(p => ({...p, category: e.target.value}))} className="w-full p-3.5 rounded-xl border border-slate-100 font-bold text-xs bg-slate-50">
                     <option value="공지사항">공지사항</option>
@@ -361,21 +368,21 @@ export default function AdminCommunity() {
         )}
       </div>
 
-      {/* 상세보기 모달 (기존과 동일) */}
+      {/* 상세보기 모달 */}
       {selectedItem && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] p-4 backdrop-blur-md" onClick={() => setSelectedItem(null)}>
-          <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center text-slate-800">
               <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-3 py-1 rounded-full uppercase tracking-widest">Content Review</span>
-              <button onClick={() => setSelectedItem(null)} className="p-2 hover:bg-white rounded-full text-slate-400 transition-colors"><X size={20}/></button>
+              <button onClick={() => setSelectedItem(null)} className="p-2 hover:bg-white rounded-full text-slate-400"><X size={20}/></button>
             </div>
             <div className="p-8 space-y-4 max-h-[50vh] overflow-y-auto text-slate-700">
               <h4 className="text-xl font-black text-slate-900 leading-tight">{selectedItem.title}</h4>
-              <p className="text-sm leading-relaxed">{selectedItem.content || "내용이 없습니다."}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedItem.content || "내용이 없습니다."}</p>
             </div>
             <div className="p-6 bg-slate-50/50 flex gap-3">
-              <button onClick={() => setSelectedItem(null)} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-500 transition-all">닫기</button>
-              <button onClick={(e) => handleDeleteItem(e, selectedItem.boardId || selectedItem.commentId, selectedItem.type)} className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black hover:bg-rose-600 transition-all">영구 삭제</button>
+              <button onClick={() => setSelectedItem(null)} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-500">닫기</button>
+              <button onClick={(e) => handleDeleteItem(e, selectedItem.boardId || selectedItem.id, selectedItem.type)} className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black hover:bg-rose-600 transition-all">영구 삭제</button>
             </div>
           </div>
         </div>
