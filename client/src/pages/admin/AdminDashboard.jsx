@@ -4,9 +4,12 @@
  * Web-style design with enhanced visual hierarchy
  */
 
+import React, { useState, useEffect } from 'react';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 import Layout from '@/components/Layout';
 import { Users, ShoppingBag, Calendar, TrendingUp, AlertCircle, Clock, BarChart3, ArrowUpRight, Activity, Zap } from 'lucide-react';
 import { Link } from 'wouter';
+import { coreApi } from '@/lib/api';
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
@@ -14,7 +17,7 @@ const platformStats = [
 { label: '총 사용자', value: '584,291', change: '+12.3%', icon: <Users size={20} />, color: 'from-rose-400 to-pink-500', bg: 'bg-rose-50', text: 'text-rose-600' },
 { label: '등록 아티스트', value: '1,240', change: '+8.7%', icon: <MicIcon size={20} />, color: 'from-violet-400 to-purple-500', bg: 'bg-violet-50', text: 'text-violet-600' },
 { label: '이번 달 거래액', value: '₩2.4억', change: '+31.2%', icon: <ShoppingBag size={20} />, color: 'from-amber-400 to-orange-400', bg: 'bg-amber-50', text: 'text-amber-600' },
-{ label: '이번 달 이벤트', value: '284', change: '+19.4%', icon: <Calendar size={20} />, color: 'from-teal-400 to-cyan-500', bg: 'bg-teal-50', text: 'text-teal-600' }];
+{ label: '승인 된 이벤트', value: '284', change: '+19.4%', icon: <Calendar size={20} />, color: 'from-teal-400 to-cyan-500', bg: 'bg-teal-50', text: 'text-teal-600' }];
 
 
 const monthlyUsers = [
@@ -60,6 +63,145 @@ function MicIcon({ size = 18 }) {
 }
 
 export default function AdminDashboard() {
+  const stompClient = useWebSocket();
+  const [settlements, setSettlements] = useState([]);
+  const [summary, setSummary] = useState({
+    thisMonthTotal: 0,
+    feeTotal: 0,
+    artistSettlementTotal: 0,
+    completedSettlementCount: 0
+  });
+
+  const [counts, setCounts] = useState({
+    totalUsers: 0,
+    totalArtists: 0,
+    totalEvents: 0,
+    pendingGoods: 0,
+    pendingEvents: 0,
+    pendingArtists: 0,
+    pendingReports: 0
+  });
+
+  const [monthlyUsers, setMonthlyUsers] = useState([]);
+  const [monthlyTrend, setMonthlyTrend] = useState([]); // 차트 데이터 상태
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 숫자를 원화 형식으로 포맷팅하는 함수
+  const formatKRW = (val) => `₩${Number(val).toLocaleString()}`;
+
+  // ✅ 데이터 가져오기 함수
+  const fetchCounts = async () => {
+    try {
+      const res = await coreApi.get('/admin/dashboard');
+      setCounts(res.data);
+      if (res.data.userGrowth) {
+      setMonthlyUsers(res.data.userGrowth); 
+    }
+    } catch (error) {
+      console.error("데이터 로딩 실패:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCounts();
+  }, []);
+
+  const liveStats = [
+    { label: '총 사용자', value: counts.totalUsers.toLocaleString() + '명', change: '+12.3%', icon: <Users size={20} />, bg: 'bg-rose-50', text: 'text-rose-600' },
+    { label: '등록 아티스트', value: counts.totalArtists.toLocaleString() + '명', change: '+8.7%', icon: <MicIcon size={20} />, bg: 'bg-violet-50', text: 'text-violet-600' },
+    { label: '이번 달 거래액', value: formatKRW(summary.thisMonthTotal), change: '+31.2%', icon: <ShoppingBag size={20} />, bg: 'bg-amber-50', text: 'text-amber-600' },
+    { label: '승인 된 이벤트', value: counts.totalEvents + '건', change: '+19.4%', icon: <Calendar size={20} />, bg: 'bg-teal-50', text: 'text-teal-600' }
+  ];
+
+  const pendingItemsList = [
+    { label: '굿즈 승인 대기', count: counts.pendingGoods, href: '/admin/store', color: 'text-amber-600 bg-amber-50', urgency: 'high' },
+    { label: '예매 승인 대기', count: counts.pendingEvents, href: '/admin/booking', color: 'text-violet-600 bg-violet-50', urgency: 'medium' },
+    { label: '아티스트 신청', count: counts.pendingArtists, href: '/admin/artists', color: 'text-rose-600 bg-rose-50', urgency: 'low' },
+    { label: '신고 접수', count: counts.pendingReports, href: '/admin/community', color: 'text-red-600 bg-red-50', urgency: 'high' }
+  ];
+
+  // 1. 초기 데이터 요청 (MQ 트리거)
+  const fetchInitialData = async () => {
+    try {
+      setIsLoading(true);
+      // 백엔드의 AdminSettlementController.java 내 @GetMapping 실행
+      await coreApi.get('/admin/settlement');
+      console.log('=====> [Settlement] 정산 데이터 계산 요청 전송');
+    } catch (error) {
+      console.error('Failed to trigger settlement data:', error);
+      toast.error('데이터를 불러오는 데 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+  // 웹소켓 연결이 안 되어 있으면 아무것도 하지 않음
+  if (!stompClient) return;
+
+  console.log('📡 [Dashboard] 웹소켓 준비 완료, 데이터 구독 및 요청 시작');
+
+  // A. 구독 설정
+  const subscription = stompClient.subscribe('/topic/admin/settlement', (frame) => {
+    try {
+      const response = JSON.parse(frame.body);
+      const data = response.payload || response; 
+      console.log('📊 [WebSocket] 데이터 수신 성공:', data);
+
+      if (data.summary) {
+        setSummary({
+          thisMonthTotal: data.summary.totalGrossAmount || 0,
+          feeTotal: data.summary.totalPlatformFee || 0,
+          artistSettlementTotal: data.summary.totalSettledAmount || 0,
+          completedSettlementCount: data.artistSettlements?.length || 0
+        });
+      }
+
+      if (data.monthlyTrend) {
+        setMonthlyTrend(data.monthlyTrend.map(stat => ({
+          month: stat.month,
+          total: stat.totalGross,
+          fee: stat.totalFee
+        })));
+      }
+
+      if (data.artistSettlements) {
+        setSettlements(data.artistSettlements.map((s, index) => ({
+          id: s.artistId || index,
+          artist: s.artistName || '알 수 없는 아티스트',
+          amount: s.grossAmount || 0,
+          fee: s.feeAmount || 0,
+          net: s.netAmount || 0,
+          status: s.status === 'COMPLETED' ? 'completed' : 'pending',
+          date: s.settlementDate || '정산 예정' 
+        })));
+      }
+    } catch (err) {
+      console.error('WebSocket data parsing error:', err);
+    }
+  });
+
+  // B. 구독이 완료된 후, 아주 약간의 시간차(0.2초)를 두고 서버에 데이터 요청
+  // (구독이 완료되기도 전에 응답이 오는 걸 방지)
+  const timer = setTimeout(() => {
+    fetchInitialData();
+  }, 200);
+
+  return () => {
+    subscription.unsubscribe();
+    clearTimeout(timer);
+  };
+}, [stompClient]); // 👈 stompClient가 들어올 때 이 로직이 실행됩니다!
+
+  // 실제 데이터가 없을 때만 보여줄 데모 데이터 (개발용)
+  const displaySettlements = settlements.length > 0 ? settlements : [
+    { id: 'demo1', artist: '데이터 로딩 중...', amount: 0, fee: 0, net: 0, status: 'pending', date: '-' }
+  ];
+
+  const displayTrend = monthlyTrend.length > 0 ? monthlyTrend : [
+    { month: '데이터 없음', total: 0, fee: 0 }
+  ];
+
   return (
     <Layout role="admin">
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-orange-50">
@@ -76,10 +218,10 @@ export default function AdminDashboard() {
         </div>
 
         <div className="max-w-7xl mx-auto px-6 py-12">
-          {/* Stats Grid */}
+          {/* ✅ 수정 1: platformStats 대신 liveStats를 사용합니다 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            {platformStats.map((stat, idx) =>
-            <div key={idx} className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-gray-200">
+            {liveStats.map((stat, idx) => (
+              <div key={idx} className="group bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-gray-200">
                 <div className="flex items-start justify-between mb-4">
                   <div className={`${stat.bg} p-3 rounded-xl group-hover:scale-110 transition-transform`}>
                     <div className={stat.text}>{stat.icon}</div>
@@ -90,14 +232,14 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <p className="text-gray-600 text-sm font-medium mb-1">{stat.label}</p>
+                {/* 여기가 실제 값이 찍히는 곳입니다 */}
                 <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
               </div>
-            )}
+            ))}
           </div>
 
-          {/* Charts Section */}
+          {/* Charts Section (기존과 동일) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-            {/* User Growth Chart */}
             <div className="lg:col-span-2 bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -120,14 +262,12 @@ export default function AdminDashboard() {
                   <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                    formatter={(value) => `${(value / 1000).toFixed(0)}K`} />
-                  
+                    formatter={(value) => `${value.toLocaleString()}명`} />
                   <Area type="monotone" dataKey="users" stroke="#f472b6" fillOpacity={1} fill="url(#colorUsers)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
 
-            {/* Revenue Chart */}
             <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -139,22 +279,20 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyRevenue}>
+                <BarChart data={monthlyTrend}>
                   <XAxis dataKey="month" stroke="#9ca3af" style={{ fontSize: '12px' }} />
                   <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                    formatter={(value) => `₩${value}억`} />
-                  
-                  <Bar dataKey="value" fill="#fb923c" radius={[8, 8, 0, 0]} />
+                    formatter={(value) => `₩${value.toLocaleString()}`} />
+                  <Bar dataKey="total" fill="#fb923c" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Pending Items & Recent Activity */}
+          {/* Pending Items & Activity (기존과 동일) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Pending Items */}
             <div className="lg:col-span-2 bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -166,22 +304,21 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                {pendingItems.map((item, idx) =>
-                <Link key={idx} href={item.href}>
-                    <a className={`${item.color} p-6 rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer group`}>
+                {pendingItemsList.map((item, idx) => (
+                  <Link key={idx} href={item.href}>
+                    <div className={`${item.color} p-6 rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer group`}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-semibold">{item.label}</span>
                         {item.urgency === 'high' && <Zap size={14} className="text-red-500" />}
                       </div>
                       <p className="text-3xl font-bold">{item.count}</p>
                       <p className="text-xs opacity-75 mt-2 group-hover:underline">상세보기 →</p>
-                    </a>
+                    </div>
                   </Link>
-                )}
+                ))}
               </div>
             </div>
 
-            {/* Recent Activities */}
             <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -193,8 +330,8 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="space-y-4">
-                {recentActivities.map((activity, idx) =>
-                <div key={idx} className="flex items-start gap-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+                {recentActivities.map((activity, idx) => (
+                  <div key={idx} className="flex items-start gap-3 pb-4 border-b border-gray-100 last:border-0 last:pb-0">
                     <div className={`${activity.color} p-2 rounded-lg flex-shrink-0`}>
                       {activity.icon}
                     </div>
@@ -206,7 +343,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   </div>
-                )}
+                ))}
               </div>
             </div>
           </div>
@@ -216,49 +353,53 @@ export default function AdminDashboard() {
             <h2 className="text-2xl font-bold text-gray-900 mb-6">빠른 관리</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Link href="/admin/users">
-                <a className="bg-white hover:bg-violet-50 rounded-xl p-4 transition-colors duration-300 border border-violet-200 hover:border-violet-400 group">
+                <div className="bg-white hover:bg-violet-50 rounded-xl p-4 transition-colors duration-300 border border-violet-200 hover:border-violet-400 group">
                   <div className="flex items-center gap-3 mb-2">
                     <Users size={20} className="text-violet-600" />
                     <span className="font-semibold text-gray-900">사용자 관리</span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">584,291명</p>
+                  <p className="text-2xl font-bold text-gray-900">{counts.totalUsers.toLocaleString()}명</p>
                   <p className="text-xs text-gray-500 mt-2 group-hover:text-violet-600">관리하기 →</p>
-                </a>
+                </div>
               </Link>
               <Link href="/admin/artists">
-                <a className="bg-white hover:bg-rose-50 rounded-xl p-4 transition-colors duration-300 border border-rose-200 hover:border-rose-400 group">
+                <div className="bg-white hover:bg-rose-50 rounded-xl p-4 transition-colors duration-300 border border-rose-200 hover:border-rose-400 group">
                   <div className="flex items-center gap-3 mb-2">
                     <MicIcon size={20} />
                     <span className="font-semibold text-gray-900 text-rose-600">아티스트 관리</span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">1,240명</p>
+                  <p className="text-2xl font-bold text-gray-900">{counts.totalArtists.toLocaleString()}명</p>
                   <p className="text-xs text-gray-500 mt-2 group-hover:text-rose-600">관리하기 →</p>
-                </a>
+                </div>
               </Link>
               <Link href="/admin/store">
-                <a className="bg-white hover:bg-amber-50 rounded-xl p-4 transition-colors duration-300 border border-amber-200 hover:border-amber-400 group">
+                <div className="bg-white hover:bg-amber-50 rounded-xl p-4 transition-colors duration-300 border border-amber-200 hover:border-amber-400 group">
                   <div className="flex items-center gap-3 mb-2">
                     <ShoppingBag size={20} className="text-amber-600" />
                     <span className="font-semibold text-gray-900">굿즈 승인</span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">5건 대기</p>
+                  <p className="text-2xl font-bold text-gray-900">{counts.pendingGoods}건 대기</p>
                   <p className="text-xs text-gray-500 mt-2 group-hover:text-amber-600">승인하기 →</p>
-                </a>
+                </div>
               </Link>
               <Link href="/admin/settlement">
-                <a className="bg-white hover:bg-teal-50 rounded-xl p-4 transition-colors duration-300 border border-teal-200 hover:border-teal-400 group">
+                <div className="bg-white hover:bg-teal-50 rounded-xl p-4 transition-colors duration-300 border border-teal-200 hover:border-teal-400 group">
                   <div className="flex items-center gap-3 mb-2">
                     <TrendingUp size={20} className="text-teal-600" />
                     <span className="font-semibold text-gray-900">결제 정산</span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">이번 달</p>
+                  {/* ✅ 수정 2: '이번 달' 글자 대신 실제 정산 예정 금액을 보여줍니다 */}
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatKRW(summary.artistSettlementTotal)}
+                  </p>
                   <p className="text-xs text-gray-500 mt-2 group-hover:text-teal-600">정산하기 →</p>
-                </a>
+                </div>
               </Link>
             </div>
           </div>
         </div>
       </div>
-    </Layout>);
+    </Layout>
+  );
 
 }
