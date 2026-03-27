@@ -72,9 +72,13 @@ const fetchMyEvents = async () => {
         let rawEvents = Array.isArray(data) ? data : (data.events || []);
         setMyEvents(rawEvents);
 
-        const totalResCount = Array.isArray(data) 
-          ? data.reduce((acc, curr) => acc + (curr.reservationsCount || curr._count?.reservations || 0), 0)
-          : (data.totalReservations || 0);
+        const totalResCount =rawEvents.reduce((acc, event) => {
+            const capacity = event.total_capacity || event.totalCapacity || 0;
+            // available_seats가 없으면 안 팔린 걸로(capacity와 동일하게) 간주
+            const available = event.available_seats ?? event.availableSeats ?? capacity;
+            const sold = capacity > available ? capacity - available : 0;
+            return acc + sold;
+        }, 0);
 
         setStats({ totalReservations: totalResCount });
     } catch (error) {
@@ -210,6 +214,13 @@ const fetchMyEvents = async () => {
       }
     }
   };
+
+  // 🌟 추가: 승인 완료(CONFIRMED) 상태이면서, 오늘 날짜 이후인 '예정된' 이벤트만 필터링
+  const upcomingEventsCount = myEvents.filter(event => {
+    const isConfirmed = event.approval_status === 'CONFIRMED' || event.status === 'CONFIRMED';
+    const eventDate = new Date(event.event_date || event.date);
+    return isConfirmed && eventDate > new Date(); // 오늘 이후의 일정만
+  }).length;
 
   return (
     <Layout role="artist">
@@ -371,7 +382,7 @@ const fetchMyEvents = async () => {
                     <div className="p-4 bg-white/60 rounded-2xl border border-teal-50">
                         <p className="text-xs text-muted-foreground mb-1">예정된 오프라인 이벤트</p>
                         {/* 🌟 수정: 실시간 내 공연 갯수로 표시되게 연동 */}
-                        <p className="text-2xl font-bold text-rose-500">{myEvents.length}건</p>
+                        <p className="text-2xl font-bold text-rose-500">{upcomingEventsCount}건</p>
                     </div>
                 </div>
             </div>
