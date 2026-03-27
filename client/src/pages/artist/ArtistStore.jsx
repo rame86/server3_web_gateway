@@ -142,15 +142,8 @@ export default function ArtistStore() {
                     <Label htmlFor="category">판매 유형 (Category)</Label>
                     <select id="category" className="w-full h-10 px-3 bg-white border border-violet-100 rounded-xl text-sm focus:ring-2 focus:ring-violet-300 focus:outline-none">
                       <option value="OFFICIAL">공식 굿즈 (OFFICIAL)</option>
-<<<<<<< HEAD
                       <option value="UNOFFICIAL">팬메이드 (UNOFFICIAL)</option>
                       <option value="SECONDHAND">중고 (SECONDHAND)</option>
-=======
-
-            <option value="UNOFFICIAL">팬메이드 (UNOFFICIAL)</option>
-
-                      <option value="ALBUM">앨범 (ALBUM)</option>
->>>>>>> 2f9f538282f165bc65893537cce8f8789b4042c0
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -217,7 +210,6 @@ export default function ArtistStore() {
                   </label>
                 </div>
                 <div className="grid grid-cols-2 gap-4 opacity-70">
-<<<<<<< HEAD
                    <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground ml-1">Seller Type (Auto)</p>
                       <Input disabled value="ARTIST" className="h-8 text-xs rounded-lg" />
@@ -226,16 +218,6 @@ export default function ArtistStore() {
                       <p className="text-[10px] text-muted-foreground ml-1">Status (Auto)</p>
                       <Input disabled value="PENDING 승인 대기" className="h-8 text-xs rounded-lg" />
                    </div>
-=======
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground ml-1">Seller ID (Auto)</p>
-                    <Input disabled value="3" className="h-8 text-xs rounded-lg" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-muted-foreground ml-1">Seller Type (Auto)</p>
-                    <Input disabled value="ARTIST" className="h-8 text-xs rounded-lg" />
-                  </div>
->>>>>>> 2f9f538282f165bc65893537cce8f8789b4042c0
                 </div>
                 <DialogFooter className="pt-4">
                   <Button type="button" variant="ghost" onClick={() => setIsAdding(false)} className="rounded-xl">취소</Button>
