@@ -4,7 +4,7 @@ import Layout from '@/components/Layout';
 import { Star, Heart, Search, ChevronRight } from 'lucide-react';
 import { formatNumber } from '@/lib/data';
 import { toast } from 'sonner';
-import { coreApi } from '@/lib/api';
+import { coreApi, resApi } from '@/lib/api';
 
 export default function UserArtists() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,15 +30,41 @@ export default function UserArtists() {
       return url.startsWith('/') ? url : `/${url}`; 
   };
 
-  // 1. 아티스트 목록 가져오기
+  // 1. 데이터 가져오기 (아티스트 + 전체 이벤트 딱 1번)
   useEffect(() => {
     const fetchArtists = async () => {
       try {
+        // 1-1. 아티스트 목록 & 팔로우 가져오기
         const [artistRes, followRes] = await Promise.all([
           coreApi.get('/artist/list'),
           coreApi.get('/artist/my-follows')
         ]);
-        setArtistList(artistRes.data);
+        
+        const baseArtists = artistRes.data || [];
+        
+        let allEvents = [];
+        try {
+          const eventsRes = await resApi.get('/events/allEvents');
+          allEvents = Array.isArray(eventsRes.data?.events) ? eventsRes.data.events : (Array.isArray(eventsRes.data) ? eventsRes.data : []);
+        } catch (eventErr) {
+          // 에러(CORS, 401 등) 나면 콘솔에 1줄만 찍히고 화면은 살림
+          console.error("이벤트 목록을 가져오지 못했습니다.");
+        }
+
+        // 1-3. 가져온 전체 이벤트 중 '승인 완료된 미래 이벤트'만 필터링
+        const activeEvents = allEvents.filter(e => {
+          const isConfirmed = e.approval_status === 'CONFIRMED' || e.status === 'CONFIRMED';
+          return isConfirmed && new Date(e.event_date || e.date) > new Date();
+        });
+
+        // 1-4. 아티스트 정보에 본인 이벤트 개수 매핑 (프론트에서 조립)
+        const artistsWithEvents = baseArtists.map(artist => {
+          // 이벤트의 artistId(또는 memberId)와 아티스트의 memberId가 일치하는 것만 카운트
+          const count = activeEvents.filter(e => String(e.artistId) === String(artist.memberId) || String(e.memberId) === String(artist.memberId)).length;
+          return { ...artist, eventCount: count };
+        });
+
+        setArtistList(artistsWithEvents);
         setFollowed(followRes.data.map(item => item.memberId || item)); 
       } catch (err) {
         toast.error("아티스트 목록을 불러오지 못했습니다.");
@@ -144,7 +170,9 @@ export default function UserArtists() {
                       <p className="text-xs text-muted-foreground">팬</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-bold text-foreground">0</p>
+                      <p className={`text-sm font-bold ${artist.eventCount > 0 ? 'text-rose-500' : 'text-foreground'}`}>
+    {artist.eventCount || 0}
+  </p>
                       <p className="text-xs text-muted-foreground">이벤트</p>
                     </div>
                     <div className="text-center">
