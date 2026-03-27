@@ -31,6 +31,7 @@ export default function ArtistStore() {
     if (activeTab === 'all') return matchesSearch;
     const categoryMap = {
       official: 'OFFICIAL',
+
       unofficial: 'UNOFFICIAL',
       secondhand: 'SECONDHAND'
 
@@ -119,7 +120,7 @@ export default function ArtistStore() {
             </h1>
             <p className="text-sm text-muted-foreground">판매 중인 굿즈와 등록 요청 상태를 확인합니다</p>
           </div>
-          
+
           <Dialog open={isAdding} onOpenChange={setIsAdding}>
             <DialogTrigger asChild>
               <button className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 text-white font-bold rounded-2xl shadow-lg hover:bg-violet-700 transition-all hover-lift">
@@ -141,8 +142,15 @@ export default function ArtistStore() {
                     <Label htmlFor="category">판매 유형 (Category)</Label>
                     <select id="category" className="w-full h-10 px-3 bg-white border border-violet-100 rounded-xl text-sm focus:ring-2 focus:ring-violet-300 focus:outline-none">
                       <option value="OFFICIAL">공식 굿즈 (OFFICIAL)</option>
+<<<<<<< HEAD
                       <option value="UNOFFICIAL">팬메이드 (UNOFFICIAL)</option>
                       <option value="SECONDHAND">중고 (SECONDHAND)</option>
+=======
+
+            <option value="UNOFFICIAL">팬메이드 (UNOFFICIAL)</option>
+
+                      <option value="ALBUM">앨범 (ALBUM)</option>
+>>>>>>> 2f9f538282f165bc65893537cce8f8789b4042c0
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -196,7 +204,7 @@ export default function ArtistStore() {
                       <div className="flex flex-col items-center gap-2 text-violet-400">
                         <ImageIcon size={28} />
                         <span className="text-xs font-semibold">클릭하여 이미지 선택</span>
-                        <span className="text-[10px] text-muted-foreground">JPG, PNG, WEBP (최대 10MB)</span>
+                        <span className="text-[10px] text-muted-foreground">JPG, PNG, WEBP (최대 50MB)</span>
                       </div>
                     )}
                     <input
@@ -209,6 +217,7 @@ export default function ArtistStore() {
                   </label>
                 </div>
                 <div className="grid grid-cols-2 gap-4 opacity-70">
+<<<<<<< HEAD
                    <div className="space-y-1">
                       <p className="text-[10px] text-muted-foreground ml-1">Seller Type (Auto)</p>
                       <Input disabled value="ARTIST" className="h-8 text-xs rounded-lg" />
@@ -217,6 +226,16 @@ export default function ArtistStore() {
                       <p className="text-[10px] text-muted-foreground ml-1">Status (Auto)</p>
                       <Input disabled value="PENDING 승인 대기" className="h-8 text-xs rounded-lg" />
                    </div>
+=======
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground ml-1">Seller ID (Auto)</p>
+                    <Input disabled value="3" className="h-8 text-xs rounded-lg" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-muted-foreground ml-1">Seller Type (Auto)</p>
+                    <Input disabled value="ARTIST" className="h-8 text-xs rounded-lg" />
+                  </div>
+>>>>>>> 2f9f538282f165bc65893537cce8f8789b4042c0
                 </div>
                 <DialogFooter className="pt-4">
                   <Button type="button" variant="ghost" onClick={() => setIsAdding(false)} className="rounded-xl">취소</Button>
@@ -231,11 +250,11 @@ export default function ArtistStore() {
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input 
-              placeholder="굿즈 이름으로 검색..." 
+            <Input
+              placeholder="굿즈 이름으로 검색..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 h-11 bg-white border-violet-100 rounded-2xl focus:ring-violet-300" 
+              className="pl-10 h-11 bg-white border-violet-100 rounded-2xl focus:ring-violet-300"
             />
           </div>
           <div className="flex gap-1 bg-violet-50 p-1 rounded-2xl overflow-x-auto">
@@ -275,7 +294,7 @@ export default function ArtistStore() {
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-3">
                     <h3 className="font-bold text-foreground leading-tight line-clamp-2">{item.name}</h3>
@@ -283,7 +302,7 @@ export default function ArtistStore() {
                       <MoreVertical size={16} />
                     </button>
                   </div>
-                  
+
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">
@@ -292,7 +311,7 @@ export default function ArtistStore() {
                       </div>
                       <span className="font-bold text-foreground">{formatPrice(item.price)}</span>
                     </div>
-                    
+
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Archive size={14} className="text-violet-400" />
@@ -304,7 +323,7 @@ export default function ArtistStore() {
                       )}>{item.stock}개 남음</span>
                     </div>
                   </div>
-                  
+
                   <div className="mt-5 pt-4 border-t border-violet-50 flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Clock size={12} />
