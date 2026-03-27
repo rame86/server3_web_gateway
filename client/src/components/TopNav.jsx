@@ -27,8 +27,9 @@ const artistCategories = [
   { label: '팬덤', href: '/artist/fandom' },
   { label: '굿즈', href: '/artist/store' },
   { label: '채팅', href: '/artist/chat' },
-  { label: '이벤트', href: '/artist/events' },
-  { label: '커뮤니티', href: '/artist/community' },
+  { label: '예매', href: '/artist/booking' },
+  // { label: '커뮤니티', href: '/artist/community' },
+  { label: '후원', href: '/artist/donations' },
   { label: '정산', href: '/artist/settlement' }
 ];
 
