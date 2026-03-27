@@ -159,7 +159,7 @@ export default function UserArtistDetail({ params }) {
   ];
 
   const latestNotice = announcements?.length > 0 ? announcements[0] : null;
-  const latestArtistLetter = fanLetters?.find(l => l.authorRole === 'ARTIST') || null;
+  const latestArtistLetter = fanLetters?.find(l => l.isArtistPost === true) || null;
   
   if (!memberId) return <Layout role="user"><div className="p-10 text-center">잘못된 접근입니다.</div></Layout>;
   if (loading) return <Layout role="user"><div className="p-10 text-center text-rose-500 font-bold italic tracking-widest">Lumina 로딩 중...</div></Layout>;
