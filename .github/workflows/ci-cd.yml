@@ -29,6 +29,7 @@ jobs:
           cp nginx.conf deploy/
           cp Dockerfile deploy/
           cp docker-compose.yml deploy/
+          cp components.json deploy/
           
           # 3. 배포 폴더 압축
           cd deploy && tar -czf frontend.tar.gz client/ shared/ patches/ package.json pnpm-lock.yaml vite.config.js nginx.conf Dockerfile docker-compose.yml
