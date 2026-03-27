@@ -15,6 +15,8 @@
  * - ArtistResponseDTO에 email, phone, nickname, adminName 필드 추가 필요
  */
 
+// 기존 import들 아래에 추가
+import { cn } from '@/lib/utils';
 import { useState, useEffect, useCallback } from 'react';
 import Layout from '@/components/Layout';
 import {
@@ -110,10 +112,11 @@ function mapPending(dto) {
  * ArtistResponseDTO (CONFIRMED) → 컴포넌트 내부 포맷
  */
 function mapApproved(dto) {
+  if (!dto) return null; // 방어 코드 추가
   return {
     _raw: dto,
     id: dto.artistId,
-    approvalId: dto.approvalId,
+    approvalId: dto.approvalId || dto.approval_id,
     artistId: dto.artistId,
     name: dto.artistName || '-',
     nickname: dto.artistName || '-',    // DTO에 nickname 없음
@@ -191,7 +194,9 @@ export default function AdminArtists() {
   const fetchApproved = useCallback(async () => {
     try {
       const { data } = await adminApi.get('/admin/artist/activeList');
-      setApprovedArtists((data || []).map(mapApproved));
+      // 💡 여기서 status가 'CONFIRMED'인 것만 필터링해서 넣어줘 (보험용)
+      const onlyActive = (data || []).filter(item => item.status === 'CONFIRMED');
+      setApprovedArtists(onlyActive.map(mapApproved));
     } catch (err) {
       toast.error(`활성 아티스트 조회 실패: ${err.message}`);
     }
@@ -225,26 +230,51 @@ export default function AdminArtists() {
   }, [fetchPending, fetchApproved, fetchRejectionHistory]);
 
   // ── 상세 조회 ──────────────────────────────
+  // AdminArtists.jsx 내 handleOpenDetail 수정
   const handleOpenDetail = async (artist) => {
-    console.log("조회하려는 ID들:", artist.approvalId, artist.artistId);
-    // pending은 list 데이터로 바로 표시
+    setDetailArtist(null);
+    
+    // 1. 거절된 이력(history) 탭
+    if (activeTab === 'history') {
+      setDetailArtist({ ...artist, status: 'rejected' });
+      return;
+    }
 
-    if (artist.status === 'pending' || !artist.artistId) {
+    // 2. 승인 대기(pending) 탭
+    if (artist.status === 'pending') {
       setDetailArtist(artist);
       return;
     }
+
+    // 3. 활성 아티스트 상세 조회 (수정 부분)
+    // mapApproved에서 사용하는 approvalId와 artistId가 정확한지 재확인
+    const targetApprovalId = artist.approvalId || artist._raw?.approvalId;
+    const targetArtistId = artist.artistId || artist.id;
+
+    if (!targetApprovalId || !targetArtistId) {
+      console.error("ID 누락:", artist);
+      toast.error("아티스트 식별 정보가 부족합니다. (ID 누락)");
+      return;
+    }
+
     setDetailLoading(true);
-    setDetailArtist(artist);
     try {
-      const { data } = await adminApi.get(`/admin/artist/${artist.approvalId}/${artist.artistId}`);
+      const { data } = await adminApi.get(`/admin/artist/${targetApprovalId}/${targetArtistId}`);
+      
+      if (!data) {
+        throw new Error("서버에서 빈 데이터를 반환했습니다.");
+      }
+      
       setDetailArtist(mapApproved(data));
     } catch (err) {
-      toast.error(`상세 조회 실패: ${err.message}`);
+      console.error("상세 조회 에러:", err);
+      // 500 에러가 나더라도 사용자가 모달에 갇히지 않게 처리
+      toast.error(`상세 정보를 가져올 수 없습니다. (서버 에러)`);
     } finally {
       setDetailLoading(false);
     }
   };
-
+  
   // ── 승인 처리 ──────────────────────────────
   const handleApprove = async (artist) => {
     try {
@@ -283,6 +313,7 @@ export default function AdminArtists() {
       setRejectArtist(null);
       setRejectReason('');
       await fetchPending();
+      await fetchRejectionHistory();
     } catch (err) {
       toast.error(`거절 처리 실패: ${err.message}`);
     }
@@ -625,36 +656,36 @@ export default function AdminArtists() {
         </div>
 
         {/* ────────────── Modals ────────────── */}
-
-        {/* [1] 상세 정보 모달 */}
+        {/* [1] 상세 정보 모달 (Pending / Active 분리 버전) */}
         {detailArtist && (
-          <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-            <div className="glass-card w-full max-w-4xl rounded-[3.1rem] overflow-hidden shadow-2xl bg-white flex flex-col max-h-[90vh]">
-              {/* Modal Header */}
-              <div className="p-8 border-b bg-gradient-to-r from-primary to-rose-400 text-white shrink-0">
+          <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm p-4 pt-16 custom-scrollbar">
+            <div className="glass-card relative w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl bg-white flex flex-col mb-10 animate-in slide-in-from-top-8 duration-300">      
+              {/* ── [Header] 상태에 따라 색상 변경 ── */}
+              <div className={cn(
+                "p-8 border-b text-white shrink-0 transition-colors duration-500",
+                detailArtist.status === 'pending' 
+                  ? "bg-gradient-to-r from-amber-400 to-orange-500" // 승인 대기는 오렌지 테마
+                  : "bg-gradient-to-r from-primary to-rose-400"    // 활성 아티스트는 로즈 테마
+              )}>
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-6">
-                    <div className="w-24 h-24 rounded-3xl bg-white/20 backdrop-blur-md flex items-center justify-center text-4xl border border-white/30 overflow-hidden">
+                    <div className="w-24 h-24 rounded-3xl bg-white/20 backdrop-blur-md flex items-center justify-center text-4xl border border-white/30 overflow-hidden shadow-inner">
                       {detailArtist.imageUrl ? (
-                        <img
-                          src={detailArtist.imageUrl}
-                          alt={detailArtist.name}
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={detailArtist.imageUrl} className="w-full h-full object-cover" />
                       ) : (
-                        detailArtist.avatar
+                        <span className="text-4xl">{getArtistEmoji(detailArtist.id)}</span>
                       )}
                     </div>
                     <div>
                       <h2 className="text-3xl font-bold font-playfair">
-                        {detailLoading ? '로딩 중…' : detailArtist.name}
+                        {detailLoading ? '데이터 로딩 중...' : detailArtist.name}
                       </h2>
-                      <p className="text-white/80 font-medium">
-                        @{detailArtist.nickname} · {detailArtist.group} · {detailArtist.genre}
+                      <p className="text-white/90 font-medium">
+                        {detailArtist.group} · {detailArtist.genre}
                       </p>
-                      <div className="mt-2 flex gap-2">
+                      <div className="mt-2">
                         <span className="px-3 py-1 bg-white/20 rounded-full text-[10px] font-black border border-white/20 uppercase tracking-widest shadow-sm">
-                          {detailArtist.status === 'pending' ? '승인 대기 중' : '활동 아티스트'}
+                          {detailArtist.status === 'pending' ? '아티스트 파트너 신청 검토' : 'Verified Artist'}
                         </span>
                       </div>
                     </div>
@@ -668,137 +699,149 @@ export default function AdminArtists() {
                 </div>
               </div>
 
-              {/* Modal Scrollable Content */}
-              <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar">
-                <div className="grid grid-cols-2 gap-10">
-                  {/* Basic Profile */}
-                  <div className="space-y-6">
-                    <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2">
-                      <User size={14} /> Basic Profile
-                    </h4>
-                    <div className="grid gap-3">
-                      <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-2xl border border-border/50">
-                        <Mail className="text-primary" size={18} />
-                        <div>
-                          <p className="text-[10px] text-muted-foreground font-bold uppercase">Email</p>
-                          <p className="font-bold text-foreground">
-                            {detailArtist.email !== '-' ? detailArtist.email : '정보 없음'}
-                          </p>
+              {/* ── [Content] 스크롤 영역 ── */}
+              <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar bg-slate-50/30">
+                
+                {/* CASE 1: 승인 대기 아티스트 (신청 내용 및 검토 중심) */}
+                {detailArtist.status === 'pending' ? (
+                  <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-6">
+                        <h4 className="font-black text-[10px] uppercase tracking-widest text-orange-600 flex items-center gap-2">
+                          <Clock size={14} /> Submission Info
+                        </h4>
+                        <div className="grid gap-3">
+                          <div className="p-4 bg-white rounded-2xl border border-orange-100 shadow-sm">
+                            <p className="text-[10px] text-muted-foreground font-bold">신청 일시</p>
+                            <p className="font-bold text-slate-700">{detailArtist.appliedDate}</p>
+                          </div>
+                          <div className="p-4 bg-white rounded-2xl border border-orange-100 shadow-sm">
+                            <p className="text-[10px] text-muted-foreground font-bold">활동 카테고리</p>
+                            <p className="font-bold text-slate-700">{detailArtist.group} · {detailArtist.genre}</p>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-2xl border border-border/50">
-                        <Phone className="text-primary" size={18} />
-                        <div>
-                          <p className="text-[10px] text-muted-foreground font-bold uppercase">Contact</p>
-                          <p className="font-bold text-foreground">
-                            {detailArtist.phone !== '-' ? detailArtist.phone : '정보 없음'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-2xl border border-border/50">
-                        <Calendar className="text-primary" size={18} />
-                        <div>
-                          <p className="text-[10px] text-muted-foreground font-bold uppercase">
-                            Registration Date
-                          </p>
-                          <p className="font-bold text-foreground">{detailArtist.regDate}</p>
+                      
+                      <div className="space-y-6">
+                        <h4 className="font-black text-[10px] uppercase tracking-widest text-orange-600 flex items-center gap-2">
+                          <User size={14} /> Applicant Note
+                        </h4>
+                        <div className="p-5 bg-amber-50 rounded-2xl border border-dashed border-amber-200 text-sm text-amber-800 font-medium italic">
+                          "아직 정식 등록 전이므로 상세 수익 및 통계 데이터가 존재하지 않습니다."
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Activity Stats */}
-                  <div className="space-y-6">
-                    <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2">
-                      <TrendingUp size={14} /> Activity Stats
-                    </h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p className="text-[10px] text-muted-foreground font-bold">FOLLOWERS</p>
-                        <p className="text-xl font-black text-foreground">
-                          {((detailArtist.followers || 0) / 1000).toFixed(0)}K
-                        </p>
-                        <p className="text-[10px] text-emerald-500 font-bold mt-1">
-                          ▲ {detailArtist.stats?.followerTrend || '0%'}
-                        </p>
-                      </div>
-                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p className="text-[10px] text-muted-foreground font-bold">POSTS</p>
-                        <p className="text-xl font-black text-foreground">
-                          {detailArtist.stats?.posts ?? '-'}
-                        </p>
-                        <p className="text-[10px] text-slate-400 font-bold mt-1">Total active</p>
-                      </div>
-                      <div className="col-span-2 p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex justify-between items-center">
-                        <div>
-                          <p className="text-[10px] text-emerald-600 font-bold uppercase">Revenue</p>
-                          <p className="text-2xl font-black text-emerald-700">
-                            ₩{(detailArtist.stats?.revenue || 0).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">
-                            Withdrawable
-                          </p>
-                          <p className="text-lg font-bold text-foreground">
-                            ₩{(detailArtist.stats?.balance || 0).toLocaleString()}
-                          </p>
-                        </div>
+                    <div className="space-y-4 pt-6 border-t border-slate-200">
+                      <h4 className="font-black text-[10px] uppercase tracking-widest text-orange-600 flex items-center gap-2">
+                        <FileText size={14} /> Application Description (활동 포부 및 소개)
+                      </h4>
+                      <div className="p-8 bg-white rounded-[2.5rem] border border-slate-200 text-slate-600 leading-relaxed font-medium shadow-inner min-h-[150px]">
+                        {detailArtist.description || "등록된 소개 내용이 없습니다."}
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Content Quick Links */}
-                <div className="space-y-4 pt-6 border-t">
-                  <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2">
-                    <ExternalLink size={14} /> Content Quick Links
-                  </h4>
-                  <div className="flex gap-3">
-                    <button className="flex-1 p-5 rounded-[2rem] bg-white border border-border hover:border-primary transition-all flex flex-col items-center gap-2 shadow-sm group text-sm font-bold">
-                      <Package className="text-primary group-hover:scale-110 transition-transform" size={24} />
-                      굿즈 목록
-                    </button>
-                    <button className="flex-1 p-5 rounded-[2rem] bg-white border border-border hover:border-primary transition-all flex flex-col items-center gap-2 shadow-sm group text-sm font-bold">
-                      <Calendar className="text-primary group-hover:scale-110 transition-transform" size={24} />
-                      예정 이벤트
-                    </button>
-                    <button className="flex-1 p-5 rounded-[2rem] bg-white border border-border hover:border-primary transition-all flex flex-col items-center gap-2 shadow-sm group text-sm font-bold">
-                      <FileText className="text-primary group-hover:scale-110 transition-transform" size={24} />
-                      게시물 관리
-                    </button>
-                  </div>
-                </div>
-
-                {/* Admin Exclusive */}
-                <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                      <ShieldAlert size={14} /> Admin Only Management
-                    </h4>
-                    <button
-                      onClick={() => setSuspensionArtist(detailArtist)}
-                      className="px-5 py-2.5 bg-white border border-red-200 text-red-500 rounded-xl text-[10px] font-black hover:bg-red-50 transition-all flex items-center gap-2 shadow-sm uppercase tracking-tighter"
-                    >
-                      <ShieldAlert size={14} /> 권한 일시 정지
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
-                      Admin Memo
-                    </label>
-                    <div className="relative">
-                      <textarea
-                        defaultValue={detailArtist.memo}
-                        placeholder="관리자 전용 비고란입니다."
-                        className="w-full h-24 p-5 rounded-3xl bg-white border border-slate-200 focus:ring-4 focus:ring-primary/10 transition-all text-sm resize-none"
-                      />
-                      <button className="absolute bottom-4 right-4 p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-primary hover:text-white transition-all">
-                        <Save size={16} />
+                    {/* 승인 대기 상태 전용 하단 액션바 */}
+                    <div className="flex gap-4 pt-6">
+                      <button
+                        onClick={() => { setRejectArtist(detailArtist); setDetailArtist(null); }}
+                        className="flex-1 py-5 bg-slate-100 text-slate-500 rounded-3xl font-black hover:bg-red-50 hover:text-red-500 transition-all uppercase tracking-tighter"
+                      >
+                        거절 처리
+                      </button>
+                      <button
+                        onClick={() => { handleApprove(detailArtist); setDetailArtist(null); }}
+                        className="flex-[2] py-5 bg-gradient-to-r from-orange-400 to-amber-500 text-white rounded-3xl font-black shadow-lg shadow-orange-100 active:scale-95 transition-all uppercase tracking-tighter"
+                      >
+                        파트너 승인하기
                       </button>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  /* CASE 2: 활성 아티스트 (기존 수익 및 통계 중심 UI) */
+                  <div className="space-y-10 animate-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-2 gap-10">
+                      {/* Profile Info */}
+                      <div className="space-y-6">
+                        <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2">
+                          <User size={14} /> Verified Profile
+                        </h4>
+                        <div className="grid gap-3">
+                          <div className="flex items-center gap-3 p-4 bg-white rounded-2xl border shadow-sm">
+                            <Mail className="text-primary" size={18} />
+                            <div>
+                              <p className="text-[10px] text-muted-foreground font-bold uppercase">Email</p>
+                              <p className="font-bold text-foreground">{detailArtist.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 p-4 bg-white rounded-2xl border shadow-sm">
+                            <Phone className="text-primary" size={18} />
+                            <div>
+                              <p className="text-[10px] text-muted-foreground font-bold uppercase">Contact</p>
+                              <p className="font-bold text-foreground">{detailArtist.phone}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Statistics */}
+                      <div className="space-y-6">
+                        <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2">
+                          <TrendingUp size={14} /> Activity Stats
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-4 bg-white rounded-2xl border shadow-sm">
+                            <p className="text-[10px] text-muted-foreground font-bold">FOLLOWERS</p>
+                            <p className="text-xl font-black text-foreground">{detailArtist.followers?.toLocaleString()}</p>
+                          </div>
+                          <div className="p-4 bg-white rounded-2xl border shadow-sm">
+                            <p className="text-[10px] text-muted-foreground font-bold">PROCESSED AT</p>
+                            <p className="text-lg font-bold text-foreground">{detailArtist.processedDate}</p>
+                          </div>
+                          <div className="col-span-2 p-5 bg-emerald-50 rounded-2xl border border-emerald-100 flex justify-between items-center">
+                            <div>
+                              <p className="text-[10px] text-emerald-600 font-bold uppercase">Total Revenue</p>
+                              <p className="text-2xl font-black text-emerald-700">
+                                ₩{(detailArtist.stats?.revenue || 0).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">Withdrawable</p>
+                              <p className="text-lg font-bold text-foreground">
+                                ₩{(detailArtist.stats?.balance || 0).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Admin Memo Section */}
+                    <div className="p-8 bg-slate-100 rounded-[2.5rem] border border-slate-200 space-y-6">
+                      <div className="flex justify-between items-center">
+                        <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                          <ShieldAlert size={14} /> Admin Only Management
+                        </h4>
+                        <button
+                          onClick={() => setSuspensionArtist(detailArtist)}
+                          className="px-5 py-2.5 bg-white border border-red-200 text-red-500 rounded-xl text-[10px] font-black hover:bg-red-50 transition-all flex items-center gap-2 shadow-sm uppercase tracking-tighter"
+                        >
+                          <ShieldAlert size={14} /> 권한 일시 정지
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <textarea
+                          defaultValue={detailArtist.memo}
+                          placeholder="관리자 전용 비고란입니다."
+                          className="w-full h-24 p-5 rounded-3xl bg-white border border-slate-200 focus:ring-4 focus:ring-primary/10 transition-all text-sm resize-none outline-none"
+                        />
+                        <button className="absolute bottom-4 right-4 p-2 bg-slate-100 text-slate-500 rounded-lg hover:bg-primary hover:text-white transition-all">
+                          <Save size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
