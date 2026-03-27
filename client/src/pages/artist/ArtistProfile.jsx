@@ -268,6 +268,7 @@ export default function ArtistProfile() {
     fileInputRef.current?.click();
   };
 
+  // 수정된 이미지 업로드 함수
   const handleImageUpload = async (e, type) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -275,19 +276,36 @@ export default function ArtistProfile() {
     try {
       toast.loading('이미지 업로드 중...');
       const uploadData = new FormData();
-      uploadData.append('profileImage', file);
+      
+      // 서버 파라미터명 분기 처리
+      if (type === 'profile') {
+        uploadData.append('profileImage', file);
+      } else {
+        uploadData.append('bgImageFile', file);
+      }
 
-      const res = await coreApi.post('/member/profile/image', uploadData, {
+      // API 경로 분기 처리
+      const endpoint = type === 'profile' ? '/member/profile/image' : '/artist/bg-image';
+      
+      const res = await coreApi.post(endpoint, uploadData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      const fieldName = type === 'profile' ? 'profileImageUrl' : 'fandomImage';
-      setFormData(prev => ({ ...prev, [fieldName]: res.data.url }));
-      toast.dismiss();
-      toast.success('이미지 임시 업로드 완료! 하단의 저장 버튼을 눌러주세요.');
+      // 성공 시 대상 상태 업데이트
+      if (type === 'profile') {
+        setFormData(prev => ({ ...prev, profileImageUrl: res.data.url }));
+        toast.dismiss();
+        toast.success('프로필 이미지가 변경되었어! 하단의 저장 버튼을 눌러줘.');
+      } else {
+        // 모달용 팬덤 이미지 업데이트
+        setFandomForm(prev => ({ ...prev, fandomImage: res.data.url }));
+        toast.dismiss();
+        toast.success('팬덤 이미지가 업로드되었어!');
+      }
+
     } catch (error) {
       toast.dismiss();
-      console.error(error);
+      console.error("❌ 업로드 에러:", error);
       toast.error('이미지 업로드에 실패했습니다.');
     }
   };
@@ -316,7 +334,7 @@ export default function ArtistProfile() {
                   ref={fileInputRef}
                   className="hidden"
                   accept="image/*"
-                  onChange={handleImageUpload}
+                  onChange={(e) => handleImageUpload(e, 'profile')}
                 />
                 <img
                   src={formData.profileImageUrl || (isArtist
