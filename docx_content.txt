@@ -1,0 +1,1676 @@
+MSA의 핵심 지향점: 분리와 자율성
+프로젝트 지향성
+ 1. MSA의 핵심 지향점: 분리와 자율성
+MSA는 서비스들을 독립적으로 배포하고 확장할 수 있는 상태를 만드는 것이 목표.
+Bounded Context (제한된 맥락): 각 서비스는 비즈니스의 특정 기능(도메인)에만 집중해야 합니다. 서비스 간 데이터베이스 공유는 금기이며, 필요시 API를 통해서만 데이터를 주고받음.
+Service Autonomy (서비스 자율성): 특정 서비스에 장애가 발생해도 전체 시스템이 중단되지 않아야 합니다(내결함성). 또한, 서비스별로 최적의 기술 스택(Polyglot)을 선택할 수 있어함.
+Decentralized Data Management: 데이터는 각 서비스가 소유합니다. 트랜잭션 관리는 2PC(Two-Phase Commit)보다는 Saga 패턴 등을 통한 결과적 일관성(Eventual Consistency)을 지향.
+2. RESTful API 제약 조건
+RESTful 원칙
+원칙 (Principle)
+설명 (Description)
+Uniform Interface
+리소스(URI)가 식별되어야 하며, HTTP 메서드(GET, POST 등)를 일관되게 사용
+Stateless (무상태성)
+서버는 클라이언트의 상태를 저장하지 않습니다. 각 요청은 처리에 필요한 모든 정보를 포함
+Cacheable (캐시 가능성)
+HTTP의 표준 캐싱 기능을 사용하여 응답 데이터의 재사용성이 높아야 함
+Client-Server 구조
+클라이언트(UI)와 서버(데이터/비즈니스 로직)가 서로 독립적으로 진화
+Layered System
+클라이언트는 서버가 중간 매체(게이트웨이)를 거치는지 직접 통신하는지 몰라야 함
+Code on Demand (옵션)
+서버에서 스크립트를 클라이언트로 보내 실행할 수 있게 함
+CRUD 별 HTTP 메서드
+행위 (CRUD)
+HTTP 메서드
+설명
+멱등성 (Idempotent)
+Create
+POST
+새로운 리소스를 생성
+(예: 게시글 작성)
+No (호출 시마다 새 데이터 생성)
+Read
+GET
+리소스의 상세 정보나 목록을 조회
+Yes (여러 번 조회해도 결과 변함없음)
+Update
+PUT
+리소스의 전체를 교체(수정)
+Yes (동일한 데이터로 덮어쓰므로 결과 동일)
+Update
+PATCH
+리소스의 일부만 수정
+No (설계에 따라 다를 수 있음)
+Delete
+DELETE
+특정 리소스를 삭제
+Yes (이미 삭제된 것을 다시 삭제해도 삭제 상태 유지)
+3. 보안 (Security)
+보안 및 인증 시스템 아키텍쳐
+Server 3(Gateway)가 진입점 역할을 수행 Server 1(Core & Redis)과 통신하여 인증을 처리하는 중앙 집중형 보안구조
+인증 방식: JWT 및 Redis 기반 중앙 집중형 제어
+인증 정보의 일관성을 유지하고 중복 로그인을 제어하기 위해 JWT와 Redis를 결합한 방식을 사용합니다.
+기본 인증 수단: JWT (JSON Web Token)를 사용하여 클라이언트에게 무상태(Stateless) 인증 수단을 제공.
+세션 및 상태 관리: Server 1의 Redis(34.158.208.117:6379)를 활용하여 JWT 인증 정보와 유저 데이터를 관리.
+토큰 발급 주체: Server 1의 Core Service(/msa/core/)가 회원가입 및 로그인 처리를 전담하며 유효한 토큰을 발급.
+API Gateway (OpenResty + Lua) 보안 파이프라인
+Server 3에 구축된 OpenResty(Nginx + Lua)가 모든 외부 요청의 보안 필터 역할을 수행
+단계
+프로세스
+동작 설명
+1. 추출
+헤더 검사
+Authorization 헤더에서 Bearer 토큰 추출.
+2. 파싱
+JWT 디코딩
+토큰 Payload를 Base64 디코딩하여 member_id 확보.
+3. 검증
+Redis Hash 대조
+member_id를 키로 Redis Hash 세션 조회(hgetall) 후 토큰 일치 여부 검증.
+4. 방어
+헤더 초기화
+권한 위조 방지를 위해 기존 X-User-Id, X-Role 헤더 삭제.
+5. 전파
+신뢰 헤더 주입
+검증된 member_id와 role을 새 헤더에 담아 내부 마이크로서비스로 전달.
+서비스별 라우팅 및 접근 제어
+서비스의 성격에 따라 게이트웨이 통과 시 인증 적용 여부를 구분
+A. 인증 예외 구간 (Public Access)
+로그인하지 않은 사용자도 접근 가능한 서비스로, Gateway의 auth.lua 검증 과정을 거치지 않음
+대상 서비스: Core Service
+주요 경로: /msa/core/ (회원가입, 로그인 등)
+설정 특징: access_by_lua_file 설정이 제외됨
+B. 인증 필수 구간 (Protected Access)
+반드시 유효한 토큰이 있어야만 접근 가능한 도메인 서비스
+대상 서비스: Payment, Shop, Reservation Service
+주요 경로: /msa/pay/, /msa/shop/, /msa/res/
+보안 적용: 모든 요청은 프록시 전달 전 auth.lua를 통해 Redis 인증을 통과해야함
+서비스별 엔드포인트
+1. Core Service
+사용자 인증 및 아티스트 관련 핵심 기능을 담당.
+서비스 게이트웨이 진입점(라우팅) : {BASE_URL}/msa/core
+Member & OAuth
+Method
+Endpoint
+Description
+Notes
+POST
+/member/SendVerification에서 
+인증 메일 발송
+POST
+/member/signup
+회원 가입
+POST
+/member/login
+로그인
+POST
+/member/logout
+로그아웃
+POST
+/member/refresh
+토큰 갱신
+리프레시 토큰 사용
+GET
+/api/login/{provider}
+소셜 로그인 시도
+kakao, naver, google
+GET
+/api/login/{provider}/callback
+소셜 로그인 콜백
+인증 완료 후 처리
+Artist
+Method
+Endpoint
+Description
+Notes
+GET
+/artist/list
+아티스트 전체 리스트
+POST
+/artist/follow/{artistId}
+팔로우/언팔로우
+Toggle 방식
+GET
+/artist/board/{artistId}
+아티스트/팬 레터 조회
+아티스트별 게시글 필터링
+2. Payment Service
+결제 및 지갑(포인트) 관리를 담당.
+서비스 게이트웨이 진입점(라우팅) : {BASE_URL}/msa/pay
+Payment & Wallet
+Method
+Endpoint
+Description
+Notes
+GET
+/payment
+결제 내역 조회
+POST
+/payment/charge
+지갑 충전 요청
+GET
+/payment/charge/kakaopay/success
+카카오페이 승인 콜백
+GET
+/wallet
+지갑 정보 조회
+GET
+/wallet/balance
+지갑 잔액 조회
+3. Reservation Service
+공연 예약 및 티켓 재고 관리를 담당하며, Redis와 MQ를 활용.
+서비스 게이트웨이 진입점(라우팅) : {BASE_URL}/msa/res
+Events & Reserve
+Method
+Endpoint
+Description
+Notes
+GET
+/events
+전체 공연 목록 조회
+POST
+/events
+공연 등록
+Redis 초기 세팅 포함
+GET
+/events/{eventId}
+공연 상세 조회
+GET
+/events/{eventId}/location
+공연 장소 및 좌표 조회
+지도 API 연동용
+POST
+/reserve
+예약 생성
+Redis DECR 처리 및 MQ 발송
+GET
+/reserve/status/{userId}
+유저별 예약 상태 확인
+POST
+/refund
+환불/취소 요청
+재고 복구 프로세스 포함
+4. Shop Service
+굿즈 판매 및 장바구니 기능을 담당합니다.
+서비스 게이트웨이 진입점(라우팅) : {BASE_URL}/msa/shop
+Product & Shop
+Method
+Endpoint
+Description
+Notes
+GET
+/product/{category}
+카테고리별 목록 조회
+official, secondhand, unofficial
+POST
+/product/{category}
+굿즈 등록
+카테고리별 등록
+DELETE
+/product/{category}/{productId}
+굿즈 삭제
+GET
+/shop
+전체 상품 조회
+GET
+/shop/detail/{productId}
+상품 상세 정보
+POST
+/shop/wishlist
+찜목록 업데이트
+GET
+/shop/cart
+장바구니 목록 조회
+POST
+/shop/cart
+장바구니 담기
+DELETE
+/shop/cart
+장바구니 상품 삭제
+GET
+/shop/order
+주문 목록 조회
+POST
+/shop/order
+주문 추가
+POST
+/shop/checkout
+최종 결제 처리
+Payment 서비스 연동 가능성
+5. Board Service
+커뮤니티 게시글 및 인터랙션을 담당.
+서비스 게이트웨이 진입점(라우팅) : {BASE_URL}/msa/core
+Method
+Endpoint
+Description
+Notes
+GET
+/board/list
+게시글 전체 조회
+GET
+/board/{id}
+게시글 상세 조회
+POST
+/board
+게시글 작성
+PUT
+/board/update
+게시글 수정
+DELETE
+/board/{id}
+게시글 삭제
+POST
+/board/{id}/like
+게시글 좋아요
+프로젝트 구조도
+프로젝트 구조도
+1. SpringBoot 기본 구조도
+# 스프링부트 프로젝트 기본 구조도
+src/main/java/com/example/├── common/                   # 공통 유틸, 예외 처리, 상수 등│   ├── exception/            # Custom Exception 클래스│   └── util/                 # 공통 유틸리티 (날짜, 문자열 등)├── config/                   # 설정 관련
+service_name/                 # 도메인 구분
+    ├── controller/           # [Controller] HTTP 요청/응답 처리    ├── service/              # [Service] 비즈니스 로직 처리 및 트랜잭션 관리    │   ├── Service.java      # Interface    │   └── ServiceImpl.java    ├── mapper/               # [Repository] MyBatis Mapper (DAO 역할)    │   └── Mapper.java       # Interface
+    ├── domain/               # [domain] 데이터 모델    └── dto/        ├── request/          # Controller 요청용        ├── response/         # Controller 응답용        └── event/            # 메시지 브로커 전송/수신용src/main/resources/├── mappers/                  # MyBatis SQL XML 파일 위치 (쿼리문 작성)│   └── Mapper.xml├── static/                   # 정적 리소스 (이미지, JS, CSS)├── application.properties           # 환경 설정 (Spring Profile, DB 연결 등)├── application-dev.properties       # 운영 환경 개발용 설정└── application-prod.properties      # 운영 환경 배포용 설정.github/workflows/└── ci-cd.yml                 # git action 배포 설정 정의용 파일.env                          # 설정 파일Dockerfile                    # 컨테이너 빌드용 파일docker-compose.yml            # 로컬 실행 및 서비스 정의용 파일
+Core Service SpringBoot
+Payment Service SpringBoot
+# Payment  구조도
+src/main/java/com/example/
+├── PaymentApplication.java
+│
+├── common/                   # 공통 유틸, 예외 처리, 상수 등│    ├── exception/           # Custom Exception 클래스│    └── util/                # 공통 유틸리티 (날짜, 문자열 등)
+│├── config/                   # 설정 관련
+│    ├── KakaoPayConfig.java
+│    └── RabbitMQConfig.java
+│ 
+└── payment/                  # 도메인    │
+    ├── controller/           # [Controller] HTTP 요청/응답 처리
+    │    ├── PaymentAdminController.java
+    │    ├── PaymentController.java
+    │    └── WalletController.java
+    │    ├── domain/               # [domain] 데이터 모델
+    │    ├── Charge.java
+    │    ├── TransactionHistory.java
+    │    └── Wallet.java
+    │
+    ├── dto/
+    │    ├── event/           # 메시지 브로커 전송/수신용
+    │    │    └── PaymentEventDTO.java
+    │    │    │    ├── request/         # Controller 요청용
+    │    │    └── ChargeRequestDTO.java
+    │    │    │    └── response/        # Controller 응답용
+    │         ├── PaymentReadyResponseDTO.java
+    │         ├── PaymentResponseDTO.java
+    │         └── WalletResponseDTO.java
+    │    │
+    ├── messaging/            # [RabbitMQ] 메시징 관련    │    ├── listener/        # 소비자
+    │    │    └── PaymentEventListener.java
+    │    │    │    └── producer/        # 발행자
+    │         └── PaymentEventProducer.java
+    │
+    ├── repository/           # [Repository] 인터페이스
+    │    ├── ChargeRepository.java
+    │    ├── TransactionHistoryRepository.java
+    │    └── WalletRepository.java
+    │    └── service/              # [Service] 비즈니스 로직 처리 및 트랜잭션 관리
+         ├── provider/        # [Provider] 외부 API 연결
+         │    ├── KakaoPayProvider.java
+         │    └── paymentProvider.java
+         │         ├── PaymentService.java
+         ├── PaymentServiceImpl.java
+         ├── WalletService.java
+         └── WalletServiceImpl.java
+src/main/resources/├── mappers/                  # MyBatis SQL XML 파일 위치 (쿼리문 작성)│    └── PaymentMapper.xml
+│├── static/                   # 정적 리소스 (이미지, JS, CSS)
+│├── application.yml           # 환경 설정 (Spring Profile, DB 연결 등)├── application-dev.yml       # 운영 환경 개발용 설정(하드코딩)└── application-prod.yml      # 운영 환경 배포용 설정(.env 참조)
+.github/workflows/└── ci-cd.yml                 # git action 배포 설정 정의용 파일.env                          # 설정 파일Dockerfile                    # 컨테이너 빌드용 파일docker-compose.yml            # 로컬 실행 및 서비스 정의용 파일
+Reservation Service SpringBoot
+개발환경 구축
+MSA 개발환경 구축
+모든 서비스가 분산되어 있는 시스템상 여러 게이트웨이와 메세지큐, 레디스같은 임시 저장소가 필요한 개발환경에서
+개발자 모두가 동일한 개발환경을 구성하기위해 docker-compose를 이용한 local 컨테이너에서 개발을 진행함
+개발 인프라 구축 파일 구조도
+develop_container/  ├── nginx/  │   ├── conf.d/  │   │    └── default.conf     # Nginx 서버 설정 파일  │   └── lua/  │        └── auth.lua         # Lua를 이용한 인증 로직 스크립트  ├── .env                      # 환경 변수 설정 파일  └── docker-compose.yml        # 컨테이너 오케스트레이션 설정
+환경 변수 (.env)
+팀원들이 공통으로 사용할 로컬 환경 변수
+# develop_container/.env
+# RabbitMQ
+RABBITMQ_USER=msa_mq
+RABBITMQ_PASSWORD=mq1234
+로컬 인프라 통합 (docker-compose.yml)
+동일한 로컬 인프라를 구축 및 별도의 bridge 네트워크를 지정하여 개발환경 최적화.
+서비스 디스커버리 (Service Discovery):
+네트워크 내에 있는 컨테이너들은 서로의컨테이너 이름(Service Name)을 도메인 이름처럼 사용하여 통신
+예를 들어, redis-commander 설정에서 IP 주소 대신 local-redis:6379라고 적어도 Docker 내부 DNS가 자동으로 해당 컨테이너의 IP로 연결. 컨테이너가 재시작되어 IP가 바뀌어도 설정을 변경할 필요가 없음.
+네트워크 격리 및 보안 (Isolation):
+기본(default) 네트워크를 사용하지 않고 전용 네트워크를 사용하면, 현재 프로젝트와 무관한 다른 Docker 컨테이너들로부터 인프라를 논리적으로 분리.
+개발 환경이 복잡해질수록 다른 프로젝트의 컨테이너와 이름이 겹치거나 포트가 충돌하는 문제를 방지.
+환경 일관성:
+모든 팀원이 동일한 docker-compose.yml을 실행하면, 각자의 로컬 PC 환경에 상관없이 컨테이너 간의 통신 경로가 동일하게 유지.
+# develop_container/docker-compose.yml
+version: '3.8'
+services:
+  # 1. Redis: 사용자 인증 토큰 및 세션 정보 저장소
+  msa-redis:
+    image: redis:alpine
+    container_name: local-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - local-msa-network # 내부 서비스 간 통신용 네트워크
+  # 2. RabbitMQ: 서비스 간 비동기 메시지 전달을 위한 브로커
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: local-rabbitmq
+    ports:
+      - "5672:5672"      # 메시지 큐 통신 포트
+      - "15672:15672"    # 관리자 웹 UI 포트
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    networks:
+      - local-msa-network
+  # 3. Nginx API Gateway: 모든 요청의 진입점 및 Lua를 이용한 인증 처리
+  nginx-gateway:
+    image: openresty/openresty:alpine
+    container_name: local-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro # 라우팅 설정 파일 마운트
+      - ./nginx/lua:/etc/nginx/lua:ro       # 인증 로직(Lua) 마운트
+    extra_hosts:
+      # 컨테이너 환경에서 호스트 OS(IDE에서 구동 중인 앱)로 접근하기 위한 별칭 설정
+      - "host.docker.internal:host-gateway"
+    networks:
+      - local-msa-network
+    depends_on:
+      - msa-redis # Redis가 먼저 구동되어야 인증 로직 수행 가능
+  # 4. Redis Commander: Redis 데이터를 웹 브라우저에서 관리하기 위한 GUI
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: local-redis-commander
+    environment:
+      - REDIS_HOSTS=local:local-redis:6379 # 내부 네트워크를 통해 Redis 컨테이너 연결
+    ports:
+      - "9090:8081" # 호스트의 9090 포트로 접속 시 8081(내부 포트) 연결
+    networks:
+      - local-msa-network
+# 서비스 간 독립적인 통신 환경을 위한 전용 네트워크 정의
+networks:
+  local-msa-network:
+    driver: bridge
+Nginx 라우팅 설정 (nginx/conf.d/default.conf)
+외부 IP 대신 host.docker.internal을 사용하여, Nginx가 로컬 컴퓨터에서 띄운 애플리케이션 포트(8081, 8082, 8083 등)로 트래픽을 전달하도록 설정
+# develop_container/nginx/conf.d/default.conf
+server {
+    listen 80;
+    server_name localhost;
+    # Docker 내장 DNS 서버 지정 (Lua 스크립트에서 컨테이너 이름 해석 용도)
+    resolver 127.0.0.11 valid=30s ipv6=off;
+   
+    # [Core Service] - 로컬 8080 포트
+    location /msa/core/ {
+        proxy_pass http://host.docker.internal:8080/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+    # [Payment Service] - 로컬 8083 포트    
+    location /msa/pay/ {
+        access_by_lua_file /etc/nginx/lua/auth.lua;
+        proxy_pass http://host.docker.internal:8083/;
+        proxy_set_header Host $host;
+    }
+    # [Shop Service] - 로컬 8081 포트
+    location /msa/shop/ {
+        access_by_lua_file /etc/nginx/lua/auth.lua;
+        proxy_pass http://host.docker.internal:8081/;
+        proxy_set_header Host $host;
+    }
+    # [Reservation Service] - 로컬 8082 포트
+    location /msa/res/ {
+        access_by_lua_file /etc/nginx/lua/auth.lua;
+        proxy_pass http://host.docker.internal:8082/;
+        proxy_set_header Host $host;
+    }
+}
+Lua 인증 스크립트 (nginx/lua/auth.lua)
+Docker 네트워크 내의 Redis 컨테이너 이름(local-redis)으로 접속하도록 설정
+-- develop_container/nginx/lua/auth.lua
+-- [모듈 로드] Redis 클라이언트 및 JSON 파서 로드
+local redis = require "resty.redis"
+local cjson = require "cjson.safe"
+local red = redis:new()
+-- [설정] Redis 연결 타임아웃 설정 (Connect, Send, Read 순서 / 단위: ms)
+red:set_timeouts(1000, 1000, 1000)
+-- [연결] Redis 서버 연결 시도 (컨테이너명 혹은 IP, 포트)
+local ok, err = red:connect("local-redis", 6379)
+if not ok then
+    ngx.log(ngx.ERR, "Redis 연결 실패: ", err)
+    ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+end
+-- =========================================================================
+-- 1. Authorization 헤더 검증 및 Bearer 토큰 추출
+-- =========================================================================
+local auth_header = ngx.var.http_authorization
+if not auth_header then
+    ngx.log(ngx.WARN, "Authorization 헤더가 없습니다.")
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+-- Bearer [Token] 형식인지 정규식으로 검사 및 토큰 본문 캡처
+local token = ngx.re.match(auth_header, "Bearer\\s+(.+)", "jo")
+if not token then
+    ngx.log(ngx.ERR, "토큰 형식이 유효하지 않음: ", auth_header)
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+local pure_token = token[1]
+-- =========================================================================
+-- 2. JWT 로컬 파싱 (Redis 조회 전 Key 생성을 위한 member_id 추출)
+-- 별도의 라이브러리 없이 JWT 구조(Header.Payload.Signature) 중 Payload를 디코딩
+-- =========================================================================
+-- 정규식을 이용해 첫 번째 점(.)과 두 번째 점 사이의 Payload 영역 추출
+local payload_b64url = ngx.re.match(pure_token, "^[^%.]+\\.([^%.]+)\\.", "jo")
+if not payload_b64url then
+    ngx.log(ngx.ERR, "JWT 형식이 올바르지 않음")
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+-- Base64Url 형식을 표준 Base64 형식으로 변환 (특수문자 치환 및 패딩 추가)
+local b64 = payload_b64url[1]:gsub("-", "+"):gsub("_", "/")
+local remainder = #b64 % 4
+if remainder > 0 then
+    b64 = b64 .. string.rep("=", 4 - remainder)
+end
+-- Base64 디코딩 수행 및 JSON 역직렬화
+local payload_json = ngx.decode_base64(b64)
+local payload_data = cjson.decode(payload_json)
+-- Payload 내 식별자 존재 여부 확인 (표준 클레임인 sub 사용)
+if not payload_data or not payload_data.sub then
+    ngx.log(ngx.ERR, "토큰 Payload에서 sub(member_id)를 찾을 수 없음")
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+-- sub 값을 member_id 변수로 매핑
+local member_id = payload_data.sub
+-- =========================================================================
+-- 3. Redis 세션 검증 (Hash 타입 구조 반영)
+-- member_id를 기반으로 저장된 최신 세션 정보를 Hash 형태로 조회
+-- =========================================================================
+local redis_key = "AUTH:MEMBER:" .. tostring(member_id)
+-- Hash 전용 명령어 hgetall 사용
+local res, err = red:hgetall(redis_key)
+if err then
+    ngx.log(ngx.ERR, "Redis 조회 에러: ", err)
+    ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+end
+-- hgetall은 키가 존재하지 않으면 빈 테이블({})을 반환함
+if not res or #res == 0 then
+    ngx.log(ngx.ERR, "로그아웃 되었거나 세션이 만료된 사용자: ", redis_key)
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+-- 평면 배열 형식([ "token", "ey...", "role", "ARTIST" ])을 Lua Key-Value 테이블로 변환
+local session_data = {}
+for i = 1, #res, 2 do
+    session_data[res[i]] = res[i + 1]
+end
+-- =========================================================================
+-- 4. 보안 정책 검증 (Token Consistency Check)
+-- 클라이언트가 보낸 토큰과 Redis에 저장된 '현재 유효한 토큰'이 일치하는지 비교
+-- =========================================================================
+if session_data.token ~= pure_token then
+    ngx.log(ngx.ERR, "토큰 불일치 (중복 로그인 등에 의해 갱신됨): ", member_id)
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+-- =========================================================================
+-- 5. 게이트웨이 통과 및 헤더 주입
+-- 인증된 정보를 Downstream(마이크로서비스) 헤더에 담아 전송
+-- =========================================================================
+ngx.req.clear_header("X-User-Id")
+ngx.req.clear_header("X-Role")
+ngx.req.set_header("X-User-Id", tostring(member_id))
+ngx.req.set_header("X-Role", tostring(session_data.role))
+-- Redis 커넥션 풀 반환
+red:set_keepalive(10000, 100)
+서버 구성 및 구축
+1. GCP 인스턴스 생성 및 구성(총 3개)
+구조도
+GCP-MSA-Project (System Architecture)│├── Server 1 (Base & Data Infrastructure)│   ├── [Server Spec] e2-standard-4 (2 vCPU, 8GB RAM, 30GB SSD)│   ││   ├── PostgreSQL            (메인 DB - 전사 공용 데이터 저장소)│   ├── RabbitMQ              (메시지 브로커 - 서비스 간 비동기 통신)
+│   ├── Redis                 (jwt 인증 및 유저 정보 저장)│   └── Core Service          (Spring Boot - 회원, 커뮤니티, 인증/인가)│├── Server 2 (Commerce Logic)│   ├── [Server Spec] e2-standard-4 (2 vCPU, 16GB RAM, 30GB HDD + 10GB SSD)│   ││   ├── Payment Service       (Spring Boot - 결제 승인 및 PG사 연동)│   ├── Shop Service          (Spring Boot - 상품 조회, 재고 관리)│   └── Reservation Service   (Node.js - 이벤트, 선착순 예약 시스템, 고트래픽 처리)│└── Server 3 (AI & Web Gateway)    ├── [Server Spec] c2-standard-4 (Compute Optimized / 4 vCPU, 16GB RAM, 30G SSD)    │
+    ├── Chat Service          (Node.js + Socket.io - 실시간 채팅, 웹소켓 서버)    ├── AI Service            (Spring AI - 챗봇, 추천 시스템 등 고연산 작업)    ├── Redis Commander       (Redis GUI 관리자 웹)
+    └── Frontend + Gateway    (Nginx + React - 웹 호스팅 및 리버스 프록시 진입점)
+서버 정보
+서버 기본 정보
+서버
+외부 IP 주소
+개방 PORT
+사용자명
+server1
+34.50.7.72
+22 (SSH), 
+5432 (postgresql), 
+5672 (rabbitmq), 
+15672 (rabbitmq-admin), 
+6379 (redis), 
+8080 (core-service springboot test)
+ssrabw
+server2
+34.50.60.193
+22 (SSH), 
+5672 (rabbitmq), 
+6379 (redis), 
+8081 (shop_service springboot test), 
+8082 (reservation_service springboot test),
+8083 (payment_service springboot test)
+oksm1003
+server3
+34.64.85.123
+22 (SSH), 
+80 (nginx gateway), 
+5672 (rabbitmq), 6379 (redis)
+suyeong1526
+Server2 와
+Github Action Secret 서버별 세팅
+Secret 이름 (Key)
+GCP 1서버 값 (Value)
+GCP 2서버 값 (Value)
+GCP 3서버 값 (Value)
+GCP_HOST
+34.50.7.72
+34.50.60.193
+34.64.85.123
+GCP_USER
+ssrabw
+oksm1003
+suyeong1526
+GCP_KEY
+GCP-ssh-s1.pem
+GCP-ssh-s2.pem
+GCP-ssh-s3.pem
+GCP_KEY에 해당하는 값은 파일 경로가 아닌 *.pem 파일의 내용 전체를 복사하여 Secret에 등록해야함.서버별 ssh .pem파일은 공유폴더 참고 
+Github Action Secret 공통 세팅
+Secret 이름 (Key)
+값 (Value)
+설명
+POSTGRES_USER
+app_user
+DB 사용자 이름
+POSTGRES_PASSWORD
+user1234
+DB 비밀번호
+DOCKER_USERNAME
+ssrabw
+Docker ID
+DOCKER_PASSWORD
+dldnfka3223
+Docker 비밀번호
+RABBITMQ_USER
+msa_mq
+RabbitMQ 사용자
+RABBITMQ_PASSWORD
+mq1234
+RabbitMQ 비밀번호
+docker 설치 (서버 동일)
+# 패키지 목록 업데이트sudo apt-get update# 필수 패키지 설치sudo apt-get install -y ca-certificates curl gnupg# 키를 저장할 디렉토리 생성 (권한 설정 포함)sudo install -m 0755 -d /etc/apt/keyrings# Docker 공식 GPG 키 다운로드 및 저장sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc# 모든 사용자가 읽을 수 있도록 권한 부여sudo chmod a+r /etc/apt/keyrings/docker.asc# docker 레포지토리 등록echo \  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null# 리포지토리 추가 후 다시 한번 업데이트sudo apt-get update# docker 최신버전 설치sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin# docker 서버 재시작시 자동실행sudo systemctl enable docker.servicesudo systemctl enable containerd.service# 현재 사용자를 docker 그룹에 추가 (권한 부여) sudo usermod -aG docker $USER # 그룹 변경 사항 적용 (로그아웃 없이 바로 적용)newgrp docker
+ 
+2. Server1 시스템 구축
+PostgreSQL
+.env파일
+# .env 파일
+# PostgreSQL 설정
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=admin1234
+POSTGRES_PORT=5432
+# Timezone 설정 (로그 확인용)
+TZ=Asia/Seoul
+초기설정 sql 파일(setup_user.sql)
+-- docker-compose.yml 파일이 존재하는 위치기준 ./postgres/data/setup_user.sql
+-- volume 폴더 ./postgres/init/setup_user.sql 로 복사됨
+-- 1. 계정 생성 (비밀번호: user1234)
+CREATE USER app_user WITH PASSWORD 'user1234';
+-- 2. 슈퍼유저 권한 부여
+ALTER USER app_user WITH SUPERUSER CREATEDB CREATEROLE;
+컴포즈 파일(docker-compose.yml)
+#main-db/ docker-compose.yml
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: db_postgres
+    restart: always
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ}
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      msa-network:
+        aliases:
+          - main-db
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "log_timezone=${TZ}"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 8G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+networks:
+  msa-network:
+    driver: bridge
+    name: msa-network
+ 
+compose 파일 경로로 이동후 docker 실행
+# /home/ssrabw/postgresql/docker-compose.yml> docker compose up -d
+Redis
+컴포즈 파일(docker-compose.yml)
+# redis/ docker-compose.yml
+version: '3.8'
+services:
+  msa-redis:
+    image: redis:alpine
+    container_name: msa-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - msa-network
+networks:
+  msa-network:
+    external: true
+compose 파일 경로로 이동후 docker 실행
+# /home/ssrabw/redis/docker-compose.yml> docker compose up -d
+ReabbitMQ
+.env파일
+# RabbitMQ/ .env 파일
+RABBITMQ_USER=msa_mq
+RABBITMQ_PASSWORD=mq1234
+컴포즈 파일(docker-compose.yml)
+#rabbitmq/ docker-compose.yml
+version: '3.8'
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine # 관리자 UI(Web) 포함된 버전
+    container_name: rabbitmq
+    restart: always
+    ports:
+      # GCP 콘솔에서 Server 1의 5672 포트를 열어주어야 다른 내부 서버들이 접근가능
+      # 관리자 페이지도 보려면 tcp:15672 추가
+      # 소스 필터: 내부 IP 범위 (예: 10.0.0.0/8 또는 Server 2, 3의 내부 IP)
+      - "5672:5672"   # AMQP 포트: Server 2, 3의 앱들이 여기로 데이터를 보냄
+      - "15672:15672" # 관리자 UI 포트: 웹 브라우저에서 대시보드 확인용
+    environment:
+      # 기본 계정은 localhost 접속만 허용되므로, 외부 서버 접속을 위한 관리자 계정을 여기서 반드시 설정해야 함.
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq # 메시지 및 설정 데이터 영구 보존
+    networks:
+      msa-network:
+        aliases:
+          - rabbitmq
+networks:
+  msa-network:
+    external: true # 이미 생성된 msa-network 사용
+compose 파일 경로로 이동후 docker 실행
+# /home/ssrabw/rabbitmq/docker-compose.yml> docker compose up -d
+Core Service
+컴포즈 파일(docker-compose.yml)
+#core-service/ docker_compose.yml
+version: '3.8'
+services:
+  core-service:
+    image: ssrabw/server1_core:latest
+    container_name: core-service
+    restart: always
+    ports:
+      - "8080:8080"
+    networks:
+      - msa-network
+    environment:
+      # 스프링 프로파일 설정
+      SPRING_PROFILES_ACTIVE: prod     
+      # Redis 연결 정보
+      SPRING_DATA_REDIS_HOST: msa-redis
+      SPRING_DATA_REDIS_PORT: 6379     
+      # DB 설정
+      SPRING_DATASOURCE_URL: jdbc:postgresql://main-db:5432/msa_core_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}     
+      # RabbitMQ 설정
+      SPRING_RABBITMQ_HOST: rabbitmq
+networks:
+  msa-network:
+    external: true
+도커파일(Dockerfile)
+#core-service/ Dockerfile
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY build/libs/*.jar app.jar
+ENTRYPOINT ["java", "-jar", "app.jar"]
+깃허브 액션 설정파일(ci-cd.yml)
+#core-service/ ci-cd.yml
+name: CI/CD Pipeline
+on:
+  push:
+    branches:
+      - master
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      - name: Build with Gradle
+        run: ./gradlew build -x test
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/server1_core
+          docker build -t $IMAGE_NAME:latest .
+          docker push $IMAGE_NAME:latest
+      # docker-compose.yml 파일 전송
+      - name: Copy docker-compose to GCP
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_KEY }}
+          source: "docker-compose.yml"
+          target: "/home/${{ secrets.GCP_USER }}/"
+      # 배포 실행 (.env 건드리는 부분 삭제됨)
+      - name: Deploy to GCP
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_KEY }}
+          script: |
+            export POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            export SPRING_PROFILES_ACTIVE=prod
+            docker network ls | grep msa-network || docker network create msa-network
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
+3. Server2 시스템 구축
+Payment Service
+도커파일(Dockerfile)
+# payment-service/ Dockerfile
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+# 빌드된 jar 파일을 컨테이너 안으로 복사
+COPY build/libs/*.jar app.jar
+# 실행 명령
+ENTRYPOINT ["java", "-jar", "app.jar"]
+컴포즈 파일(docker-compose.yml)
+# payment-service/ docker-compose.yml
+services:
+  payment:
+    image: ssrabw/msa-payment:latest
+    container_name: payment-service
+    restart: always
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://34.158.208.117:5432/msa_pay_db
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_RABBITMQ_HOST: 34.158.208.117
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    networks:
+      - msa-network
+networks:
+  msa-network:
+    external: true  # 서버에 미리 만들어둔 공통 네트워크 사용
+깃허브 액션 설정파일(ci-cd.yml)
+#payment service ci-cd.yml
+name: Payment Service CI/CD
+on:
+  push:
+    branches: [ master ] # master 브랜치에 푸시되거나 머지될 때만 실행
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      # 1. JAR 파일 빌드 (Gradle 사용)
+      - name: Build with Gradle
+        run: |
+          chmod +x ./gradlew
+          ./gradlew clean bootJar
+      # 2. Docker Hub 로그인
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      # 3. Docker 이미지 빌드 및 푸시
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/msa-payment:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/msa-payment:latest
+      # 4. GCP Server 2 배포
+      - name: Deploy to GCP Server 2
+        uses: appleboy/ssh-action@master
+        with:
+          host: 34.50.60.193
+          username: oksm1003
+          key: ${{ secrets.GCP_KEY }}
+          script: |
+            # payment 폴더로 이동 (없으면 에러 방지용 체크 필요할 수 있음)
+            cd /home/oksm1003/payment
+           
+            # 서버 브랜치를 master로 전환하고 최신 코드 가져오기
+            git fetch origin
+            git checkout master || git checkout -b master
+            git pull origin master
+            # 컨테이너 갱신 및 실행
+            docker compose pull
+            docker compose up -d
+           
+            # 사용하지 않는 오래된 이미지 삭제 (용량 확보)
+            docker image prune -f
+Shop Service
+도커파일(Dockerfile)
+# shop-service/ Dockerfile
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY build/libs/*.jar app.jar
+ENTRYPOINT ["java", "-jar", "app.jar"]
+컴포즈 파일(docker-compose.yml)
+# shop-service/ docker-compose.yml
+services:
+  shop:
+    image: ssrabw/msa-shop:latest
+    container_name: shop-service
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://34.158.208.117:5432/msa_shop_db
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_RABBITMQ_HOST: 34.158.208.117
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    networks:
+      - msa-network
+networks:
+  msa-network:
+    external: true # 서버에 생성된 공통 네트워크 사용
+깃허브 액션 설정파일(ci-cd.yml)
+# shop-service/ ci-cd.yml
+name: Shop Service CI/CD
+on:
+  push:
+    branches: [ master ] # 1. 트리거 브랜치를 master로 변경
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      # 1. Shop 서비스 빌드 (Gradle)
+      - name: Build Shop Service
+        run: |
+          chmod +x gradlew
+          ./gradlew build -x test
+      # 2. DockerHub 로그인
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      # 3. 이미지 빌드 및 푸시
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/msa-shop:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/msa-shop:latest
+      # 4. GCP Server 2 배포
+      - name: Deploy to GCP Server 2
+        uses: appleboy/ssh-action@master
+        with:
+          host: 34.50.60.193
+          username: oksm1003
+          key: ${{ secrets.GCP_KEY }}
+          script: |
+            cd /home/oksm1003/shop
+           
+            git remote set-url origin https://github.com/rame86/server2_commerce_shop.git
+           
+            # 2. 서버에서 가져올 브랜치도 master로 변경 (중요!)
+            git fetch origin master
+            git checkout master || git checkout -b master
+            git reset --hard origin/master
+           
+            # .env 설정 및 실행
+            echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env
+            echo "DB_USER=${{ secrets.POSTGRES_USER }}" >> .env
+            echo "DB_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> .env
+            echo "RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}" >> .env
+            echo "RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}" >> .env
+            echo "TZ=Asia/Seoul" >> .env
+           
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
+Reservation Service
+도커파일(Dockerfile)
+# reservation-service/ Dockerfile
+FROM node:20-alpine
+WORKDIR /app
+COPY package*.json ./
+# 배포용이므로 --only=production 권한 권장
+RUN npm install --only=production
+COPY . .
+EXPOSE 8082
+CMD ["node", "app.js"]
+컴포즈 파일(docker-compose.yml)
+# reservation-server/ docker-compose.yml
+services:
+  reservation:
+    image: ssrabw/msa-reservation:latest
+    container_name: reservation-service
+    restart: always
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      # Server 1 IP(34.158.208.117) 사용
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@34.158.208.117:5432/msa_res_db
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@34.158.208.117:5672
+    networks:
+      - msa-network
+networks:
+  msa-network:
+    external: true
+깃허브 액션 설정파일(ci-cd.yml)
+# reservation-server/ ci-cd.yml
+name: Reservation Service CI/CD
+on:
+  push:
+    branches: [ main ]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      # 이미지 빌드 및 푸시
+      - name: Build and Push Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/msa-reservation:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/msa-reservation:latest
+      # GCP Server 2 배포 (시크릿 이름 GCP_KEY로 수정)
+      - name: Deploy to GCP Server 2
+        uses: appleboy/ssh-action@master
+        with:
+          host: 34.50.60.193
+          username: oksm1003
+          key: ${{ secrets.GCP_KEY }}
+          # Deploy to GCP Server 2 단계의 script 부분 수정
+          script: |
+            mkdir -p /home/oksm1003/reservation
+            cd /home/oksm1003/reservation
+           
+            # 1. 환경 변수 파일 생성 (Secrets 이름을 실제 등록한 이름과 맞춤)
+            # DATABASE_URL 구성 시 POSTGRES_USER, POSTGRES_PASSWORD 사용
+            echo "DATABASE_URL=postgres://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@34.158.208.117:5432/msa_res_db" > .env
+           
+            # RabbitMQ 정보 (별도 Secret이 없다면 일단 직접 입력하거나 Secret 추가 후 수정)
+            echo "RABBITMQ_URL=amqp://msa_mq:mq1234@34.158.208.117:5672" >> .env
+            echo "PORT=8082" >> .env
+           
+            # 2. docker-compose.yml 생성 (기존과 동일)
+            cat <<EOF > docker-compose.yml
+            services:
+              reservation:
+                image: ${{ secrets.DOCKER_USERNAME }}/msa-reservation:latest
+                container_name: reservation-service
+                restart: always
+                ports:
+                  - "8082:8082"
+                env_file: .env
+                networks:
+                  - msa-network
+            networks:
+              msa-network:
+                external: true
+            EOF
+           
+            # 3. 실행
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
+4. Server3 시스템 구축
+nginx & redis_commander
+컴포즈 파일(docker-compose.yml)
+#nginx & radis-admin/ docker-compose.yml
+# /home/suyeong1526/nginx/docker-compose.yml
+version: '3.8'
+services:
+  nginx-gateway:
+    # 일반 nginx 대신 Lua 환경이 내장된 openresty 사용 (API Gateway 역할)
+    image: openresty/openresty:alpine
+    container_name: nginx-gateway
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      # React 프론트엔드 정적 파일 마운트
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      # Nginx 프록시 및 라우팅 설정 파일 마운트
+      - ./conf.d:/etc/nginx/conf.d:ro
+      # Lua 스크립트 파일을 컨테이너 내부로 마운트 (Redis 인증용)
+      - ./lua:/etc/nginx/lua:ro
+    networks:
+      msa-network:
+        aliases:
+          - nginx-gateway
+  # Server 3의 docker-compose.yml에 추가 (Redis 데이터 확인용 관리자 UI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    environment:
+      # Server 1의 IP(34.158.208.117)와 Redis 포트(6379)를 지정
+      # msa-redis는 관리자 페이지 좌측 트리에 표시될 단순 라벨링 이름
+      - REDIS_HOSTS=msa-redis:34.158.208.117:6379
+    ports:
+      # 앞의 9090이 브라우저에서 접속할 포트, 뒤의 8081은 컨테이너 내부 포트
+# nginx의 reverse proxy를 이용할 경우 사용되지 않는 포트
+      - "9090:8081"
+    networks:
+      - msa-network
+networks:
+  msa-network:
+    driver: bridge
+    name: msa-network
+compose 파일 경로로 이동후 docker 실행
+# /home/suyeong1526/nginx/docker-compose.yml> docker compose up -d
+Redis 접근 인증을 위한 auth.lua 파일
+-- /home/suyeong1526/nginx/lua/auth.lua
+-- [모듈 로드] Redis 클라이언트 및 JSON 파서 로드
+local redis = require "resty.redis"
+local cjson = require "cjson.safe"
+local red = redis:new()
+-- [설정] Redis 연결 타임아웃 설정 (Connect, Send, Read 순서 / 단위: ms)
+red:set_timeouts(1000, 1000, 1000)
+-- [연결] Redis 서버 연결 시도 (컨테이너명 혹은 IP, 포트)
+local ok, err = red:connect("local-redis", 6379)
+if not ok then
+    ngx.log(ngx.ERR, "Redis 연결 실패: ", err)
+    ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+end
+-- =========================================================================
+-- 1. Authorization 헤더 검증 및 Bearer 토큰 추출
+-- =========================================================================
+local auth_header = ngx.var.http_authorization
+if not auth_header then
+    ngx.log(ngx.WARN, "Authorization 헤더가 없습니다.")
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+-- Bearer [Token] 형식 정규식 검사 및 토큰 본문 캡처
+local token = ngx.re.match(auth_header, "Bearer\\s+(.+)", "jo")
+if not token then
+    ngx.log(ngx.ERR, "토큰 형식이 유효하지 않음: ", auth_header)
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+local pure_token = token[1]
+-- =========================================================================
+-- 2. JWT 로컬 파싱 (Redis 조회 전 Key 생성을 위한 member_id 추출)
+-- Payload 영역을 추출하여 Base64Url 디코딩 수행
+-- =========================================================================
+-- JWT 구조(Header.Payload.Signature) 중 Payload 영역 추출
+local payload_b64url = ngx.re.match(pure_token, "^[^%.]+\\.([^%.]+)\\.", "jo")
+if not payload_b64url then
+    ngx.log(ngx.ERR, "JWT 형식이 올바르지 않음")
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+-- Base64Url -> 표준 Base64 변환 및 패딩 추가
+local b64 = payload_b64url[1]:gsub("-", "+"):gsub("_", "/")
+local remainder = #b64 % 4
+if remainder > 0 then
+    b64 = b64 .. string.rep("=", 4 - remainder)
+end
+-- Base64 디코딩 및 JSON 역직렬화
+local payload_json = ngx.decode_base64(b64)
+local payload_data = cjson.decode(payload_json)
+-- Payload 내 식별자(sub) 존재 확인
+if not payload_data or not payload_data.sub then
+    ngx.log(ngx.ERR, "토큰 Payload에서 sub(member_id)를 찾을 수 없음")
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+local member_id = payload_data.sub
+-- =========================================================================
+-- 3. Redis 세션 검증 (Hash 타입 구조 반영)
+-- member_id 기반으로 저장된 세션 정보를 Hash 형태로 조회
+-- =========================================================================
+local redis_key = "AUTH:MEMBER:" .. tostring(member_id)
+-- Hash 전용 명령어 hgetall 사용
+local res, err = red:hgetall(redis_key)
+if err then
+    ngx.log(ngx.ERR, "Redis 조회 에러: ", err)
+    ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+end
+-- 키 미존재 시 401 반환
+if not res or #res == 0 then
+    ngx.log(ngx.ERR, "로그아웃 되었거나 세션이 만료된 사용자: ", redis_key)
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+-- 평면 배열 형식을 Lua Key-Value 테이블로 변환
+local session_data = {}
+for i = 1, #res, 2 do
+    session_data[res[i]] = res[i + 1]
+end
+-- =========================================================================
+-- 4. 보안 정책 검증 (Token Consistency Check)
+-- 클라이언트 토큰과 Redis 저장 토큰 일치 여부 비교 (중복 로그인 방지)
+-- =========================================================================
+if session_data.token ~= pure_token then
+    ngx.log(ngx.ERR, "토큰 불일치 (중복 로그인 등에 의해 갱신됨): ", member_id)
+    ngx.exit(ngx.HTTP_UNAUTHORIZED)
+end
+-- =========================================================================
+-- 5. 게이트웨이 통과 및 헤더 주입
+-- 인증된 정보를 마이크로서비스(Downstream) 헤더에 주입
+-- =========================================================================
+ngx.req.clear_header("X-User-Id")
+ngx.req.clear_header("X-Role")
+ngx.req.set_header("X-User-Id", tostring(member_id))
+ngx.req.set_header("X-Role", tostring(session_data.role))
+-- Redis 커넥션 풀 반환
+red:set_keepalive(10000, 100)
+리버스 프록시(Reverse Proxy) 설정
+# /home/suyeong1526/nginx/conf.d/default.conf
+server {
+    listen 80;
+    server_name _;
+    # Docker 내장 DNS 서버 지정 (Lua 스크립트에서 컨테이너 이름 해석 용도)
+    # 중요함. 이거땜에 진짜 개고생함 아오
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    # [프론트엔드]
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+    # [Core Service] - Server 1
+    location /msa/core/ {
+        proxy_pass http://34.158.208.117:8080/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+    # [RabbitMQ Admin] - Server 1
+    location /msa/rabbitmq-admin/ {
+        proxy_pass http://34.158.208.117:15672/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # WebSocket 대응 (RabbitMQ 관리자 UI 실시간 데이터용)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    # ==========================================
+    # Redis 토큰 인증이 필요한 서비스들 (Lua Gateway)
+    # ==========================================
+    # [Payment Service] - Server 2
+    location /msa/pay/ {
+        access_by_lua_file /etc/nginx/lua/auth.lua;
+        proxy_pass http://34.50.60.193:8080/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+    # [Shop Service] - Server 2
+    location /msa/shop/ {
+        access_by_lua_file /etc/nginx/lua/auth.lua;
+        proxy_pass http://34.50.60.193:8081/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+    # [Reservation Service] - Server 2
+    location /msa/res/ {
+        access_by_lua_file /etc/nginx/lua/auth.lua;
+        proxy_pass http://34.50.60.193:8082/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+    # [Redis Commander GUI] - Server 3 Local
+    location /msa/redis-admin/ {
+        proxy_pass http://redis-commander:8081/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+       
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+frontend(react+vite)
+#web/ deploy.yml
+name: Deploy Frontend to Nginx (GCP Server 3)
+on:
+  push:
+    branches:
+      - master  # master 브랜치에 코드 반영 시 자동 실행
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest # 가상 실행 환경 설정
+   
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4 # 1. 저장소 코드를 가상 환경으로 복제
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4 # 2. 패키지 매니저 pnpm 설치
+        with:
+          version: 10
+      - name: Set up Node.js
+        uses: actions/setup-node@v4 # 3. Node.js 환경 구축 및 캐싱 설정
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install # 4. 필요한 라이브러리 설치
+      - name: Build the project
+        run: pnpm run build # 5. 배포용 정적 파일 생성 (dist 폴더)
+      - name: Clear old dist on GCP Server 3
+        uses: appleboy/ssh-action@master # 6. 원격 서버 접속 후 기존 파일 삭제
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_KEY }}
+          script: |
+            mkdir -p /home/${{ secrets.GCP_USER }}/nginx/frontend
+            rm -rf /home/${{ secrets.GCP_USER }}/nginx/frontend/dist
+      - name: Copy dist to GCP Server 3
+        uses: appleboy/scp-action@master # 7. 빌드된 dist 폴더를 서버로 전송
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_KEY }}
+          source: "dist"
+          target: "/home/${{ secrets.GCP_USER }}/nginx/frontend"
+DB 구성 및 구축
+PostgreSQL DDL 코드
+1. Core (회원 및 커뮤니티) 시스템
+전사 공용 데이터 저장소 및 타 서비스의 기준이 되는 회원 식별자(member_id) 제공이 핵심.
+public / board 스키마: 유저 기본 정보와 커뮤니티 도메인을 물리적으로 분리.
+member: 프로필 및 권한(USER/ARTIST) 관리. JSONB 타입을 활용해 유연한 속성 확장 지원.
+social_account: OAuth 연동 정보 관리. Cascade 설정을 통해 회원 탈퇴 시 연쇄 삭제 및 무결성 유지.
+board: 게시글 및 집계(조회/좋아요) 관리. 부분 인덱스(Partial Index)로 조회 성능 최적화.
+-- msa_core_db
+-- 1. 멤버(member) 테이블: 프로필 및 권한(USER/ARTIST) 관리
+CREATE TABLE public.member (
+    member_id BIGINT PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,  -- 전사 서비스 공용 고유 식별자
+    email VARCHAR(255) NOT NULL UNIQUE,                             -- 로그인 이메일 (계정 ID)
+    password VARCHAR(255) NOT NULL,                                 -- 암호화된 비밀번호
+    name VARCHAR(255) NOT NULL,                                     -- 사용자 실명 또는 닉네임
+    address VARCHAR(255),                                           -- 배송 및 기본 주소 정보
+    age VARCHAR(255),                                               -- 연령대 (통계 및 필터링용)
+    phone VARCHAR(255),                                             -- 연락처
+    role VARCHAR(255) DEFAULT 'USER',                               -- 사용자 권한 (USER, ARTIST, ADMIN 등)
+    info JSONB,                                                     -- 기타 메타데이터 (유연한 확장을 위한 JSON)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP   -- 계정 생성 일시
+);
+-- 2. 소셜계정(social_account) 테이블: OAuth 연동 정보 관리
+CREATE TABLE public.social_account (
+    social_id BIGINT PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,  -- 소셜 연동 고유 식별자
+    provider VARCHAR(255) NOT NULL,                                 -- 소셜 제공자 (kakao, naver, google 등)
+    provider_id VARCHAR(255) NOT NULL,                              -- 제공자 측에서 발급한 고유 ID
+    member_id BIGINT NOT NULL,                                      -- 연결된 내부 member_id (Core 참조)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,  -- 소셜 연동 완료 일시
+    CONSTRAINT fk_social_account_member FOREIGN KEY (member_id) 
+               REFERENCES public.member(member_id) ON DELETE CASCADE, -- 회원 탈퇴 시 연쇄 삭제
+    CONSTRAINT uidx_provider_provider_id UNIQUE (provider, provider_id) -- 동일 제공자 내 중복 가입 방지
+);
+-- 특정 회원의 소셜 연동 정보 조회 성능 최적화를 위한 인덱스
+CREATE INDEX idx_social_account_member_id ON public.social_account(member_id);
+-- board 스키마 생성
+CREATE SCHEMA IF NOT EXISTS board;
+-- 3. 게시판(board) 테이블: 커뮤니티 게시글 및 집계 데이터 관리
+CREATE TABLE board.board (
+    board_id BIGINT PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY,  -- 게시글 고유 식별자
+    category VARCHAR(20) NOT NULL,                                 -- 게시판 카테고리 (NOTICE, FREE 등)
+    title VARCHAR(255) NOT NULL,                                   -- 게시글 제목
+    content TEXT NOT NULL,                                         -- 게시글 본문 내용
+    member_id BIGINT NOT NULL,                                     -- 작성자 member_id (Core 서비스 참조)
+    like_count INTEGER DEFAULT 0 CHECK (like_count >= 0),          -- 추천수 (음수 방지 제약)
+    comment_count INTEGER DEFAULT 0 CHECK (comment_count >= 0),    -- 댓글수 (음수 방지 제약)
+    view_count INTEGER DEFAULT 0 CHECK (view_count >= 0),          -- 조회수 (음수 방지 제약)
+    is_artist_post BOOLEAN DEFAULT FALSE,                          -- 아티스트(공식) 작성 글 여부 플래그
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, -- 최초 작성 시각
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP  -- 마지막 수정 시각
+);
+-- 카테고리별 최신글 페이징 조회 성능을 높이기 위한 복합 인덱스
+CREATE INDEX idx_board_category_created_at ON board.board(category, created_at DESC);
+-- 좋아요 10개 초과인 인기글 조회를 최적화하기 위한 부분 인덱스(Partial Index)
+CREATE INDEX idx_board_likes ON board.board(like_count DESC) WHERE like_count > 10;
+-- 데이터 일관성 유지를 위한 자동 업데이트 트리거 함수
+CREATE OR REPLACE FUNCTION board.update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+-- board 테이블에 트리거 적용
+CREATE TRIGGER update_board_modtime
+    BEFORE UPDATE ON board.board
+    FOR EACH ROW EXECUTE PROCEDURE board.update_modified_column();
+2. Payment (결제) 시스템
+결제(Pay) 시스템은 데이터 정합성, 동시성 제어(Double Spending 방지), 외부 API 장애 격리가 가장 중요.
+이를 위해 스키마를 분리하고, 원장(Ledger) 형태의 트랜잭션 테이블을 구성하는 것이 최신 MSA 트렌드.
+pay 스키마: public 스키마 대신 도메인별 스키마를 분리하여 관리.
+wallets (지갑): 사용자의 현재 잔액과 상태를 관리.
+charges (외부 충전): 외부 결제 API(PG)와의 통신 내역 및 상태를 추적. 장애 발생 시 대사 작업(Reconciliation)에 필수.
+transactions (포인트 원장): 포인트의 증감(충전, 결제, 환불)이 일어나는 모든 내역을 불변(Immutable)의 형태로 기록.
+-- msa_pay_db
+CREATE SCHEMA IF NOT EXISTS pay;
+-- 1. 지갑(wallets): 사용자의 자산 잔액 상태 관리
+CREATE TABLE pay.wallets (
+    wallet_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),               -- 분산 환경용 UUID 식별자
+    member_id BIGINT NOT NULL UNIQUE,                                   -- Core 회원 ID와 1:1 매핑
+    balance NUMERIC(15, 2) NOT NULL DEFAULT 0.00 CHECK (balance >= 0),  -- 현재 잔액 (소수점 2자리)
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',                       -- 계좌 상태 (ACTIVE, FROZEN)
+    version INTEGER NOT NULL DEFAULT 0,                                 -- 낙관적 락(Optimistic Lock) 버전
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,      -- 지갑 생성일
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP       -- 마지막 변경일
+);
+-- 2. 충전(charges): 외부 PG사 연동 내역 및 결과 추적
+CREATE TABLE pay.charges (
+    charge_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),             -- 충전 요청 고유 ID
+    wallet_id UUID NOT NULL REFERENCES pay.wallets(wallet_id),        -- 충전 대상 지갑 ID
+    pg_provider VARCHAR(50) NOT NULL,                                 -- PG사 이름 (Kakaopay, Toss 등)
+    pg_transaction_id VARCHAR(255),                                   -- PG사 연동 거래 번호
+    amount NUMERIC(15, 2) NOT NULL CHECK (amount > 0),                -- 충전 요청 금액 (양수만 허용)
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',                    -- 처리 상태 (SUCCESS, FAILED)
+    error_message TEXT,                                               -- 실패 시 에러 메시지
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,    -- 요청 시각
+    completed_at TIMESTAMP WITH TIME ZONE                             -- 완료 시각
+);
+-- 3. 원장(transactions): 모든 포인트 증감 내역을 기록하는 불변 데이터
+CREATE TABLE pay.transactions (
+    transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),        -- 거래 기록 고유 ID
+    wallet_id UUID NOT NULL REFERENCES pay.wallets(wallet_id),        -- 대상 지갑 ID
+    transaction_type VARCHAR(20) NOT NULL,                            -- 거래 유형 (CHARGE, PAYMENT, REFUND)
+    amount NUMERIC(15, 2) NOT NULL,                                   -- 증감액 (+/-)
+    balance_after NUMERIC(15, 2) NOT NULL,                            -- 거래 직후 잔액 (검증용)
+    reference_id VARCHAR(255) NOT NULL,                               -- 주문번호 등 외부 참조 ID
+    description VARCHAR(255),                                         -- 거래 상세 설명
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP     -- 기록 시각
+);
+-- 성능 최적화 인덱스
+CREATE INDEX idx_transactions_wallet_id ON pay.transactions(wallet_id);
+CREATE UNIQUE INDEX uidx_transactions_reference ON pay.transactions(reference_id, transaction_type);
+2. Shop (커머스) 시스템
+상품 재고 보존 및 주문 시점의 가격 변동을 방어하는 데이터 스냅샷 유지가 핵심.
+shop 스키마: 커머스 도메인을 분리하고 상태값 관리를 위한 전용 ENUM 활용.
+products: 상품 정보 및 재고 관리. Soft Delete(is_active) 적용으로 주문 내역과의 참조 무결성 확보.
+orders: 주문 흐름 및 결제 상태 관리. 전체 프로세스의 마스터 원장 역할.
+order_items: 주문 상세 내역 기록. 상품 가격 변동에 영향받지 않도록 주문 당시 가격(unit_price)을 기록.
+unit_price: 이 설계에서 가장 중요한 컬럼.  products 테이블의 가격은 변하더라도, order_items에 '주문 시점의 가격을 복사'해두어야 고객의 실제 결제 금액과 주문 내역이 일치
+영문 상태값 (English Status)
+한국어 번역 (Korean Translation)
+비즈니스 의미 (Business Meaning)
+PENDING
+결제 대기
+주문서가 생성되었으나 아직 결제가 완료되지 않은 상태
+PAID
+결제 완료
+결제가 확인되어 판매자가 배송을 준비해야 하는 상태
+SHIPPED
+배송 중
+상품이 출고되어 택배사로 전달된 상태
+COMPLETED
+주문 완료
+배송이 끝나고 구매 확정까지 이루어진 최종 상태
+CANCELLED
+주문 취소
+결제 전 취소 혹은 환불 처리가 완료된 상태
+-- msa_shop_db
+-- shop 서비스 스키마 생성
+CREATE SCHEMA IF NOT EXISTS shop;
+-- 0. 상태 및 유형 관리를 위한 ENUM 정의
+CREATE TYPE shop.seller_type AS ENUM ('ARTIST', 'USER');             -- 판매자 구분 (아티스트/일반유저)
+CREATE TYPE shop.product_category AS ENUM ('OFFICIAL', 'UNOFFICIAL', 'SECONDHAND'); -- 상품 카테고리
+CREATE TYPE shop.order_status AS ENUM ('PENDING', 'PAID', 'SHIPPED', 'COMPLETED', 'CANCELLED'); -- 주문 진행 상태
+-- 1. 상품(products): 여러 옵션이 공유하는 상품의 기본/공통 정보
+CREATE TABLE shop.products (
+    product_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),         -- 상품 고유 ID
+    seller_id   BIGINT NOT NULL,                                    -- 판매자 식별자 (Member 서비스 참조)
+    seller_type shop.seller_type NOT NULL,                          -- 판매자 유형 (아티스트, 일반유저)
+    category    shop.product_category NOT NULL,                     -- 상품 분류
+    title       VARCHAR(255) NOT NULL,                              -- 상품명
+    description TEXT,                                               -- 상품 상세 설명
+    image_url   VARCHAR(500),                                       -- 상품 대표 이미지 경로 또는 URL 저장
+    base_price  NUMERIC(15, 2) NOT NULL CHECK (base_price >= 0),    -- 상품 기본 가격
+    is_active   BOOLEAN DEFAULT TRUE,                               -- 판매 활성화 여부 (Soft Delete 대용)
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, -- 등록 일시
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP  -- 수정 일시
+);
+-- 2. 상품 상세 옵션(product_variants): 재고 관리 및 실제 판매가 이루어지는 최소 단위 (SKU)
+CREATE TABLE shop.product_variants (
+    variant_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),         -- 옵션 고유 ID
+    product_id       UUID NOT NULL REFERENCES shop.products(product_id) ON DELETE CASCADE, -- 부모 상품 ID
+    color            VARCHAR(50),                                        -- 색상 옵션
+    size             VARCHAR(50),                                        -- 사이즈 옵션
+    additional_price NUMERIC(15, 2) DEFAULT 0,                           -- 기본가에 추가되는 금액
+    stock_quantity   INT NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0), -- 해당 옵션의 현재 재고 수량
+    sku_code         VARCHAR(100) UNIQUE,                                -- 자체 관리용 재고 코드
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+-- 3. 주문(orders): 결제 및 배송 처리를 위한 주문 요약 정보
+CREATE TABLE shop.orders (
+    order_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),         -- 주문 고유 ID
+    member_id        BIGINT NOT NULL,                                    -- 구매자 식별자 (Member 서비스 참조)
+    total_amount     NUMERIC(15, 2) NOT NULL CHECK (total_amount >= 0),  -- 총 결제 금액
+    status           shop.order_status DEFAULT 'PENDING',                -- 주문/결제/배송 상태
+    shipping_address TEXT,                                               -- 배송 목적지 주소
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+-- 4. 주문 상세(order_items): 주문 당시의 상품 옵션 및 가격 정보 기록 (스냅샷)
+CREATE TABLE shop.order_items (
+    order_item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),            -- 상세 품목 고유 ID
+    order_id      UUID NOT NULL REFERENCES shop.orders(order_id) ON DELETE CASCADE, -- 부모 주문 ID
+    variant_id    UUID NOT NULL REFERENCES shop.product_variants(variant_id), -- 구매한 상품 옵션 ID
+    quantity      INT NOT NULL CHECK (quantity > 0),                     -- 구매 수량
+    unit_price    NUMERIC(15, 2) NOT NULL CHECK (unit_price >= 0),       -- 구매 시점의 개당 단가 (옵션가 포함)
+    created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+-- 5. 장바구니(cart_items): 사용자가 구매 전 보관하는 상품 목록
+CREATE TABLE shop.cart_items (
+    cart_item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),             -- 장바구니 항목 ID
+    member_id    BIGINT NOT NULL,                                        -- 사용자 식별자
+    variant_id   UUID NOT NULL REFERENCES shop.product_variants(variant_id) ON DELETE CASCADE, -- 담은 상품 옵션 ID
+    quantity     INT NOT NULL DEFAULT 1 CHECK (quantity > 0),            -- 담은 수량
+    created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uidx_cart_member_variant UNIQUE (member_id, variant_id)    -- 유저별 동일 옵션 중복 방지
+);
+-- 6. 주요 검색 및 조회를 위한 인덱스 설정
+CREATE INDEX idx_products_category ON shop.products(category);           -- 카테고리별 검색 최적화
+CREATE INDEX idx_products_seller ON shop.products(seller_id, seller_type); -- 판매자별 상품 목록 조회
+CREATE INDEX idx_products_active ON shop.products(is_active) WHERE is_active = TRUE; -- 판매 중 상품 필터링 최적화
+CREATE INDEX idx_product_variants_product ON shop.product_variants(product_id); -- 상품 상세 옵션 조회 성능 향상
+CREATE INDEX idx_orders_member ON shop.orders(member_id);                -- 유저별 주문 내역 조회
+CREATE INDEX idx_orders_status ON shop.orders(status);                   -- 배송/결제 상태별 관리 조회
+CREATE INDEX idx_order_items_order_id ON shop.order_items(order_id);     -- 주문별 상세 품목 조회
+CREATE INDEX idx_cart_items_member ON shop.cart_items(member_id);        -- 유저별 장바구니 조회
+-- 7. 시간 업데이트 자동화를 위한 트리거 함수 및 적용
+CREATE OR REPLACE FUNCTION shop.update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP; -- 데이터 수정 시 updated_at을 현재 시간으로 갱신
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+-- 수정 일시 자동 갱신 트리거 등록
+CREATE TRIGGER update_products_modtime BEFORE UPDATE ON shop.products FOR EACH ROW EXECUTE PROCEDURE shop.update_modified_column();
+CREATE TRIGGER update_product_variants_modtime BEFORE UPDATE ON shop.product_variants FOR EACH ROW EXECUTE PROCEDURE shop.update_modified_column();
+CREATE TRIGGER update_orders_modtime BEFORE UPDATE ON shop.orders FOR EACH ROW EXECUTE PROCEDURE shop.update_modified_column();
+CREATE TRIGGER update_cart_items_modtime BEFORE UPDATE ON shop.cart_items FOR EACH ROW EXECUTE PROCEDURE shop.update_modified_column();
+3. Reservation (예약) 시스템
+고트래픽 선착순 처리 및 서비스 간 낮은 결합도(Loose Coupling) 유지가 핵심.
+res 스키마: 예약 도메인 장애 격리 및 독립성 보장.
+events: 공연 정보 및 잔여석 관리. version 컬럼을 이용한 낙관적 락(Optimistic Lock)으로 동시성 제어.
+reservations: 예약 확정 내역 관리. FK 제약조건을 생략하여 Core 시스템과의 물리적 의존성 제거.
+-- msa_res_db
+CREATE SCHEMA IF NOT EXISTS res;
+-- 1. 이벤트(events): 공연 정보 및 실시간 잔여석 관리
+CREATE TABLE res.events (
+    event_id SERIAL PRIMARY KEY,                               -- 이벤트 고유 번호
+    title VARCHAR(255) NOT NULL,                               -- 공연 제목
+    artist_name VARCHAR(100),                                  -- 출연 아티스트
+    event_type VARCHAR(50),                                    -- 공연 성격 (CONCERT, FANMEETING)
+    price INTEGER NOT NULL CHECK (price >= 0),                 -- 티켓 단가
+    total_capacity INT NOT NULL CHECK (total_capacity > 0),    -- 총 좌석 수
+    available_seats INT NOT NULL CHECK (available_seats >= 0), -- 현재 남은 좌석 수
+    event_date TIMESTAMP WITH TIME ZONE NOT NULL,              -- 공연 일시
+    open_time TIMESTAMP WITH TIME ZONE NOT NULL,               -- 티켓 오픈 시각
+    close_time TIMESTAMP WITH TIME ZONE NOT NULL,              -- 티켓 마감 시각
+    version INTEGER NOT NULL DEFAULT 0,                        -- 낙관적 락용 버전 (선착순 처리 핵심)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+-- 2. 위치 정보(event_locations): 상세 장소 및 지도 데이터 (1:1)
+CREATE TABLE res.event_locations (
+    event_id INTEGER PRIMARY KEY REFERENCES res.events(event_id) ON DELETE CASCADE,
+    venue VARCHAR(255) NOT NULL,                               -- 공연 장소 (기존 events에서 분리)
+    address VARCHAR(500) NOT NULL,                             -- 장소 상세 주소 (기존 events에서 분리)
+    latitude DECIMAL(10, 8),                                   -- 카카오/구글 지도 API 위도
+    longitude DECIMAL(11, 8),                                  -- 카카오/구글 지도 API 경도
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+-- 3. 사진 정보(event_images): 포스터 및 상세 페이지 사진 (1:N)
+CREATE TABLE res.event_images (
+    image_id SERIAL PRIMARY KEY,                               -- 이미지 고유 번호
+    event_id INTEGER NOT NULL REFERENCES res.events(event_id) ON DELETE CASCADE,
+    image_url VARCHAR(500) NOT NULL,                           -- S3 경로 등
+    image_role VARCHAR(20) DEFAULT 'DETAIL'                    -- 포스터, 상세, 좌석배치도 등 역할 구분
+        CHECK (image_role IN ('POSTER', 'DETAIL', 'LAYOUT')),
+    sort_order INTEGER DEFAULT 0,                              -- 정렬 순서
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+-- 4. 예약(reservations): 예매 확정 정보 및 티켓 코드
+CREATE TABLE res.reservations (
+    reservation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- 예약 고유 번호
+    event_id INTEGER NOT NULL REFERENCES res.events(event_id), -- 대상 이벤트 ID
+    member_id BIGINT NOT NULL,                                 -- 예매자 ID (외부 참조 - MSA 낮은 결합도를 위해 FK 생략)
+    ticket_count INT NOT NULL CHECK (ticket_count > 0),        -- 매수
+    total_price INT NOT NULL CHECK (total_price >= 0),         -- 총 결제액
+    ticket_code VARCHAR(50) UNIQUE NOT NULL,                   -- 사용자용 티켓 식별 코드
+    -- 허용되지 않은 상태값 삽입 방지 제약조건 추가
+    status VARCHAR(20) DEFAULT 'PENDING'                       -- 상태값: 대기, 확정, 취소(변심), 환불(완료), 실패(시스템오류)
+        CHECK (status IN ('PENDING', 'CONFIRMED', 'CANCELLED', 'REFUNDED', 'FAILED')),
+    booked_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP -- 예매 완료 시각
+);
+---
+-- 성능 최적화 인덱스
+---
+-- 검색 성능 최적화 (이벤트 기간 조회용)
+CREATE INDEX idx_events_open_close ON res.events(open_time, close_time);
+-- 특정 유저의 예매 내역 조회 최적화
+CREATE INDEX idx_reservations_member ON res.reservations(member_id);
+-- 검색 성능 최적화를 위한 인덱스 (특정 공연의 예매 현황)
+CREATE INDEX idx_reservations_event ON res.reservations(event_id);
+-- 공연별 이미지 리스트 조회 최적화
+CREATE INDEX idx_event_images_event_id ON res.event_images(event_id);
+4. Chat (채팅) 시스템
+대량의 메시지 쓰기 성능 확보 및 실시간 조회를 위한 인덱스 최적화가 핵심.
+chat 스키마: 실시간 통신 전용 스키마로 분리하여 I/O 부하 격리.
+rooms: 채팅방 생성 및 그룹 여부 등 메타데이터 관리.
+participants: 참여자 매핑 정보. last_read_message_id를 통한 안 읽은 메시지 동기화.
+messages: 실제 메시지 데이터 기록. 성능 극대화를 위해 FK를 생략하고 시간순 조회를 위한 복합 인덱스 적용.
+-- 채팅 스키마 생성
+CREATE SCHEMA IF NOT EXISTS chat;
+-- 1. 채팅방 테이블
+CREATE TABLE chat.rooms (
+    room_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    room_name VARCHAR(255),
+    is_group BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+-- 2. 채팅방 참여자 테이블 (Redis에서 받은 member_id 사용)
+CREATE TABLE chat.participants (
+    room_id UUID NOT NULL,
+    member_id BIGINT NOT NULL, -- Core 서비스의 BIGINT 타입과 통일
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    last_read_message_id BIGINT, -- 읽음 처리(안 읽은 메시지 수)를 위한 마커
+    PRIMARY KEY (room_id, member_id)
+);
+CREATE INDEX idx_chat_participants_member ON chat.participants(member_id);
+-- 3. 메시지 테이블
+CREATE TABLE chat.messages (
+    message_id BIGSERIAL PRIMARY KEY,
+    room_id UUID NOT NULL,
+    sender_id BIGINT NOT NULL, -- 작성자 (member_id)
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    -- 외래키는 생략 (MSA 결합도 최소화 및 쓰기 성능 향상 목적)
+);
+-- 채팅방 진입 시 과거 메시지를 빠르게 불러오기 위한 핵심 인덱스
+CREATE INDEX idx_chat_messages_room_time ON chat.messages(room_id, created_at DESC);
+node.js 서버 구축
+서버 구축
+초기화
+# npm 초기화 (기본값 설정)npm init -y# 필요한 폴더 생성 (MSA 패턴 지향)mkdir -p src/config src/controllers src/routes src/services src/modelstouch .env src/app.js
+필수 라이브러리 설치
+# express: 웹 프레임워크# dotenv: 환경변수 관리# cors: 교차 출처 리소스 공유 허용# helmet: 보안 관련 HTTP 헤더 설정# morgan: HTTP 요청 로깅npm install express dotenv cors helmet morgan
+환경변수 설정(.env)
+PORT=3000NODE_ENV=development# 추후 DB 연결 시 여기에 추가 (e.g., DATABASE_URL=...)
+2. 웹서버와 MQ 라이브러리 설치
+npm install express amqplib
+각 라이브러리의 역할
+Express
+용도: Node.js를 위한 가장 대중적인 웹 프레임워크.
+기능: HTTP 요청(GET, POST 등) 처리, 라우팅(경로 설정), 미들웨어 관리 등을 쉽게 할 수 있는 도구.
+한 줄 요약: 웹 서버를 만들기 위한 도구.
+amqplib
+용도: RabbitMQ와 같은 메시지 브로커와 통신하기 위한 라이브러리.
+기능: AMQP 0-9-1 프로토콜을 사용하여 메시지를 보내거나(Publish) 받는(Consume) 기능을 수행.
+한 줄 요약: 메시지 큐(RabbitMQ)에 접속하기 위한 클라이언트 도구.
