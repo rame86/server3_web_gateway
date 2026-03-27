@@ -20,7 +20,7 @@ export default function UserCommunityDetail() {
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
   
-  // [추가] 인증을 통해 가져온 이미지의 Blob URL 상태
+  // 인증을 통해 가져온 이미지의 Blob URL 상태
   const [imageBlobUrl, setImageBlobUrl] = useState(null);
 
   // 댓글 수정 관련 상태
@@ -53,9 +53,12 @@ export default function UserCommunityDetail() {
     if (!path) return;
     try {
       const token = localStorage.getItem('accessToken') || localStorage.getItem('TOKEN');
-      const pureFileName = path.split('/').pop();
+
+      // 1. 파일명만 추출 (경로에 'board/'가 포함되어 있어도 파일명만 쏙 뺍니다)
+      const pureFileName = path.includes('/') ? path.split('/').pop() : path;
       const imageUrl = `${IMAGE_SERVER_URL}/files/${pureFileName}`;
 
+      // 2. fetch 호출 시 인증 헤더를 반드시 포함해야 합니다.
       const response = await fetch(imageUrl, {
         method: 'GET',
         headers: { 
@@ -68,6 +71,7 @@ export default function UserCommunityDetail() {
       // 이미지를 Blob(Binary Large Object)으로 변환 후 브라우저용 URL 생성
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
+      
       setImageBlobUrl(objectUrl); // 생성된 Blob URL을 상태에 저장
     } catch (err) {
       console.error("이미지 보안 로드 실패:", err);
@@ -270,7 +274,11 @@ export default function UserCommunityDetail() {
           {/* 통계 정보 (좋아요, 댓글수, 조회수) */}
           <div className="flex gap-6 pt-6 border-t border-rose-50 text-gray-400 text-xs font-bold">
             <button onClick={async () => (await apiFetch(`${API_BASE_URL}/${params.id}/like`, 'POST')).ok && fetchData()} className="flex items-center gap-1.5 hover:text-rose-500 transition-colors">
-              <Heart size={18} fill={(post.likeCount || 0) > 0 ? "#f43f5e" : "none"} className={(post.likeCount || 0) > 0 ? "text-rose-500" : ""}/> 
+              <Heart 
+                size={18} 
+                fill={post.isLiked ? "#f43f5e" : "none"} 
+                className={post.isLiked ? "text-rose-500" : ""}
+              /> 
               <span>좋아요 {post.likeCount || 0}</span>
             </button>
             <span className="flex items-center gap-1.5"><MessageCircle size={18}/> 댓글 {comments.length}</span>
