@@ -84,6 +84,7 @@ export default function UserPurchaseProcess() {
                         stock: 100, // Placeholder
                     };
                     setItems([mappedItem]);
+                    setItem(mappedItem);
                 }
             } catch (error) {
                 console.error('Failed to load checkout data:', error);
@@ -140,12 +141,37 @@ export default function UserPurchaseProcess() {
         setIsPayConfirmOpen(false);
         toast.loading('포인트 결제가 진행 중입니다...');
         try {
-            await shopApi.post('/shop/checkout', { productId: item.id, quantity, usePoint: grandTotal });
+            if (isFromCart) {
+                // 장바구니 결제
+                const orderItems = items.map(i => ({ variantId: i.variantId.toString(), quantity: i.quantity }));
+                await shopApi.post('/shop/order', {
+                    shippingAddress: '기본 배송지 (체크아웃)',
+                    items: orderItems,
+                    shippingFee: totalItemsPrice >= 50000 ? 0 : deliveryFee,
+                    totalAmount: grandTotal
+                });
+                
+                // 장바구니 비우기
+                const res = await shopApi.get('/shop/cart');
+                const cartData = res.data;
+                if (cartData && cartData.items) {
+                    for (const cItem of cartData.items) {
+                        await shopApi.delete(`/shop/cart/${cItem.cartItemId}`);
+                    }
+                }
+            } else {
+                // 단일 결제
+                await shopApi.post('/shop/checkout', { 
+                    productId: items[0].id, 
+                    quantity: singleQuantity, 
+                    usePoint: grandTotal 
+                });
+            }
             toast.dismiss();
             handleNext();
         } catch (error) {
             toast.dismiss();
-            toast.error('결제에 실패했습니다.');
+            toast.error('결제에 실패했습니다. (같은 아티스트 상품만 담았는지 확인해 주세요)');
         }
     };
 
@@ -298,38 +324,7 @@ export default function UserPurchaseProcess() {
                         </div>
 
                         <button
-                            onClick={async () => {
-                                toast.loading('포인트 결제가 진행 중입니다...');
-                                try {
-                                    if (isFromCart) {
-                                        // 장바구니 결제: /shop/order 호출 (다중 아이템)
-                                        const orderItems = items.map(i => ({ variantId: i.variantId.toString(), quantity: i.quantity }));
-                                        await shopApi.post('/shop/order', {
-                                            shippingAddress: '기본 배송지 (체크아웃)',
-                                            items: orderItems,
-                                            shippingFee: totalItemsPrice >= 50000 ? 0 : deliveryFee,
-                                            totalAmount: grandTotal
-                                        });
-                                        
-                                        // 장바구니 비우기 호출 (각각 삭제)
-                                        const res = await shopApi.get('/shop/cart');
-                                        const cartData = res.data;
-                                        if (cartData && cartData.items) {
-                                            for (const cItem of cartData.items) {
-                                                await shopApi.delete(`/shop/cart/${cItem.cartItemId}`);
-                                            }
-                                        }
-                                    } else {
-                                        // 단일 결제: /shop/checkout 호출
-                                        await shopApi.post('/shop/checkout', { productId: items[0].id, quantity: singleQuantity, usePoint: grandTotal });
-                                    }
-                                    toast.dismiss();
-                                    handleNext();
-                                } catch (error) {
-                                    toast.dismiss();
-                                    toast.error('결제에 실패했습니다. (같은 아티스트 상품만 담았는지 확인해 주세요)');
-                                }
-                            }}
+                            onClick={() => setIsPayConfirmOpen(true)}
                             disabled={!isEnoughPoints}
                             className="w-full py-4 btn-primary-gradient text-white rounded-2xl font-bold shadow-lg disabled:opacity-50 disabled:grayscale transition-all hover:scale-[1.02]"
                         >
@@ -409,8 +404,8 @@ export default function UserPurchaseProcess() {
                             </p>
                         </div>
                         <div className="px-4 py-3 bg-rose-50 rounded-2xl text-sm text-rose-600 font-medium">
-                            수량: <span className="font-bold">{quantity}개</span>
-                            {totalPrice >= 50000 ? ' · 배송비 무료' : ` · 배송비 ${formatPrice(deliveryFee)}`}
+                            수량: <span className="font-bold">{totalQuantity}개</span>
+                            {totalItemsPrice >= 50000 ? ' · 배송비 무료' : ` · 배송비 ${formatPrice(deliveryFee)}`}
                         </div>
                         <div className="flex gap-3 pt-2">
                             <button
