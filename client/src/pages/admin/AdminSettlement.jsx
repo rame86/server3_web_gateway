@@ -42,13 +42,46 @@ export default function AdminSettlement() {
 
     const subscription = stompClient.subscribe('/topic/admin/settlement', (frame) => {
       try {
-        const data = JSON.parse(frame.body);
-        console.log('📢 [WebSocket] 정산 데이터 수신:', data);
+        const response = JSON.parse(frame.body);
+        console.log('📢 [WebSocket] 수신된 원본 데이터:', response);
         
-        // 백엔드에서 전해주는 데이터 구조에 맞춰 상태 업데이트
-        if (data.settlements) setSettlements(data.settlements);
-        if (data.summary) setSummary(data.summary);
-        if (data.monthlyTrend) setMonthlyTrend(data.monthlyTrend);
+        // 데이터가 response.payload 안에 들어있을 수도 있고, 
+        // 이미지처럼 response 자체가 객체일 수도 있으니 둘 다 대응합니다.
+        const data = response.payload || response; 
+
+        // 1. 요약 데이터 매핑
+        if (data.summary) {
+          setSummary({
+            thisMonthTotal: data.summary.totalGrossAmount || 0,
+            feeTotal: data.summary.totalPlatformFee || 0,
+            artistSettlementTotal: data.summary.totalSettledAmount || 0,
+            completedSettlementCount: data.artistSettlements?.length || 0
+          });
+        }
+
+        // 2. 아티스트별 리스트 매핑
+        if (data.artistSettlements) {
+          const mappedSettlements = data.artistSettlements.map((s, index) => ({
+            id: s.artistId || index,
+            artist: s.artistName,
+            amount: s.grossAmount,
+            fee: s.feeAmount,
+            net: s.netAmount,
+            status: s.status === 'COMPLETED' ? 'completed' : 'pending',
+            date: '실시간' // 혹은 s.lastTransactionDate 변환
+          }));
+          setSettlements(mappedSettlements);
+        }
+
+        // ⭐ 3. 월별 트렌드 데이터 매핑 (여기 추가/수정!)
+        if (data.monthlyTrend) {
+          const mappedTrend = data.monthlyTrend.map(t => ({
+            month: t.month,        // "2026-03"
+            total: t.totalGross,   // 👈 서버의 totalGross를 차트의 total로 매핑
+            fee: t.totalFee        // 👈 서버의 totalFee를 차트의 fee로 매핑
+          }));
+          setMonthlyTrend(mappedTrend);
+        }
       } catch (err) {
         console.error('WebSocket data parsing error:', err);
       }
