@@ -3,13 +3,13 @@
  * Soft Bloom Design: Event management and proposal flow for artists
  */
 
-import { useState, useEffect } from 'react'; // 🌟 useEffect 추가
+import { useState, useEffect } from 'react'; //  useEffect 추가
 import Layout from '@/components/Layout';
 import { cn } from "@/lib/utils";
 import { Calendar, Plus, Search, MapPin, Users, Ticket, Clock, Check, X, MoreVertical, Image as ImageIcon, Sparkles, Map, MessageSquareX } from 'lucide-react';
 import { events, formatPrice, eventTypeLabel, eventTypeBadgeClass } from '@/lib/data';
 import { toast } from 'sonner';
-import { resApi, adminApi } from '@/lib/api'; // 🌟 백엔드 통신을 위한 API 추가
+import { resApi, adminApi } from '@/lib/api'; //  백엔드 통신을 위한 API 추가
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import SeatSelection from '../user/UserBookingSeatSelection';
 
-// 🌟 추가: DB의 영문 상태값을 예쁜 한글과 색상으로 바꿔주는 매핑 객체
+//  추가: DB의 영문 상태값을 예쁜 한글과 색상으로 바꿔주는 매핑 객체
 const statusMap = {
   PENDING: { label: '승인 대기 중', style: 'bg-amber-500 text-white' },
   CONFIRMED: { label: '승인 완료', style: 'bg-teal-500 text-white' },
