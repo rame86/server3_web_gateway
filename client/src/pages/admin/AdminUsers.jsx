@@ -94,7 +94,6 @@ export default function AdminUsers() {
   const subscription = stompClient.subscribe('/topic/user-stats', (frame) => {
       try {
         const response = JSON.parse(frame.body);
-        // 백엔드에서 socketData.put("type", ...) 로 보냈으므로 type을 꺼냅니다.
         const { type, payload } = response; 
         
         console.log("🚀 웹소켓 수신 데이터:", type, payload);
@@ -107,7 +106,15 @@ export default function AdminUsers() {
             return prevUsers.map(user => {
               // memberId가 같은 항목을 찾아 업데이트
               const updated = payload.find(p => Number(p.memberId) === Number(user.memberId));
-              return updated ? { ...user, ...updated } : user;
+
+              if(updated){
+                return{
+                  ...user,
+                  ...updated,
+                  createdAt: user.createdAt
+                };
+              }
+              return user;
             });
           });
         } 
