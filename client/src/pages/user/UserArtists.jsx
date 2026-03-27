@@ -44,13 +44,14 @@ export default function UserArtists() {
         
         let allEvents = [];
         try {
-          const eventsRes = await resApi.get('/events/allEvents');
-          allEvents = Array.isArray(eventsRes.data?.events) ? eventsRes.data.events : (Array.isArray(eventsRes.data) ? eventsRes.data : []);
+          // 핵심 주석: resApi 대신 fetch를 사용해 브라우저의 OPTIONS 사전 요청을 강제로 우회함
+          const res = await fetch(`${gatewayUrl}/msa/res/eventsList`);
+          const data = await res.json();
+          allEvents = Array.isArray(data?.events) ? data.events : (Array.isArray(data) ? data : []);
         } catch (eventErr) {
-          // 에러(CORS, 401 등) 나면 콘솔에 1줄만 찍히고 화면은 살림
-          console.error("이벤트 목록을 가져오지 못했습니다.");
+          console.error("이벤트 목록 조회 실패:", eventErr);
         }
-
+        
         // 1-3. 가져온 전체 이벤트 중 '승인 완료된 미래 이벤트'만 필터링
         const activeEvents = allEvents.filter(e => {
           const isConfirmed = e.approval_status === 'CONFIRMED' || e.status === 'CONFIRMED';
