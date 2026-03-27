@@ -1,4 +1,3 @@
-# /web/ .github/workflows/ci-cd.yml
 name: Frontend CI/CD Pipeline
 
 on:
@@ -14,18 +13,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-
       - name: Package for Docker Build
         run: |
           mkdir -p deploy
+          # 의존성 설치 및 빌드에 필요한 모든 파일 복사
           cp -r client deploy/client
-          cp -r patches deploy/patches
+          cp -r patches deploy/patches || true # patches가 없을 경우 예외 처리
           cp package.json deploy/
           cp pnpm-lock.yaml deploy/
           cp vite.config.js deploy/
           cp nginx.conf deploy/
           cp client/Dockerfile deploy/
-          cd deploy && tar -czf frontend.tar.gz client/ patches/ package.json pnpm-lock.yaml vite.config.js nginx.conf Dockerfile
+          cp docker-compose.yml deploy/ # 컴포즈 파일 추가
+          
+          # 압축 시 컴포즈 파일 포함
+          cd deploy && tar -czf frontend.tar.gz client/ patches/ package.json pnpm-lock.yaml vite.config.js nginx.conf Dockerfile docker-compose.yml
 
       - name: Copy to GCP
         uses: appleboy/scp-action@master
@@ -37,7 +39,7 @@ jobs:
           target: "/home/${{ secrets.GCP_USER }}/frontend/"
           strip_components: 1
 
-      - name: Build Container and Refresh Gateway
+      - name: Deploy via Docker Compose and Refresh Gateway
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.GCP_HOST }}
@@ -48,10 +50,11 @@ jobs:
             tar -xzf frontend.tar.gz
             rm frontend.tar.gz
             
-            # 1. 프론트엔드 컨테이너 빌드 및 재실행
-            docker build -t lumina-frontend .
-            docker rm -f frontend || true
-            docker run -d --name frontend --network msa-network lumina-frontend
+            # 1. Docker Compose로 빌드 및 컨테이너 무중단 재시작 (변경사항이 있을 경우만 새로 빌드)
+            docker compose up -d --build
             
-            # 2. 게이트웨이 재시작 (연결 갱신)
+            # 2. 불필요해진 이전 버전의 dangling 이미지 제거 (디스크 용량 최적화)
+            docker image prune -f
+            
+            # 3. 게이트웨이 재시작 (연결 갱신)
             docker restart nginx-gateway
