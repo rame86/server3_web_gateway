@@ -16,22 +16,8 @@ jobs:
       - name: Package for Docker Build
         run: |
           mkdir -p deploy
-          
-          # 1. 빌드에 필요한 디렉터리 복사 (shared 폴더 포함)
-          cp -r client deploy/client
-          cp -r shared deploy/shared || true
-          cp -r patches deploy/patches || true
-          
-          # 2. 빌드에 필요한 설정 파일 복사 (루트 기준)
-          cp package.json deploy/
-          cp pnpm-lock.yaml deploy/
-          cp vite.config.js deploy/
-          cp nginx.conf deploy/
-          cp Dockerfile deploy/
-          cp docker-compose.yml deploy/
-          
-          # 3. 배포 폴더 압축
-          cd deploy && tar -czf frontend.tar.gz client/ shared/ patches/ package.json pnpm-lock.yaml vite.config.js nginx.conf Dockerfile docker-compose.yml
+          # 누락되는 설정 파일이 없도록 node_modules, .git을 제외하고 전체 압축
+          tar --exclude='./node_modules' --exclude='./.git' --exclude='./deploy' -czf deploy/frontend.tar.gz .
 
       - name: Copy to GCP
         uses: appleboy/scp-action@master
@@ -54,11 +40,6 @@ jobs:
             tar -xzf frontend.tar.gz
             rm frontend.tar.gz
             
-            # Docker Compose 빌드 및 무중단 실행
             docker compose up -d --build
-            
-            # 잉여(dangling) 이미지 삭제로 서버 용량 확보
             docker image prune -f
-            
-            # Nginx Gateway 연결 갱신을 위한 재시작
             docker restart nginx-gateway
