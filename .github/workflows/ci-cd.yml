@@ -23,7 +23,7 @@ jobs:
           cp pnpm-lock.yaml deploy/
           cp vite.config.js deploy/
           cp nginx.conf deploy/
-          cp client/Dockerfile deploy/
+          cp Dockerfile deploy/
           cp docker-compose.yml deploy/ # 컴포즈 파일 추가
           
           # 압축 시 컴포즈 파일 포함
