@@ -9,7 +9,7 @@ import {
 import { toast } from 'sonner';
 import { coreApi, payApi } from '@/lib/api';
 
-// 목업 데이터 (UI 확인용)
+// 목업 데이터
 const mockMedia = [
   { id: 1, title: "'Starry Night' M/V Behind The Scenes", img: "https://images.unsplash.com/photo-1598387181032-a3103a2db5b3?q=80&w=400" },
   { id: 2, title: "NOVA World Tour in Seoul Highlight", img: "https://images.unsplash.com/photo-1540039155732-6762e1c9cc1f?q=80&w=400" },
@@ -23,7 +23,8 @@ const mockShop = [
 ];
 
 export default function UserArtistDetail({ params }) {
-  const memberId = params?.id; 
+  // memberId를 일관되게 숫자로 변환하여 관리 (MSA API 규격에 맞춤)
+  const memberId = params?.id ? parseInt(params.id) : null; 
   
   const [artist, setArtist] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
@@ -31,7 +32,6 @@ export default function UserArtistDetail({ params }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
 
-  // 게시글 상세보기 상태
   const [selectedPost, setSelectedPost] = useState(null);
   const [postDetailLoading, setPostDetailLoading] = useState(false);
 
@@ -51,22 +51,24 @@ export default function UserArtistDetail({ params }) {
       try {
         setLoading(true);
 
-        // 포인트 정보
+        // 1. 포인트 정보 조회 (페이 서비스)
         payApi.get('/payment/')
           .then(res => {
             if (res.data?.currentBalance !== undefined) setMyPoints(res.data.currentBalance);
           }).catch(() => console.warn("포인트 정보를 가져올 수 없습니다."));
 
-        // 아티스트 정보 및 팔로우 상태
-        const artistRes = await coreApi.get(`/artist/${memberId}`);
-        const artistData = artistRes.data;
+        // 2. 아티스트 정보 및 팔로우 상태 동시 조회
+        const [artistRes, followRes] = await Promise.all([
+          coreApi.get(`/artist/${memberId}`),
+          coreApi.get('/artist/my-follows').catch(() => ({ data: [] }))
+        ]);
         
-        const followRes = await coreApi.get('/artist/my-follows').catch(() => ({ data: [] }));
-        const isFollowed = Array.isArray(followRes.data) && followRes.data.some(f => f.memberId === parseInt(memberId));
+        const artistData = artistRes.data;
+        const isFollowed = Array.isArray(followRes.data) && followRes.data.some(f => f.memberId === memberId);
         
         setArtist({ ...artistData, isFollowed });
 
-        // 공지 및 팬레터 목록
+        // 3. 공지 및 팬레터 목록 (아티스트 식별자 기준)
         const targetId = artistData?.artistId || memberId; 
         const [noticeRes, letterRes] = await Promise.all([
           coreApi.get(`/artist/${targetId}/notices`).catch(() => ({ data: [] })),
@@ -86,7 +88,7 @@ export default function UserArtistDetail({ params }) {
     fetchAllData();
   }, [memberId]);
 
-  // 게시글 상세 정보 가져오기
+  // 게시글 상세 정보 가져오기 (메모이제이션 적용)
   const handleOpenPost = useCallback(async (post) => {
     if (!post?.boardId) return;
     
@@ -125,7 +127,8 @@ export default function UserArtistDetail({ params }) {
     if (amount > myPoints) { toast.error('포인트가 부족합니다.'); return; }
 
     try {
-      await coreApi.post('/artist/donate', { artistId: parseInt(memberId), amount: amount });
+      // MSA 구조에 따라 아티스트 ID를 정확히 전달
+      await coreApi.post('/artist/donate', { artistId: memberId, amount: amount });
       setMyPoints(prev => prev - amount);
       setIsDonateOpen(false);
       setDonateAmount('');
@@ -137,8 +140,10 @@ export default function UserArtistDetail({ params }) {
 
   const handleSendMessage = () => {
     if (!chatMessage.trim()) return;
-    setChatHistory([...chatHistory, { sender: 'user', text: chatMessage }]);
+    setChatHistory(prev => [...prev, { sender: 'user', text: chatMessage }]);
+    const currentMsg = chatMessage;
     setChatMessage('');
+    
     setTimeout(() => {
       setChatHistory(prev => [...prev, { sender: 'ai', text: '그랬구나! 나도 항상 널 응원하고 있어 💖' }]);
     }, 1000);
@@ -154,9 +159,9 @@ export default function UserArtistDetail({ params }) {
   ];
 
   const latestNotice = announcements?.length > 0 ? announcements[0] : null;
-  const latestArtistLetter = fanLetters?.find(l => l.isArtist === true || l.authorRole === 'ARTIST') || (fanLetters?.length > 0 ? fanLetters[0] : null);
-  const latestFanLetter = fanLetters?.find(l => l.isArtist === false && l.authorRole !== 'ARTIST') || (fanLetters?.length > 1 ? fanLetters[1] : fanLetters[0]);
+  const latestArtistLetter = fanLetters?.find(l => l.authorRole === 'ARTIST') || null;
   
+  if (!memberId) return <Layout role="user"><div className="p-10 text-center">잘못된 접근입니다.</div></Layout>;
   if (loading) return <Layout role="user"><div className="p-10 text-center text-rose-500 font-bold italic tracking-widest">Lumina 로딩 중...</div></Layout>;
   if (!artist) return <Layout role="user"><div className="p-10 text-center">아티스트 정보가 없습니다.</div></Layout>;
 
@@ -169,7 +174,7 @@ export default function UserArtistDetail({ params }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
           <div className="absolute bottom-0 left-0 w-full p-6 lg:px-12 flex flex-col md:flex-row items-end md:items-center justify-between gap-4">
             <div className="flex items-end gap-4 text-white">
-              <img src={artist.profileImageUrl || "https://placehold.co/200x200"} alt={artist.stageName} className="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover ring-4 ring-white/20 backdrop-blur-sm shadow-2xl transition-transform hover:scale-105" />
+              <img src={artist.profileImageUrl || "https://placehold.co/200x200"} alt={artist.stageName} className="w-24 h-24 md:w-32 md:h-32 rounded-2xl object-cover ring-4 ring-white/20 shadow-2xl transition-transform hover:scale-105" />
               <div className="pb-2">
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/90 mb-2 inline-block uppercase tracking-wider">Lumina Fandom</span>
                 <h1 className="text-3xl md:text-4xl font-bold drop-shadow-lg">{artist.stageName}</h1>
@@ -189,7 +194,7 @@ export default function UserArtistDetail({ params }) {
 
         {/* 메인 콘텐츠 */}
         <div className="p-4 lg:p-6 lg:px-12 space-y-6">
-          {/* 커스텀 탭 네비게이션 */}
+          {/* 탭 네비게이션 */}
           <div className="flex overflow-x-auto hide-scrollbar gap-2 pb-2 border-b border-gray-100">
             {tabs.map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-rose-50 text-rose-600 border border-rose-100 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}>
@@ -205,12 +210,12 @@ export default function UserArtistDetail({ params }) {
                 <div className="glass-card p-6 rounded-2xl bg-white border border-gray-100 shadow-sm">
                   <h3 className="font-bold flex items-center gap-2 mb-4 text-gray-800"><Bell size={18} className="text-rose-500"/> 최근 주요 소식</h3>
                   <div className="space-y-3">
-                    {latestNotice && (
+                    {latestNotice ? (
                       <div onClick={() => handleDashboardPostClick(latestNotice)} className="p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-gray-300 cursor-pointer transition-all active:scale-[0.98]">
                         <div className="flex justify-between mb-1"><span className="text-[10px] font-bold text-gray-600 bg-gray-200 px-2 py-0.5 rounded-md uppercase">Notice</span><span className="text-[10px] text-muted-foreground">{latestNotice.createdAt?.split('T')[0]}</span></div>
                         <p className="text-sm font-semibold line-clamp-1">{latestNotice.title}</p>
                       </div>
-                    )}
+                    ) : <p className="text-sm text-gray-400">등록된 공지사항이 없습니다.</p>}
                     {latestArtistLetter && (
                       <div onClick={() => handleDashboardPostClick(latestArtistLetter)} className="p-3 rounded-xl bg-rose-50 border border-rose-100 hover:border-rose-300 cursor-pointer transition-all active:scale-[0.98]">
                         <div className="flex justify-between mb-1"><span className="text-[10px] font-bold text-rose-600 uppercase">Artist</span><span className="text-[10px] text-muted-foreground">{latestArtistLetter.createdAt?.split('T')[0]}</span></div>
@@ -236,7 +241,7 @@ export default function UserArtistDetail({ params }) {
               </div>
             )}
 
-            {/* 📍 2. 미디어 탭 (복원 완료) */}
+            {/* 2. 미디어 탭 */}
             {activeTab === 'media' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {mockMedia.map(media => (
@@ -266,8 +271,11 @@ export default function UserArtistDetail({ params }) {
             {/* 3. 커뮤니티 */}
             {activeTab === 'community' && (
               <div className="glass-card p-6 rounded-2xl bg-white border border-gray-100 shadow-sm">
-                <h3 className="font-bold flex items-center gap-2 mb-6 text-gray-800"><MessageSquare size={18} className="text-rose-500"/> 팬 여러분께</h3>
+                <h3 className="font-bold flex items-center gap-2 mb-6 text-gray-800"><MessageSquare size={18} className="text-rose-500"/> 소통 공간</h3>
                 <div className="space-y-3">
+                  {announcements.length === 0 && fanLetters.length === 0 && (
+                    <div className="py-20 text-center text-gray-400">게시글이 아직 없습니다.</div>
+                  )}
                   {announcements.map((notice) => (
                     <div key={notice.boardId} onClick={() => handleOpenPost(notice)} className="flex items-center justify-between p-4 border border-rose-100 rounded-xl bg-rose-50/30 hover:bg-rose-50 cursor-pointer group transition-all">
                       <div className="flex items-center gap-4">
@@ -280,7 +288,9 @@ export default function UserArtistDetail({ params }) {
                   {fanLetters.map((letter) => (
                     <div key={letter.boardId} onClick={() => handleOpenPost(letter)} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl bg-white hover:shadow-md cursor-pointer group transition-all">
                       <div className="flex items-center gap-4">
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-rose-100 text-rose-600 uppercase">팬레터</span>
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase ${letter.authorRole === 'ARTIST' ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-600'}`}>
+                          {letter.authorRole === 'ARTIST' ? '아티스트' : '팬레터'}
+                        </span>
                         <p className="font-medium text-sm group-hover:text-rose-600">{letter.title}</p>
                       </div>
                       <span className="text-xs text-muted-foreground">{letter.createdAt?.split('T')[0]}</span>
@@ -295,7 +305,7 @@ export default function UserArtistDetail({ params }) {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {mockShop.map(item => (
                   <div key={item.id} className="group bg-white p-3 rounded-2xl border border-gray-100 hover:shadow-lg transition-all cursor-pointer">
-                    <div className="aspect-square rounded-xl mb-3 overflow-hidden relative bg-gray-50 shadow-inner">
+                    <div className="aspect-square rounded-xl mb-3 overflow-hidden relative bg-gray-50">
                       <img src={item.img} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       <button className="absolute bottom-2 right-2 bg-white/90 backdrop-blur p-2 rounded-full shadow-md text-gray-700 hover:text-rose-500 transition-all">
                         <ShoppingCart size={16} />
@@ -328,7 +338,7 @@ export default function UserArtistDetail({ params }) {
                   ))}
                 </div>
                 <div className="p-4 border-t bg-white flex gap-2">
-                  <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()} placeholder="메시지 입력..." className="flex-1 bg-gray-100 border-none rounded-2xl px-5 py-3 text-sm focus:ring-2 focus:ring-rose-500/20 focus:outline-none" />
+                  <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()} placeholder="메시지 입력..." className="flex-1 bg-gray-100 border-none rounded-2xl px-5 py-3 text-sm focus:ring-2 focus:ring-rose-500/20 focus:outline-none" />
                   <button onClick={handleSendMessage} className="p-3 bg-rose-500 text-white rounded-2xl shadow-lg active:scale-95 transition-all"><Send size={20} /></button>
                 </div>
               </div>
@@ -378,7 +388,10 @@ export default function UserArtistDetail({ params }) {
               <p className="text-2xl font-bold text-rose-600">{myPoints.toLocaleString()} P</p>
             </div>
             <input type="number" value={donateAmount} onChange={(e) => setDonateAmount(e.target.value)} placeholder="0" className="w-full text-center text-3xl font-bold py-3 border-b-2 border-rose-500 focus:outline-none mb-10" />
-            <button onClick={executeDonation} className="w-full bg-rose-500 text-white py-4 rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-xl active:scale-95">후원 보내기</button>
+            <div className="flex gap-2">
+              <button onClick={() => setIsDonateOpen(false)} className="flex-1 bg-gray-100 text-gray-600 py-4 rounded-2xl font-bold">취소</button>
+              <button onClick={executeDonation} className="flex-[2] bg-rose-500 text-white py-4 rounded-2xl font-bold hover:bg-rose-600 transition-all shadow-xl active:scale-95">후원 보내기</button>
+            </div>
           </div>
         </div>
       )}
