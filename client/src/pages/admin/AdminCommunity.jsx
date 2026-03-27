@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react'; // useRef 추가
 import Layout from '@/components/Layout';
-import { AlertCircle, Eye, Trash2, Search, Flag, X, Clock, User, Layers3, MessageSquare } from 'lucide-react';
+import { AlertCircle, Eye, Trash2, Search, Flag, X, Clock, User, Layers3, MessageSquare, Megaphone, Send, Paperclip, Globe, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 
@@ -20,16 +20,32 @@ export default function AdminCommunity() {
   const [commentCount, setcommentCount] = useState(0);
   const [boardCount, setBoardCount] = useState(0);
 
+  // 공지사항 작성 관련 상태
+  const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [allArtists, setAllArtists] = useState([]);
+  const [noticeType, setNoticeType] = useState('ALL'); // ALL(전체) | ARTIST(아티스트별)
+  const [noticeData, setNoticeData] = useState({
+    title: '',
+    content: '',
+    category: '공지사항',
+    artistId: '0' // 기본값 0 (전체공지)
+  });
+  
   // --- API 경로 설정 (MSA 구조 대응) ---
   const ADMIN_API_BASE = "/msa/core/admin/board"; 
   const BOARD_API_BASE = "/msa/core/board";
   const BOARD_ADMIN_API_BASE = "/msa/core/board/admin";
+  const ARTIST_API_BASE = "/msa/core/artist";
   
   // 컴포넌트 마운트 시 초기 데이터 로드
   useEffect(() => {
     fetchPosts();
     fetchReports();
+    fetchAllArtists();
   }, []);
+
+  
   // 신고 서브 탭이 변경되거나 신고 관리 탭으로 진입할 때 목록 새로고침
   useEffect(() => {
     if (activeTab === 'reports') {
@@ -46,9 +62,7 @@ export default function AdminCommunity() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       setPostList(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error("게시글 로드 실패:", error);
-    } finally { setLoading(false); }
+    } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
   // 2. 신고 목록 로드
@@ -57,28 +71,36 @@ export default function AdminCommunity() {
       setLoading(true);
       const token = localStorage.getItem('accessToken');
       const headers = { 'Authorization': `Bearer ${token}` };
-
       // [병렬 처리] 게시글 신고와 댓글 신고 목록을 한 번에 호출
       const [boardRes, commentRes] = await Promise.all([
         axios.get(`${ADMIN_API_BASE}/reports`, { headers }), // -> /msa/core/admin/board/reports
         axios.get(`${ADMIN_API_BASE}/reports/comments`, { headers }) // -> /msa/core/admin/board/reports/comments
       ]);
-
       const boards = Array.isArray(boardRes.data) ? boardRes.data : [];
       const comments = Array.isArray(commentRes.data) ? commentRes.data : [];
-
       // 카운트 업데이트
       setBoardCount(boards.length);
       setcommentCount(comments.length);
       setTotalReportCount(boards.length + comments.length);
       setReportList(reportSubTab === 'boards' ? boards : comments);
-
     } catch (error) {
       console.error("신고 목록 로드 실패:", error);
       // 에러가 나더라도 리스트를 비워줌으로써 '데이터 없음' 메시지가 뜨게 합니다.
       setReportList([]); 
     } finally { setLoading(false); }
   };
+  
+  // 아티스트 목록 로드 (공지사항용)
+  const fetchAllArtists = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.get(`${ARTIST_API_BASE}/all`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setAllArtists(response.data || []);
+    } catch (error) { console.error("아티스트 목록 로드 실패"); }
+  };
+  
   //상세 내용 확인 (모달 띄우기)
   const handleShowDetail = async (item, type) => {
     if (item.content) {
@@ -129,14 +151,13 @@ export default function AdminCommunity() {
   const handleDeleteItem = async (e, id, type) => {
     if (e) e.stopPropagation();
     if (!window.confirm("정말로 영구 삭제하시겠습니까?")) return;
-
     try {
       const token = localStorage.getItem('accessToken');
       const url = type === 'board' 
         ? `${BOARD_ADMIN_API_BASE}/boards/${id}` 
         : `${BOARD_ADMIN_API_BASE}/comments/${id}`;
-      
-      await axios.delete(url, { headers: { 'Authorization': `Bearer ${token}` } });
+
+        await axios.delete(url, { headers: { 'Authorization': `Bearer ${token}` } });
       toast.success('영구 삭제되었습니다.');
       setSelectedItem(null);
       activeTab === 'posts' ? fetchPosts() : fetchReports();
@@ -144,6 +165,50 @@ export default function AdminCommunity() {
       toast.error("삭제 실패");
     }
   };
+
+  // 공지사항 제출 핸들러
+  const handleNoticeSubmit = async (e) => {
+    e.preventDefault();
+    if (!noticeData.title.trim() || !noticeData.content.trim()) {
+      toast.error("제목과 내용을 입력해주세요.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('accessToken');
+      const formData = new FormData();
+      
+      const finalArtistId = noticeType === 'ALL' ? 0 : Number(noticeData.artistId);
+
+      const requestBlob = new Blob(
+        [JSON.stringify({
+          ...noticeData,
+          artistId: finalArtistId,
+          isAdmin: true
+        })],
+        { type: 'application/json' }
+      );
+      
+      formData.append('request', requestBlob);
+      if (selectedFile) formData.append('file', selectedFile);
+
+      await axios.post(`${BOARD_ADMIN_API_BASE}/write`, formData, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      toast.success('공지사항이 등록되었습니다.');
+      setNoticeData({ ...noticeData, title: '', content: '' });
+      setSelectedFile(null);
+      setActiveTab('posts');
+      fetchPosts();
+    } catch (error) { toast.error("공지사항 등록 실패"); } finally { setLoading(false); }
+  };
+
+
   // 검색 로직: 제목 또는 작성자명에 검색어가 포함된 항목 필터링
   const filteredPosts = postList.filter((p) =>
     p.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -163,7 +228,11 @@ export default function AdminCommunity() {
           <button onClick={() => setActiveTab('reports')} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'reports' ? 'bg-white text-rose-500 shadow-md' : 'text-slate-500'}`}>
             <Flag size={16} className="inline mr-2" /> 신고 관리 ({totalReportCount})
           </button>
+          <button onClick={() => setActiveTab('write')} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === 'write' ? 'bg-white text-rose-500 shadow-md' : 'text-slate-500'}`}>
+            <Megaphone size={16} className="inline mr-2" /> 공지사항 작성
+          </button>
         </div>
+        
         {/* 신고 관리 선택 시에만 나타나는 서브 탭 */}
         {activeTab === 'reports' && (
           <div className="flex gap-6 border-b border-slate-100 mb-4 px-2">
@@ -172,10 +241,9 @@ export default function AdminCommunity() {
           </div>
         )}
 
-        {/* 리스트 영역 */}
-        {activeTab === 'posts' ? (
+        {/* --- 1. 게시글 리스트 --- */}
+        {activeTab === 'posts' && (
           <div className="space-y-4">
-            {/* 검색바 */}
             <div className="relative">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input type="text" placeholder="제목 또는 작성자 검색..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm outline-none shadow-sm focus:border-rose-300 transition-all" />
@@ -213,8 +281,10 @@ export default function AdminCommunity() {
               )}
             </div>
           </div>
-        ) : (
-          /* 신고 관리 탭 뷰 (카드 형태) */
+        )}
+
+        {/* --- 2. 신고 관리 --- */}
+        {activeTab === 'reports' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {loading ? <div className="col-span-full text-center py-20 text-slate-400 font-bold animate-pulse uppercase tracking-widest">Loading Reports...</div> : (
               reportList.length === 0 ? <div className="col-span-full text-center py-20 text-slate-400 font-bold bg-slate-50 rounded-[2rem] border border-dashed border-slate-200">현재 대기 중인 신고 건이 없습니다.</div> :
@@ -229,7 +299,6 @@ export default function AdminCommunity() {
                     </div>
                     <span className="text-[9px] bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg font-black uppercase tracking-tighter">PENDING</span>
                   </div>
-                  {/* 신고 사유 섹션 */}
                   <div className="bg-slate-50 p-4 rounded-2xl mb-5 border border-slate-100">
                     <p className="text-[10px] text-slate-400 font-black mb-1.5 flex items-center gap-1 uppercase tracking-wider"><AlertCircle size={12}/> Reason</p>
                     <p className="text-xs text-slate-700 font-bold leading-relaxed">{report.reason}</p>
@@ -243,9 +312,56 @@ export default function AdminCommunity() {
             )}
           </div>
         )}
+
+        {/* --- 3. 공지사항 작성 --- */}
+        {activeTab === 'write' && (
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm">
+              <h2 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3">
+                <div className="p-2.5 bg-rose-500 rounded-xl text-white"><Megaphone size={18}/></div>
+                공지사항 등록
+              </h2>
+              <form onSubmit={handleNoticeSubmit} className="space-y-6">
+                <div className="flex gap-3 p-1.5 bg-slate-50 rounded-2xl border border-slate-100">
+                  <button type="button" onClick={() => setNoticeType('ALL')} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${noticeType === 'ALL' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-400'}`}>
+                    <Globe size={14}/> 전체 공지 (자유게시판)
+                  </button>
+                  <button type="button" onClick={() => setNoticeType('ARTIST')} className={`flex-1 py-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${noticeType === 'ARTIST' ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-400'}`}>
+                    <Star size={14}/> 아티스트별 공지
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <select disabled={noticeType === 'ALL'} value={noticeData.artistId} onChange={(e) => setNoticeData(p => ({...p, artistId: e.target.value}))} className="w-full p-3.5 rounded-xl border border-slate-100 font-bold text-xs bg-slate-50">
+                    <option value="0">아티스트 선택</option>
+                    {allArtists.map(a => <option key={a.artistId} value={a.artistId}>{a.stageName}</option>)}
+                  </select>
+                  <select value={noticeData.category} onChange={(e) => setNoticeData(p => ({...p, category: e.target.value}))} className="w-full p-3.5 rounded-xl border border-slate-100 font-bold text-xs bg-slate-50">
+                    <option value="공지사항">공지사항</option>
+                    <option value="이벤트">이벤트</option>
+                  </select>
+                </div>
+
+                <input type="text" value={noticeData.title} onChange={(e) => setNoticeData(p => ({...p, title: e.target.value}))} placeholder="제목" className="w-full p-3.5 rounded-xl border border-slate-100 font-bold text-xs bg-slate-50 outline-none" required />
+                <textarea rows="6" value={noticeData.content} onChange={(e) => setNoticeData(p => ({...p, content: e.target.value}))} placeholder="내용" className="w-full p-4 rounded-xl border border-slate-100 text-xs bg-slate-50 outline-none resize-none" required />
+                
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 py-3.5 border-2 border-dashed border-slate-100 rounded-xl text-slate-400 font-bold text-xs flex items-center justify-center gap-2">
+                    <Paperclip size={16} /> {selectedFile ? selectedFile.name : "이미지 첨부"}
+                  </button>
+                  <input type="file" ref={fileInputRef} onChange={(e) => setSelectedFile(e.target.files[0])} className="hidden" />
+                </div>
+
+                <button type="submit" disabled={loading} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm hover:bg-rose-600 transition-all flex items-center justify-center gap-2 disabled:bg-slate-200">
+                  <Send size={16}/> {loading ? "전송 중..." : "공지사항 등록"}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 상세보기 모달 */}
+      {/* 상세보기 모달 (기존과 동일) */}
       {selectedItem && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[9999] p-4 backdrop-blur-md" onClick={() => setSelectedItem(null)}>
           <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
@@ -253,19 +369,13 @@ export default function AdminCommunity() {
               <span className="text-[10px] font-black text-rose-500 bg-rose-50 px-3 py-1 rounded-full uppercase tracking-widest">Content Review</span>
               <button onClick={() => setSelectedItem(null)} className="p-2 hover:bg-white rounded-full text-slate-400 transition-colors"><X size={20}/></button>
             </div>
-            <div className="p-8 space-y-4 max-h-[50vh] overflow-y-auto">
-              {selectedItem.title && <h4 className="text-xl font-black text-slate-900 leading-tight tracking-tight">{selectedItem.title}</h4>}
-              <div className="flex items-center justify-between text-[11px] text-slate-400 font-bold border-b border-slate-50 pb-4">
-                <span className="flex items-center gap-1.5"><User size={14} className="text-rose-400"/> {selectedItem.authorName || '작성자 정보 없음'}</span>
-                <span className="flex items-center gap-1.5"><Clock size={14}/> {selectedItem.createdAt?.replace('T', ' ')}</span>
-              </div>
-              <div className="text-slate-700 whitespace-pre-wrap py-4 leading-relaxed text-sm font-medium">
-                {selectedItem.content || "내용이 없습니다."}
-              </div>
+            <div className="p-8 space-y-4 max-h-[50vh] overflow-y-auto text-slate-700">
+              <h4 className="text-xl font-black text-slate-900 leading-tight">{selectedItem.title}</h4>
+              <p className="text-sm leading-relaxed">{selectedItem.content || "내용이 없습니다."}</p>
             </div>
-            <div className="p-6 bg-slate-50/50 flex gap-3 border-t border-slate-100">
-              <button onClick={() => setSelectedItem(null)} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-500 hover:bg-slate-100 transition-all">닫기</button>
-              <button onClick={(e) => handleDeleteItem(e, selectedItem.boardId || selectedItem.commentId, selectedItem.type)} className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black hover:bg-rose-600 transition-all shadow-lg">영구 삭제</button>
+            <div className="p-6 bg-slate-50/50 flex gap-3">
+              <button onClick={() => setSelectedItem(null)} className="flex-1 py-4 bg-white border border-slate-200 rounded-2xl font-black text-slate-500 transition-all">닫기</button>
+              <button onClick={(e) => handleDeleteItem(e, selectedItem.boardId || selectedItem.commentId, selectedItem.type)} className="flex-1 py-4 bg-rose-500 text-white rounded-2xl font-black hover:bg-rose-600 transition-all">영구 삭제</button>
             </div>
           </div>
         </div>
