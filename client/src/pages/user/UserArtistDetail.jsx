@@ -23,7 +23,6 @@ const mockShop = [
 ];
 
 export default function UserArtistDetail({ params }) {
-  // memberId를 일관되게 숫자로 변환하여 관리 (MSA API 규격에 맞춤)
   const memberId = params?.id ? parseInt(params.id) : null; 
   
   const [artist, setArtist] = useState(null);
@@ -50,14 +49,11 @@ export default function UserArtistDetail({ params }) {
     const fetchAllData = async () => {
       try {
         setLoading(true);
-
-        // 1. 포인트 정보 조회 (페이 서비스)
         payApi.get('/payment/')
           .then(res => {
             if (res.data?.currentBalance !== undefined) setMyPoints(res.data.currentBalance);
           }).catch(() => console.warn("포인트 정보를 가져올 수 없습니다."));
 
-        // 2. 아티스트 정보 및 팔로우 상태 동시 조회
         const [artistRes, followRes] = await Promise.all([
           coreApi.get(`/artist/${memberId}`),
           coreApi.get('/artist/my-follows').catch(() => ({ data: [] }))
@@ -65,10 +61,8 @@ export default function UserArtistDetail({ params }) {
         
         const artistData = artistRes.data;
         const isFollowed = Array.isArray(followRes.data) && followRes.data.some(f => f.memberId === memberId);
-        
         setArtist({ ...artistData, isFollowed });
 
-        // 3. 공지 및 팬레터 목록 (아티스트 식별자 기준)
         const targetId = artistData?.artistId || memberId; 
         const [noticeRes, letterRes] = await Promise.all([
           coreApi.get(`/artist/${targetId}/notices`).catch(() => ({ data: [] })),
@@ -88,14 +82,11 @@ export default function UserArtistDetail({ params }) {
     fetchAllData();
   }, [memberId]);
 
-  // 게시글 상세 정보 가져오기 (메모이제이션 적용)
   const handleOpenPost = useCallback(async (post) => {
     if (!post?.boardId) return;
-    
     try {
       setPostDetailLoading(true);
       setSelectedPost(post); 
-      
       const res = await coreApi.get(`/board/${post.boardId}`);
       setSelectedPost(res.data); 
     } catch (err) {
@@ -125,9 +116,7 @@ export default function UserArtistDetail({ params }) {
     const amount = parseInt(donateAmount);
     if (!amount || amount <= 0) { toast.error('금액을 입력해주세요.'); return; }
     if (amount > myPoints) { toast.error('포인트가 부족합니다.'); return; }
-
     try {
-      // MSA 구조에 따라 아티스트 ID를 정확히 전달
       await coreApi.post('/artist/donate', { artistId: memberId, amount: amount });
       setMyPoints(prev => prev - amount);
       setIsDonateOpen(false);
@@ -141,13 +130,16 @@ export default function UserArtistDetail({ params }) {
   const handleSendMessage = () => {
     if (!chatMessage.trim()) return;
     setChatHistory(prev => [...prev, { sender: 'user', text: chatMessage }]);
-    const currentMsg = chatMessage;
     setChatMessage('');
-    
     setTimeout(() => {
       setChatHistory(prev => [...prev, { sender: 'ai', text: '그랬구나! 나도 항상 널 응원하고 있어 💖' }]);
     }, 1000);
   };
+
+  // [중요] 최신 2개씩 데이터 필터링 로직
+  const latestNotices = announcements.filter(p => p.category === '공지사항').slice(0, 2);
+  const latestArtistLetters = fanLetters.filter(p => p.category === '아티스트레터').slice(0, 2);
+  const latestFanLetters = fanLetters.filter(p => p.category === '팬레터').slice(0, 2);
 
   const tabs = [
     { id: 'dashboard', label: '대쉬보드', icon: LayoutDashboard },
@@ -158,9 +150,6 @@ export default function UserArtistDetail({ params }) {
     { id: 'ai_recommend', label: 'AI 추천', icon: Sparkles },
   ];
 
-  const latestNotice = announcements?.length > 0 ? announcements[0] : null;
-  const latestArtistLetter = fanLetters?.find(l => l.isArtistPost === true) || null;
-  
   if (!memberId) return <Layout role="user"><div className="p-10 text-center">잘못된 접근입니다.</div></Layout>;
   if (loading) return <Layout role="user"><div className="p-10 text-center text-rose-500 font-bold italic tracking-widest">Lumina 로딩 중...</div></Layout>;
   if (!artist) return <Layout role="user"><div className="p-10 text-center">아티스트 정보가 없습니다.</div></Layout>;
@@ -168,7 +157,7 @@ export default function UserArtistDetail({ params }) {
   return (
     <Layout role="user">
       <div className="pb-10 relative">
-        {/* 헤더 영역 */}
+        {/* 헤더 영역 생략 (동일) */}
         <div className="relative h-64 md:h-80 w-full overflow-hidden">
           <img src={artist.fandomImage || "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?q=80&w=1200"} alt="cover" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
@@ -192,9 +181,7 @@ export default function UserArtistDetail({ params }) {
           </div>
         </div>
 
-        {/* 메인 콘텐츠 */}
         <div className="p-4 lg:p-6 lg:px-12 space-y-6">
-          {/* 탭 네비게이션 */}
           <div className="flex overflow-x-auto hide-scrollbar gap-2 pb-2 border-b border-gray-100">
             {tabs.map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-rose-50 text-rose-600 border border-rose-100 shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}>
@@ -204,23 +191,49 @@ export default function UserArtistDetail({ params }) {
           </div>
 
           <div className="fade-in-up mt-6">
-            {/* 1. 대쉬보드 */}
+            {/* 1. [수정된 대쉬보드 영역] */}
             {activeTab === 'dashboard' && (
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="glass-card p-6 rounded-2xl bg-white border border-gray-100 shadow-sm">
                   <h3 className="font-bold flex items-center gap-2 mb-4 text-gray-800"><Bell size={18} className="text-rose-500"/> 최근 주요 소식</h3>
                   <div className="space-y-3">
-                    {latestNotice ? (
-                      <div onClick={() => handleDashboardPostClick(latestNotice)} className="p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-gray-300 cursor-pointer transition-all active:scale-[0.98]">
-                        <div className="flex justify-between mb-1"><span className="text-[10px] font-bold text-gray-600 bg-gray-200 px-2 py-0.5 rounded-md uppercase">Notice</span><span className="text-[10px] text-muted-foreground">{latestNotice.createdAt?.split('T')[0]}</span></div>
-                        <p className="text-sm font-semibold line-clamp-1">{latestNotice.title}</p>
+                    
+                    {/* 공지사항 최신 2개 */}
+                    {latestNotices.length > 0 ? latestNotices.map(notice => (
+                      <div key={`notice-${notice.boardId}`} onClick={() => handleDashboardPostClick(notice)} className="p-3 rounded-xl bg-gray-50 border border-gray-100 hover:border-gray-300 cursor-pointer transition-all active:scale-[0.98]">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[10px] font-bold text-gray-600 bg-gray-200 px-2 py-0.5 rounded-md uppercase">Notice</span>
+                          <span className="text-[10px] text-muted-foreground">{notice.createdAt?.split('T')[0]}</span>
+                        </div>
+                        <p className="text-sm font-semibold line-clamp-1">{notice.title}</p>
                       </div>
-                    ) : <p className="text-sm text-gray-400">등록된 공지사항이 없습니다.</p>}
-                    {latestArtistLetter && (
-                      <div onClick={() => handleDashboardPostClick(latestArtistLetter)} className="p-3 rounded-xl bg-rose-50 border border-rose-100 hover:border-rose-300 cursor-pointer transition-all active:scale-[0.98]">
-                        <div className="flex justify-between mb-1"><span className="text-[10px] font-bold text-rose-600 uppercase">Artist</span><span className="text-[10px] text-muted-foreground">{latestArtistLetter.createdAt?.split('T')[0]}</span></div>
-                        <p className="text-sm font-semibold line-clamp-1">{latestArtistLetter.title}</p>
+                    )) : null}
+
+                    {/* 아티스트레터 최신 2개 */}
+                    {latestArtistLetters.length > 0 ? latestArtistLetters.map(letter => (
+                      <div key={`artist-${letter.boardId}`} onClick={() => handleDashboardPostClick(letter)} className="p-3 rounded-xl bg-rose-50 border border-rose-100 hover:border-rose-300 cursor-pointer transition-all active:scale-[0.98]">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[10px] font-bold text-rose-600 uppercase">Artist</span>
+                          <span className="text-[10px] text-muted-foreground">{letter.createdAt?.split('T')[0]}</span>
+                        </div>
+                        <p className="text-sm font-semibold line-clamp-1">{letter.title}</p>
                       </div>
+                    )) : null}
+
+                    {/* 팬레터 최신 2개 */}
+                    {latestFanLetters.length > 0 ? latestFanLetters.map(letter => (
+                      <div key={`fan-${letter.boardId}`} onClick={() => handleDashboardPostClick(letter)} className="p-3 rounded-xl bg-blue-50 border border-blue-100 hover:border-blue-300 cursor-pointer transition-all active:scale-[0.98]">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-[10px] font-bold text-blue-600 uppercase">Fan</span>
+                          <span className="text-[10px] text-muted-foreground">{letter.createdAt?.split('T')[0]}</span>
+                        </div>
+                        <p className="text-sm font-semibold line-clamp-1">{letter.title}</p>
+                      </div>
+                    )) : null}
+
+                    {/* 소식이 아예 없을 때 */}
+                    {latestNotices.length === 0 && latestArtistLetters.length === 0 && latestFanLetters.length === 0 && (
+                      <p className="text-sm text-gray-400 py-10 text-center">등록된 소식이 없습니다.</p>
                     )}
                   </div>
                 </div>
@@ -230,7 +243,11 @@ export default function UserArtistDetail({ params }) {
                   <div className="grid grid-cols-2 gap-3">
                     {mockMedia.slice(0, 2).map(media => (
                       <div key={media.id} className="group relative rounded-xl overflow-hidden aspect-video cursor-pointer shadow-sm">
-                        <img src={media.img} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        <img 
+                          src={media.img} 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                          onError={(e) => { e.target.src = "https://placehold.co/400x225?text=Media"; }}
+                        />
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                           <Play className="text-white fill-white" size={24} />
                         </div>
@@ -241,7 +258,7 @@ export default function UserArtistDetail({ params }) {
               </div>
             )}
 
-            {/* 2. 미디어 탭 */}
+            {/* 2. 미디어 탭 생략 (동일) */}
             {activeTab === 'media' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {mockMedia.map(media => (
@@ -268,7 +285,7 @@ export default function UserArtistDetail({ params }) {
               </div>
             )}
 
-            {/* 3. 커뮤니티 */}
+            {/* 3. 커뮤니티 탭 (동일) */}
             {activeTab === 'community' && (
               <div className="glass-card p-6 rounded-2xl bg-white border border-gray-100 shadow-sm">
                 <h3 className="font-bold flex items-center gap-2 mb-6 text-gray-800"><MessageSquare size={18} className="text-rose-500"/> 소통 공간</h3>
@@ -300,7 +317,7 @@ export default function UserArtistDetail({ params }) {
               </div>
             )}
 
-            {/* 4. 굿즈샵 */}
+            {/* 4. 굿즈샵 생략 (동일) */}
             {activeTab === 'shop' && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {mockShop.map(item => (
@@ -318,7 +335,7 @@ export default function UserArtistDetail({ params }) {
               </div>
             )}
             
-            {/* 5. 가상챗봇 */}
+            {/* 5. 챗봇 생략 (동일) */}
             {activeTab === 'chatbot' && (
               <div className="max-w-2xl mx-auto bg-white rounded-3xl border border-gray-100 shadow-2xl overflow-hidden h-[550px] flex flex-col">
                 <div className="bg-rose-500 p-4 text-white flex items-center justify-between shadow-md">
@@ -347,7 +364,7 @@ export default function UserArtistDetail({ params }) {
         </div>
       </div>
 
-      {/* 게시글 상세보기 모달 */}
+      {/* 모달 영역 (동일) */}
       {selectedPost && (
         <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-2xl h-[85vh] md:h-auto md:max-h-[85vh] rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col">
@@ -378,7 +395,6 @@ export default function UserArtistDetail({ params }) {
         </div>
       )}
 
-      {/* 후원 모달 */}
       {isDonateOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl">
