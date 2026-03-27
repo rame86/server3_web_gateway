@@ -40,6 +40,8 @@ jobs:
             tar -xzf frontend.tar.gz
             rm frontend.tar.gz
             
-            docker compose up -d --build
+            # BuildKit 활성화로 빌드 속도 극대화
+            DOCKER_BUILDKIT=1 docker compose up -d --build
+            
+            # [수정] 모든 이미지를 지우지 말고, 태그가 없는 이미지만 정리 (캐시 보존)
             docker image prune -f
-            docker restart nginx-gateway
