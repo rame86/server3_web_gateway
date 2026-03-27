@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { toast } from "sonner";
 
 const WebSocketContext = createContext(null);
 
@@ -27,6 +28,21 @@ export const WebSocketProvider = ({ children }) => {
       onConnect: () => {
         console.log('✅ [전역] 최신 STOMP 클라이언트 연결 성공');
         setStompClient(client);
+
+        client.subscribe('/topic/admin/notifications', (frame) => {
+          try {
+            const data = JSON.parse(frame.body);
+            
+            // 실시간 토스트 알림 띄우기! ㅡㅡ🔔
+            toast.success(data.message || '새로운 알림이 도착했습니다!', {
+              duration: 5000,
+              position: 'top-right',
+              icon: '🔔',
+            });
+          } catch (err) {
+            console.error('알림 데이터 파싱 에러:', err);
+          }
+        });
       },
 
       // 연결 실패/중단 시 실행

@@ -4,7 +4,7 @@
  * 역할: 권한(User, Artist, Admin)에 따른 차등 UI 및 네비게이션 제공
  */
 import React, { useEffect, useState } from 'react';
-
+import { useWebSocket } from '@/contexts/WebSocketContext';
 import { Link, useLocation } from 'wouter';
 import {
   Home, ShoppingBag, MessageCircle, Calendar, BookOpen, Music,
@@ -42,18 +42,6 @@ const artistNavItems = [
   { label: '정산 내역', icon: <BarChart3 size={18} />, href: '/artist/settlement' }
 ];
 
-// 관리자용 메뉴
-const adminNavItems = [
-  { label: '대시보드', icon: <LayoutDashboard size={18} />, href: '/admin' },
-  { label: '사용자 관리', icon: <Users size={18} />, href: '/admin/users' },
-  { label: '아티스트 관리', icon: <Mic2 size={18} />, href: '/admin/artists' },
-  { label: '굿즈 승인', icon: <Package size={18} />, href: '/admin/store', badge: 5 },
-  { label: '예매 승인', icon: <CheckSquare size={18} />, href: '/admin/booking', badge: 3 },
-  { label: '게시판 관리', icon: <FileText size={18} />, href: '/admin/community' },
-  { label: '결제 정산', icon: <BarChart3 size={18} />, href: '/admin/settlement' },
-  { label: '환불 관리', icon: <CheckSquare size={18} />, href: '/admin/refunds', badge: 12 }
-];
-
 // --- 역할별 테마 및 기본 정보 설정 ---
 const roleConfig = {
   user: {
@@ -79,19 +67,113 @@ const roleConfig = {
     color: 'from-amber-400 to-orange-500',
     bgColor: 'bg-amber-50',
     textColor: 'text-amber-600',
-    navItems: adminNavItems,
+    navItems: [],
     userName: '관리자',
     userImage: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&h=100&fit=crop'
   }
 };
 
 export default function Layout({ children, role }) {
+  const stompClient = useWebSocket();
+  const [adminCounts, setAdminCounts] = useState({
+    user: 0,
+    artist: 0,
+    shop: 0,   // 초기값 (나중에 API로 가져오게 설정 가능)
+    event: 0,
+    board: 0,
+    settlement: 0,
+    refund: 0
+  });
+
+  useEffect(() => {
+    // 관리자일 때만 데이터를 가져옵니다.
+    if (role !== 'admin') return;
+
+    const fetchInitialCounts = async () => {
+      try {
+        const res = await coreApi.get('/admin/dashboard');
+        // 대시보드 API에서 주는 필드명에 맞춰서 매핑합니다.
+        setAdminCounts(prev => ({
+          ...prev,
+          artist: res.data.pendingArtists || 0,
+          shop: res.data.pendingGoods || 0,
+          event: res.data.pendingEvents || 0,
+          user: res.data.totalUsers || 0,
+          board: res.data.pendingReports || 0,
+          refund: res.data.pendingEvents || 0
+        }));
+      } catch (error) {
+        console.error("사이드바 초기 카운트 로딩 실패:", error);
+      }
+    };
+
+    fetchInitialCounts();
+  }, [role]);
+
+  useEffect(() => {
+    if (!stompClient || role !== 'admin') return;
+
+    const sub = stompClient.subscribe('/topic/notifications/admin', (frame) => {
+      const data = JSON.parse(frame.body);
+      
+      if (data.message.includes('아티스트 승인 요청')) {
+        setAdminCounts(prev => ({ ...prev, artist: prev.artist + 1 }));
+      }
+      else if (data.message.includes('굿즈 승인 요청')) {
+        setAdminCounts(prev => ({ ...prev, shop: prev.shop + 1 }));
+      }
+      else if (data.message.includes('이벤트 승인 요청')) {
+        setAdminCounts(prev => ({ ...prev, event: prev.event + 1 }));
+      }
+      else if (data.message.includes('환불 요청')) {
+        setAdminCounts(prev => ({ ...prev, refund: prev.refund + 1 }));
+      }
+
+    });
+
+    return () => sub.unsubscribe();
+  }, [stompClient, role]);
+
+  // 관리자용 메뉴
+  const dynamicAdminNavItems = [
+    { label: '대시보드', icon: <LayoutDashboard size={18} />, href: '/admin' },
+    { label: '사용자 관리', icon: <Users size={18} />, href: '/admin/users' },
+    { 
+      label: '아티스트 관리', 
+      icon: <Mic2 size={18} />, 
+      href: '/admin/artists', 
+      badge: adminCounts.artist > 0 ? adminCounts.artist : undefined 
+    },
+    { 
+      label: '굿즈 승인', 
+      icon: <Package size={18} />, 
+      href: '/admin/store', 
+      badge: adminCounts.shop > 0 ? adminCounts.shop : undefined 
+    },
+    { 
+      label: '예매 승인', 
+      icon: <CheckSquare size={18} />, 
+      href: '/admin/booking', 
+      badge: adminCounts.event > 0 ? adminCounts.event : undefined 
+    },
+    { label: '게시판 관리', icon: <FileText size={18} />, href: '/admin/community' },
+    { label: '결제 정산', icon: <BarChart3 size={18} />, href: '/admin/settlement' },
+    { 
+      label: '환불 관리', 
+      icon: <CheckSquare size={18} />, 
+      href: '/admin/refunds', 
+      badge: adminCounts.refund > 0 ? adminCounts.refund : undefined }
+  ];
+
   const [location, setLocation] = useLocation(); // 현재 경로 추적 및 이동
   const [sidebarOpen, setSidebarOpen] = useState(false); // 모바일 사이드바 개폐 상태
   const currentRole = (role || 'user').toLowerCase();
 
   // 해결 포인트 2: 만약 잘못된 role이 들어와도 터지지 않게 'user' 정보를 기본으로 가져옴
-  const config = roleConfig[currentRole] || roleConfig['user'];
+  const config = {
+    ...roleConfig[currentRole],
+    navItems: currentRole === 'admin' ? dynamicAdminNavItems : (roleConfig[currentRole]?.navItems || [])
+  };
 
   // 사용자 이름 및 이미지 상태 관리 (로컬스토리지 우선)\
   // 1. 상태 정의: 로컬스토리지에 값이 있으면 먼저 사용
