@@ -115,6 +115,11 @@ export default function Layout({ children, role }) {
 
     const sub = stompClient.subscribe('/topic/notifications/admin', (frame) => {
       const data = JSON.parse(frame.body);
+
+      toast.info('🔔 신규 알림', {
+        description: data.message,
+        duration: 5000, // 5초 동안 노출
+      });
       
       if (data.message.includes('아티스트 승인 요청')) {
         setAdminCounts(prev => ({ ...prev, artist: prev.artist + 1 }));
@@ -128,11 +133,43 @@ export default function Layout({ children, role }) {
       else if (data.message.includes('환불 요청')) {
         setAdminCounts(prev => ({ ...prev, refund: prev.refund + 1 }));
       }
+      else if (data.message.includes('아티스트로 최종')) {
+        setAdminCounts(prev => ({ ...prev, artist: Math.max(0, prev.artist - 1) }));
+      }
+      else if (data.message.includes('굿즈 신청이 최종')) {
+        setAdminCounts(prev => ({ ...prev, shop: Math.max(0, prev.shop - 1) }));
+      }
+      else if (data.message.includes('EVENT 신청이 최종')) {
+        setAdminCounts(prev => ({ ...prev, event: Math.max(0, prev.event - 1) }));
+      }
+      else if (data.message.includes('환불 신청이 최종')) {
+        setAdminCounts(prev => ({ ...prev, refund: Math.max(0, prev.refund - 1) }));
+      }
 
     });
 
     return () => sub.unsubscribe();
   }, [stompClient, role]);
+
+  useEffect(() => {
+  const memberId = localStorage.getItem('memberId'); 
+  if (!stompClient || !memberId) return;
+
+  const userSub = stompClient.subscribe(`/topic/notifications/user/${memberId}`, (frame) => {
+    const data = JSON.parse(frame.body);
+
+    toast.success('🔔 신규 알림', {
+      description: data.message,
+      duration: 6000,
+    });
+
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+  });
+
+  return () => userSub.unsubscribe();
+}, [stompClient]);
 
   // 관리자용 메뉴
   const dynamicAdminNavItems = [
