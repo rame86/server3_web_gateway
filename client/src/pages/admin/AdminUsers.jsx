@@ -433,214 +433,215 @@ export default function AdminUsers() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* --- [모달 1] 상세 보기 모달 --- */}
-        {selectedUser && (
-          <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="glass-card w-full max-w-4xl rounded-[3rem] overflow-hidden shadow-2xl bg-white flex flex-col max-h-[90vh]">
-              <div className="p-8 border-b bg-gradient-to-r from-rose-500 to-pink-500 text-white shrink-0">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-6">
-                    <div className="w-20 h-20 rounded-3xl bg-white/20 backdrop-blur-md flex items-center justify-center text-4xl border border-white/30 shadow-lg font-bold">
-                      {selectedUser.name?.charAt(0)}
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold font-playfair">{selectedUser.name} <span className="text-xs font-bold opacity-70 ml-2 uppercase">ID: {selectedUser.memberId}</span></h2>
-                      <p className="text-white/80 font-medium">{selectedUser.email}</p>
-                    </div>
+      {/* --- M O D A L S --- */}
+      {/* --- [모달 1] 상세 보기 모달 --- */}
+      {selectedUser && (
+        <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={(e) => { if (e.target === e.currentTarget) setSelectedUser(null); }}>
+          <div className="glass-card w-full max-w-4xl rounded-[3rem] overflow-hidden shadow-2xl bg-white flex flex-col max-h-[90vh] relative z-[10000]">
+            <div className="p-8 border-b bg-gradient-to-r from-rose-500 to-pink-500 text-white shrink-0">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-6">
+                  <div className="w-20 h-20 rounded-3xl bg-white/20 backdrop-blur-md flex items-center justify-center text-4xl border border-white/30 shadow-lg font-bold">
+                    {selectedUser.name?.charAt(0)}
                   </div>
-                  <button onClick={() => setSelectedUser(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-all text-white">
-                    <X size={24} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar">
-                <div className="grid grid-cols-2 gap-10">
-                  <div className="space-y-6">
-                    <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2"><User size={14} /> User Profile</h4>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-2xl border border-border/50 font-bold text-sm">
-                        <Phone className="text-primary" size={18} /> {selectedUser.phone || '전화번호 정보 없음'}
-                      </div>
-                      <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-2xl border border-border/50 font-bold text-xs">
-                        <MapPin className="text-primary" size={18} /> {selectedUser.address || '주소 정보 없음'}
-                      </div>
-                      <div className="flex items-center gap-3 p-4 bg-rose-50/50 rounded-2xl border border-rose-100 font-bold text-xs">
-                        <Clock className="text-primary" size={18} /> 상태: {selectedUser.status}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2"><CreditCard size={14} /> Assets</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                        <p className="text-[10px] text-muted-foreground font-bold">TOTAL PURCHASES</p>
-                        <p className="text-2xl font-black text-foreground">{selectedUser.totalPurchases}건</p>
-                      </div>
-                      <div className="p-5 bg-rose-50 rounded-2xl border border-rose-100">
-                        <p className="text-[10px] text-primary font-bold">POINT BALANCE</p>
-                        <p className="text-2xl font-black text-primary font-dm-sans">{selectedUser.pointBalance?.toLocaleString()}P</p>
-                      </div>
-                    </div>
+                  <div>
+                    <h2 className="text-2xl font-bold font-playfair">{selectedUser.name} <span className="text-xs font-bold opacity-70 ml-2 uppercase">ID: {selectedUser.memberId}</span></h2>
+                    <p className="text-white/80 font-medium">{selectedUser.email}</p>
                   </div>
                 </div>
-
-                <div className="space-y-4 pt-6 border-t">
-                  <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2"><History size={14} /> History Log</h4>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-200">
-                      <p className="text-[11px] font-black text-slate-400 mb-4 uppercase">구매 이력</p>
-                      <div className="space-y-3">
-                        {selectedUser.purchaseHistory?.length > 0 ? selectedUser.purchaseHistory.map((h, i) => (
-                          <div key={i} className="flex justify-between items-center p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                            <div><p className="text-xs font-bold text-slate-800">{h.itemName}</p><p className="text-[10px] text-slate-400">{formatDateTime(h.purchasedAt)}</p></div>
-                            <p className="text-xs font-black text-primary">₩{h.amount?.toLocaleString()}</p>
-                          </div>
-                        )) : <p className="text-xs text-muted-foreground text-center py-4 font-bold">구매 이력이 없습니다.</p>}
-                      </div>
-                    </div>
-                    <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-200">
-                      <p className="text-[11px] font-black text-slate-400 mb-4 uppercase">포인트 히스토리</p>
-                      <div className="space-y-3">
-                        {selectedUser.pointHistory?.length > 0 ? selectedUser.pointHistory.map((p, i) => (
-                          <div key={i} className="flex justify-between items-center p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                            <div><p className="text-xs font-bold text-slate-800">{p.detail}</p><p className="text-[10px] text-slate-400">{formatDateTime(p.processedAt)}</p></div>
-                            <p className={`text-xs font-black ${p.amount > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{p.amount?.toLocaleString()}P</p>
-                          </div>
-                        )) : <p className="text-xs text-muted-foreground text-center py-4 font-bold">포인트 내역이 없습니다.</p>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 space-y-4">
-                  <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2"><Save size={14} /> Admin Memo</h4>
-                  <div className="relative">
-                    <textarea
-                      placeholder="특이사항 기록..."
-                      className="w-full h-24 p-5 rounded-3xl bg-white border border-slate-200 focus:ring-4 focus:ring-primary/10 transition-all text-sm resize-none outline-none shadow-inner"
-                    />
-                    <button className="absolute bottom-4 right-4 p-2 bg-primary text-white rounded-lg shadow-lg hover:scale-105 transition-all"><Save size={16} /></button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- [모달 2] 차단 사유 입력 모달 --- */}
-        {blockingUser && (
-          <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="glass-card w-full max-w-md rounded-[2.5rem] p-10 space-y-6 bg-white shadow-2xl border border-red-100 fade-in-up">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-red-100 shadow-inner">
-                  <AlertCircle size={36} />
-                </div>
-                <h2 className="text-2xl font-bold text-foreground font-playfair">사용자 차단(Block)</h2>
-                <p className="text-sm text-muted-foreground mt-2 font-medium">
-                  <span className="text-primary font-bold">"{blockingUser.name}"</span>님을 차단하시겠습니까?
-                </p>
-              </div>
-              <textarea
-                value={blockReason}
-                onChange={(e) => setBlockReason(e.target.value)}
-                placeholder="차단 사유를 입력해주세요..."
-                className="w-full h-40 p-5 rounded-3xl bg-secondary/30 border-none focus:ring-4 focus:ring-red-100 text-sm leading-relaxed transition-all shadow-inner outline-none"
-              />
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setBlockingUser(null); setBlockReason(''); }} className="flex-1 py-4 font-bold text-muted-foreground hover:bg-secondary rounded-2xl transition-all">취소</button>
-                <button onClick={handleBlockConfirm} className="flex-[1.5] py-4 rounded-2xl bg-red-500 text-white font-bold shadow-xl hover:bg-red-600 active:scale-95 transition-all">차단 확정</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- [모달 3] 비밀번호 초기화 --- */}
-        {resetPwdUser && (
-          <div className="fixed inset-0 w-full h-full z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="glass-card w-full max-w-sm rounded-[2.5rem] p-8 bg-white shadow-2xl border border-slate-100 text-center space-y-6 animate-in zoom-in duration-200">
-              <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                <Key size={32} />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">비밀번호 초기화</h2>
-                <p className="text-sm text-slate-500 mt-2 font-medium">
-                  <span className="font-bold text-slate-800">{resetPwdUser.name}</span>님의 새 비밀번호를 설정하세요.
-                </p>
-              </div>
-
-              <div className="space-y-2 text-left">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">New Password</label>
-                <input
-                  type="text"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="새 비밀번호 입력"
-                  className="w-full p-4 rounded-2xl bg-slate-50 border-none focus:ring-4 focus:ring-blue-100 text-sm font-bold outline-none transition-all shadow-inner text-blue-600"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setResetPwdUser(null); setNewPassword(''); }} className="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">취소</button>
-                <button onClick={handleResetPasswordSubmit} className="flex-[1.5] py-3 bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-100 hover:bg-blue-600 active:scale-95 transition-all">초기화 실행</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- [모달 4] 권한 변경 모듈 --- */}
-        {changeRoleUser && (
-          <div className="fixed inset-0 w-full h-full z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="glass-card w-full max-w-md rounded-[2.5rem] p-8 bg-white shadow-2xl border border-slate-100 fade-in-up space-y-6">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                  <UserPlus size={32} />
-                </div>
-                <h2 className="text-xl font-bold text-slate-800">사용자 권한 변경</h2>
-                <p className="text-sm text-slate-500 mt-1"><span className="font-bold text-slate-800">{changeRoleUser.name}</span>님의 역할을 선택하세요.</p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3">
-                {[
-                  { id: 'USER', label: '일반 유저', icon: UserCheck, desc: '기본 구매 및 커뮤니티 활동 가능' },
-                  { id: 'ARTIST', label: '아티스트', icon: ShieldCheck, desc: '굿즈 등록 및 수익 창출 가능' },
-                  { id: 'ADMIN', label: '관리자', icon: Crown, desc: '플랫폼 모든 관리 권한 보유' }
-                ].map((role) => (
-                  <button
-                    key={role.id}
-                    onClick={() => setSelectedNewRole(role.id)}
-                    className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${selectedNewRole === role.id
-                        ? 'border-primary bg-rose-50 shadow-md ring-4 ring-primary/5'
-                        : 'border-slate-100 bg-white hover:border-slate-200'
-                      }`}
-                  >
-                    <div className={`p-3 rounded-xl ${selectedNewRole === role.id ? 'bg-primary text-white' : 'bg-slate-50 text-slate-400'}`}>
-                      <role.icon size={20} />
-                    </div>
-                    <div>
-                      <p className={`text-sm font-bold ${selectedNewRole === role.id ? 'text-primary' : 'text-slate-700'}`}>{role.label}</p>
-                      <p className="text-[11px] text-slate-400 font-medium">{role.desc}</p>
-                    </div>
-                    {selectedNewRole === role.id && <div className="ml-auto w-5 h-5 bg-primary rounded-full flex items-center justify-center"><Check size={12} className="text-white" /></div>}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setChangeRoleUser(null); setSelectedNewRole(''); }} className="flex-1 py-4 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">취소</button>
-                <button
-                  onClick={handleChangeRoleSubmit}
-                  className="flex-[1.5] py-4 bg-primary text-white rounded-2xl text-sm font-bold shadow-xl shadow-rose-100 hover:bg-rose-600 active:scale-95 transition-all"
-                >
-                  권한 변경 적용
+                <button onClick={() => setSelectedUser(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-all text-white">
+                  <X size={24} />
                 </button>
               </div>
             </div>
+
+            <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar">
+              <div className="grid grid-cols-2 gap-10">
+                <div className="space-y-6">
+                  <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2"><User size={14} /> User Profile</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-2xl border border-border/50 font-bold text-sm">
+                      <Phone className="text-primary" size={18} /> {selectedUser.phone || '전화번호 정보 없음'}
+                    </div>
+                    <div className="flex items-center gap-3 p-4 bg-secondary/30 rounded-2xl border border-border/50 font-bold text-xs">
+                      <MapPin className="text-primary" size={18} /> {selectedUser.address || '주소 정보 없음'}
+                    </div>
+                    <div className="flex items-center gap-3 p-4 bg-rose-50/50 rounded-2xl border border-rose-100 font-bold text-xs">
+                      <Clock className="text-primary" size={18} /> 상태: {selectedUser.status}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2"><CreditCard size={14} /> Assets</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                      <p className="text-[10px] text-muted-foreground font-bold">TOTAL PURCHASES</p>
+                      <p className="text-2xl font-black text-foreground">{selectedUser.totalPurchases}건</p>
+                    </div>
+                    <div className="p-5 bg-rose-50 rounded-2xl border border-rose-100">
+                      <p className="text-[10px] text-primary font-bold">POINT BALANCE</p>
+                      <p className="text-2xl font-black text-primary font-dm-sans">{selectedUser.pointBalance?.toLocaleString()}P</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-6 border-t">
+                <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-primary flex items-center gap-2"><History size={14} /> History Log</h4>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-200">
+                    <p className="text-[11px] font-black text-slate-400 mb-4 uppercase">구매 이력</p>
+                    <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2 custom-scrollbar">
+                      {selectedUser.purchaseHistory?.length > 0 ? selectedUser.purchaseHistory.map((h, i) => (
+                        <div key={i} className="flex justify-between items-center p-3 bg-white rounded-xl shadow-sm border border-slate-100 flex-shrink-0">
+                          <div><p className="text-xs font-bold text-slate-800">{h.itemName}</p><p className="text-[10px] text-slate-400">{formatDateTime(h.purchasedAt)}</p></div>
+                          <p className="text-xs font-black text-primary">₩{h.amount?.toLocaleString()}</p>
+                        </div>
+                      )) : <p className="text-xs text-muted-foreground text-center py-4 font-bold">구매 이력이 없습니다.</p>}
+                    </div>
+                  </div>
+                  <div className="bg-slate-50/50 p-6 rounded-3xl border border-slate-200">
+                    <p className="text-[11px] font-black text-slate-400 mb-4 uppercase">포인트 히스토리</p>
+                    <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2 custom-scrollbar">
+                      {selectedUser.pointHistory?.length > 0 ? selectedUser.pointHistory.map((p, i) => (
+                        <div key={i} className="flex justify-between items-center p-3 bg-white rounded-xl shadow-sm border border-slate-100 flex-shrink-0">
+                          <div><p className="text-xs font-bold text-slate-800">{p.detail}</p><p className="text-[10px] text-slate-400">{formatDateTime(p.processedAt)}</p></div>
+                          <p className={`text-xs font-black ${p.amount > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{p.amount?.toLocaleString()}P</p>
+                        </div>
+                      )) : <p className="text-xs text-muted-foreground text-center py-4 font-bold">포인트 내역이 없습니다.</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 bg-slate-50 rounded-[2.5rem] border border-slate-200 space-y-4">
+                <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2"><Save size={14} /> Admin Memo</h4>
+                <div className="relative">
+                  <textarea
+                    placeholder="특이사항 기록..."
+                    className="w-full h-24 p-5 rounded-3xl bg-white border border-slate-200 focus:ring-4 focus:ring-primary/10 transition-all text-sm resize-none outline-none shadow-inner"
+                  />
+                  <button className="absolute bottom-4 right-4 p-2 bg-primary text-white rounded-lg shadow-lg hover:scale-105 transition-all"><Save size={16} /></button>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* --- [모달 2] 차단 사유 입력 모달 --- */}
+      {blockingUser && (
+        <div className="fixed inset-0 w-full h-full z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="glass-card w-full max-w-md rounded-[2.5rem] p-10 space-y-6 bg-white shadow-2xl border border-red-100 fade-in-up">
+            <div className="text-center">
+              <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-red-100 shadow-inner">
+                <AlertCircle size={36} />
+              </div>
+              <h2 className="text-2xl font-bold text-foreground font-playfair">사용자 차단(Block)</h2>
+              <p className="text-sm text-muted-foreground mt-2 font-medium">
+                <span className="text-primary font-bold">"{blockingUser.name}"</span>님을 차단하시겠습니까?
+              </p>
+            </div>
+            <textarea
+              value={blockReason}
+              onChange={(e) => setBlockReason(e.target.value)}
+              placeholder="차단 사유를 입력해주세요..."
+              className="w-full h-40 p-5 rounded-3xl bg-secondary/30 border-none focus:ring-4 focus:ring-red-100 text-sm leading-relaxed transition-all shadow-inner outline-none"
+            />
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => { setBlockingUser(null); setBlockReason(''); }} className="flex-1 py-4 font-bold text-muted-foreground hover:bg-secondary rounded-2xl transition-all">취소</button>
+              <button onClick={handleBlockConfirm} className="flex-[1.5] py-4 rounded-2xl bg-red-500 text-white font-bold shadow-xl hover:bg-red-600 active:scale-95 transition-all">차단 확정</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- [모달 3] 비밀번호 초기화 --- */}
+      {resetPwdUser && (
+        <div className="fixed inset-0 w-full h-full z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="glass-card w-full max-w-sm rounded-[2.5rem] p-8 bg-white shadow-2xl border border-slate-100 text-center space-y-6 animate-in zoom-in duration-200">
+            <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+              <Key size={32} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-slate-800">비밀번호 초기화</h2>
+              <p className="text-sm text-slate-500 mt-2 font-medium">
+                <span className="font-bold text-slate-800">{resetPwdUser.name}</span>님의 새 비밀번호를 설정하세요.
+              </p>
+            </div>
+
+            <div className="space-y-2 text-left">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">New Password</label>
+              <input
+                type="text"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="새 비밀번호 입력"
+                className="w-full p-4 rounded-2xl bg-slate-50 border-none focus:ring-4 focus:ring-blue-100 text-sm font-bold outline-none transition-all shadow-inner text-blue-600"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => { setResetPwdUser(null); setNewPassword(''); }} className="flex-1 py-3 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">취소</button>
+              <button onClick={handleResetPasswordSubmit} className="flex-[1.5] py-3 bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-100 hover:bg-blue-600 active:scale-95 transition-all">초기화 실행</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- [모달 4] 권한 변경 모듈 --- */}
+      {changeRoleUser && (
+        <div className="fixed inset-0 w-full h-full z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="glass-card w-full max-w-md rounded-[2.5rem] p-8 bg-white shadow-2xl border border-slate-100 fade-in-up space-y-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                <UserPlus size={32} />
+              </div>
+              <h2 className="text-xl font-bold text-slate-800">사용자 권한 변경</h2>
+              <p className="text-sm text-slate-500 mt-1"><span className="font-bold text-slate-800">{changeRoleUser.name}</span>님의 역할을 선택하세요.</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              {[
+                { id: 'USER', label: '일반 유저', icon: UserCheck, desc: '기본 구매 및 커뮤니티 활동 가능' },
+                { id: 'ARTIST', label: '아티스트', icon: ShieldCheck, desc: '굿즈 등록 및 수익 창출 가능' },
+                { id: 'ADMIN', label: '관리자', icon: Crown, desc: '플랫폼 모든 관리 권한 보유' }
+              ].map((role) => (
+                <button
+                  key={role.id}
+                  onClick={() => setSelectedNewRole(role.id)}
+                  className={`flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${selectedNewRole === role.id
+                      ? 'border-primary bg-rose-50 shadow-md ring-4 ring-primary/5'
+                      : 'border-slate-100 bg-white hover:border-slate-200'
+                    }`}
+                >
+                  <div className={`p-3 rounded-xl ${selectedNewRole === role.id ? 'bg-primary text-white' : 'bg-slate-50 text-slate-400'}`}>
+                    <role.icon size={20} />
+                  </div>
+                  <div>
+                    <p className={`text-sm font-bold ${selectedNewRole === role.id ? 'text-primary' : 'text-slate-700'}`}>{role.label}</p>
+                    <p className="text-[11px] text-slate-400 font-medium">{role.desc}</p>
+                  </div>
+                  {selectedNewRole === role.id && <div className="ml-auto w-5 h-5 bg-primary rounded-full flex items-center justify-center"><Check size={12} className="text-white" /></div>}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => { setChangeRoleUser(null); setSelectedNewRole(''); }} className="flex-1 py-4 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">취소</button>
+              <button
+                onClick={handleChangeRoleSubmit}
+                className="flex-[1.5] py-4 bg-primary text-white rounded-2xl text-sm font-bold shadow-xl shadow-rose-100 hover:bg-rose-600 active:scale-95 transition-all"
+              >
+                권한 변경 적용
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
