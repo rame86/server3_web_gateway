@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import TopNav from './TopNav';
-import { coreApi, resApi } from '@/lib/api';
+import { coreApi, resApi, shopApi } from '@/lib/api';
 
 // --- 네비게이션 항목 정의 (역할별) ---
 
@@ -94,7 +94,7 @@ export default function Layout({ children, role }) {
         const res = await coreApi.get('/admin/dashboard');
 
 
-        // 🌟 2. 추가: Res 환불 대기 목록 API 호출해서 개수 가져오기
+        // 1. 추가: Res 환불 대기 목록 API 호출해서 개수 가져오기
         let pendingRefundCount = 0;
         try {
           const refundRes = await resApi.post('/refundList', { _t: Date.now() });
@@ -104,11 +104,22 @@ export default function Layout({ children, role }) {
           console.error("환불 대기 카운트 로딩 실패:", err);
         }
 
+        // 2. 추가: Shop 굿즈 승인 대기 목록 API 호출해서 개수 가져오기
+        let pendingShopCount = 0;
+        try {
+          const shopRes = await shopApi.get('/admin/approval-list');
+          const shopData = shopRes.data || [];
+          // 배열의 길이 자체가 승인 대기 중인 건수
+          pendingShopCount = Array.isArray(shopData) ? shopData.length : 0;
+        } catch (err) {
+          console.error("굿즈 대기 카운트 로딩 실패:", err);
+        }
+
         // 3. 상태 업데이트
         setAdminCounts(prev => ({
           ...prev,
           artist: res.data.pendingArtists || 0,
-          shop: res.data.pendingGoods || 0,
+          shop: pendingShopCount,
           event: res.data.pendingEvents || 0,
           user: res.data.totalUsers || 0,
           board: res.data.pendingReports || 0,
