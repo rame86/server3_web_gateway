@@ -53,7 +53,7 @@ async function apiFetch(path, options = {}) {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(text || `HTTP ${res.status}`);
   }
-  
+
   // 204 No Content 등 body 없는 경우 처리
   const contentType = res.headers.get('content-type') || '';
   return contentType.includes('application/json') ? res.json() : res.text();
@@ -209,15 +209,15 @@ export default function AdminArtists() {
    */
   const fetchRejectionHistory = useCallback(async () => {
     try {
-    // 💡 { data } 로 감싸면 Axios 응답 객체에서 실제 데이터 배열만 쏙 빠집니다.
-    const { data } = await adminApi.get('/admin/artist/rejectionList'); 
-    
-    // 이제 data는 배열이므로 .map()이 작동합니다.
-    setRejectionHistory((data || []).map(mapRejection));
-  } catch (err) {
-    console.error("거절 이력 에러:", err);
-    toast.error(`거절 이력 조회 실패: ${err.message}`);
-  }
+      // 💡 { data } 로 감싸면 Axios 응답 객체에서 실제 데이터 배열만 쏙 빠집니다.
+      const { data } = await adminApi.get('/admin/artist/rejectionList');
+
+      // 이제 data는 배열이므로 .map()이 작동합니다.
+      setRejectionHistory((data || []).map(mapRejection));
+    } catch (err) {
+      console.error("거절 이력 에러:", err);
+      toast.error(`거절 이력 조회 실패: ${err.message}`);
+    }
   }, []);
 
   useEffect(() => {
@@ -233,7 +233,7 @@ export default function AdminArtists() {
   // AdminArtists.jsx 내 handleOpenDetail 수정
   const handleOpenDetail = async (artist) => {
     setDetailArtist(null);
-    
+
     // 1. 거절된 이력(history) 탭
     if (activeTab === 'history') {
       setDetailArtist({ ...artist, status: 'rejected' });
@@ -260,11 +260,11 @@ export default function AdminArtists() {
     setDetailLoading(true);
     try {
       const { data } = await adminApi.get(`/admin/artist/${targetApprovalId}/${targetArtistId}`);
-      
+
       if (!data) {
         throw new Error("서버에서 빈 데이터를 반환했습니다.");
       }
-      
+
       setDetailArtist(mapApproved(data));
     } catch (err) {
       console.error("상세 조회 에러:", err);
@@ -274,7 +274,7 @@ export default function AdminArtists() {
       setDetailLoading(false);
     }
   };
-  
+
   // ── 승인 처리 ──────────────────────────────
   const handleApprove = async (artist) => {
     try {
@@ -287,7 +287,6 @@ export default function AdminArtists() {
         createdAt: artist.appliedDate,
         status: 'CONFIRMED',
       });
-      toast.success(`"${artist.name}" 아티스트 승인 완료!`);
       await fetchPending();
       await fetchApproved();
     } catch (err) {
@@ -436,11 +435,10 @@ export default function AdminArtists() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                    activeTab === tab.key
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === tab.key
                       ? 'bg-white text-primary shadow-md'
                       : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                    }`}
                 >
                   <tab.icon size={16} />
                   {tab.label}
@@ -502,7 +500,7 @@ export default function AdminArtists() {
                           className="w-full h-full items-center justify-center text-2xl bg-gradient-to-br from-rose-100 to-lavender"
                         >
                           {getArtistEmoji(artist.id)}
-                        </span> 
+                        </span>
                       </div>
                       <div>
                         <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -659,11 +657,11 @@ export default function AdminArtists() {
         {/* [1] 상세 정보 모달 (Pending / Active 분리 버전) */}
         {detailArtist && (
           <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm p-4 pt-16 custom-scrollbar">
-            <div className="glass-card relative w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl bg-white flex flex-col mb-10 animate-in slide-in-from-top-8 duration-300">      
+            <div className="glass-card relative w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl bg-white flex flex-col mb-10 animate-in slide-in-from-top-8 duration-300">
               {/* ── [Header] 상태에 따라 색상 변경 ── */}
               <div className={cn(
                 "p-8 border-b text-white shrink-0 transition-colors duration-500",
-                detailArtist.status === 'pending' 
+                detailArtist.status === 'pending'
                   ? "bg-gradient-to-r from-amber-400 to-orange-500" // 승인 대기는 오렌지 테마
                   : "bg-gradient-to-r from-primary to-rose-400"    // 활성 아티스트는 로즈 테마
               )}>
@@ -701,7 +699,7 @@ export default function AdminArtists() {
 
               {/* ── [Content] 스크롤 영역 ── */}
               <div className="p-10 overflow-y-auto space-y-10 custom-scrollbar bg-slate-50/30">
-                
+
                 {/* CASE 1: 승인 대기 아티스트 (신청 내용 및 검토 중심) */}
                 {detailArtist.status === 'pending' ? (
                   <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
@@ -721,7 +719,7 @@ export default function AdminArtists() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="space-y-6">
                         <h4 className="font-black text-[10px] uppercase tracking-widest text-orange-600 flex items-center gap-2">
                           <User size={14} /> Applicant Note

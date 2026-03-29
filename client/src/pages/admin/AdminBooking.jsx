@@ -90,7 +90,6 @@ export default function AdminBooking() {
         bookingStartDate: null,
         bookingEndDate: null,
       });
-      toast.success('승인 처리되었습니다.');
       fetchData();
     } catch (error) {
       toast.error('승인 처리 실패');
