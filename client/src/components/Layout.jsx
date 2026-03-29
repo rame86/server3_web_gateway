@@ -185,7 +185,6 @@ export default function Layout({ children, role }) {
       label: '굿즈 승인', 
       icon: <Package size={18} />, 
       href: '/admin/store', 
-      badge: adminCounts.shop > 0 ? adminCounts.shop : undefined 
     },
     { 
       label: '예매 승인', 
@@ -198,8 +197,8 @@ export default function Layout({ children, role }) {
     { 
       label: '환불 관리', 
       icon: <CheckSquare size={18} />, 
-      href: '/admin/refunds', 
-      badge: adminCounts.refund > 0 ? adminCounts.refund : undefined }
+      href: '/admin/refunds' 
+    }
   ];
 
   const [location, setLocation] = useLocation(); // 현재 경로 추적 및 이동
