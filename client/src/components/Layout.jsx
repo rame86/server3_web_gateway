@@ -23,7 +23,7 @@ import { coreApi, resApi, shopApi } from '@/lib/api';
 const userNavItems = [
   { label: '대시보드', icon: <Home size={18} />, href: '/user' },
   { label: '굿즈 샵', icon: <ShoppingBag size={18} />, href: '/user/store', badge: 'NEW' },
-  { label: '채팅', icon: <MessageCircle size={18} />, href: '/user/chat', badge: 3 },
+  { label: '채팅', icon: <MessageCircle size={18} />, href: '/user/chat' },
   { label: '예매', icon: <Calendar size={18} />, href: '/user/booking' },
   { label: '커뮤니티', icon: <BookOpen size={18} />, href: '/user/community' },
   { label: '아티스트', icon: <Star size={18} />, href: '/user/artists' },
