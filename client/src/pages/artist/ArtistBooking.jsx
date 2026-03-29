@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react'; //  useEffect 추가
 import Layout from '@/components/Layout';
 import { cn } from "@/lib/utils";
-import { Calendar, Plus, Search, MapPin, Users, Ticket, Clock, Check, X, MoreVertical, Image as ImageIcon, Sparkles, Map, MessageSquareX } from 'lucide-react';
+import { Calendar, Plus, Search, MapPin, Users, Ticket, Clock, Check, X, MoreVertical, Image as ImageIcon, Sparkles, Map, MessageSquareX, TrendingUp } from 'lucide-react';
 import { events, formatPrice, eventTypeLabel, eventTypeBadgeClass } from '@/lib/data';
 import { toast } from 'sonner';
 import { resApi, adminApi } from '@/lib/api'; //  백엔드 통신을 위한 API 추가
@@ -45,6 +45,8 @@ export default function ArtistBooking() {
 
   // 🌟 추가: 통계 데이터를 담을 상태 (기본값 0)
   const [stats, setStats] = useState({ totalReservations: 0 });
+  // 핵심 주석: 일별 예매 추이 상태
+  const [dailySales, setDailySales] = useState([]);
 
   // ArtistBooking.jsx 상단 state 선언부
   const [openManagerId, setOpenManagerId] = useState(null); // 기존에 있던 것
@@ -55,43 +57,58 @@ export default function ArtistBooking() {
 
   // 🌟 백엔드 응답 객체 구조에 맞게 수정된 버전
   // ArtistBooking.jsx 내 fetchMyEvents 함수 수정
-const fetchMyEvents = async () => {
-    try {
-        setLoading(true);
-        const memberId = localStorage.getItem('memberId');
-        
-        if (!memberId) {
-            toast.error("로그인이 필요합니다.");
-            return;
-        }
+  const fetchMyEvents = async () => {
+      try {
+          setLoading(true);
+          const memberId = localStorage.getItem('memberId');
+          
+          if (!memberId) {
+              toast.error("로그인이 필요합니다.");
+              return;
+          }
 
-        // 🚨 호출 주소를 /events에서 /events/my로 변경합니다.
-        const response = await resApi.get(`/events/my?artistId=${memberId}`);
-        const data = response.data;
+          // 🚨 호출 주소를 /events에서 /events/my로 변경합니다.
+          const response = await resApi.get(`/events/my?artistId=${memberId}`);
+          const data = response.data;
 
-        let rawEvents = Array.isArray(data) ? data : (data.events || []);
-        setMyEvents(rawEvents);
+          let rawEvents = Array.isArray(data) ? data : (data.events || []);
+          setMyEvents(rawEvents);
 
-        const totalResCount =rawEvents.reduce((acc, event) => {
-            const capacity = event.total_capacity || event.totalCapacity || 0;
-            // available_seats가 없으면 안 팔린 걸로(capacity와 동일하게) 간주
-            const available = event.available_seats ?? event.availableSeats ?? capacity;
-            const sold = capacity > available ? capacity - available : 0;
-            return acc + sold;
-        }, 0);
+          const totalResCount =rawEvents.reduce((acc, event) => {
+              const capacity = event.total_capacity || event.totalCapacity || 0;
+              // available_seats가 없으면 안 팔린 걸로(capacity와 동일하게) 간주
+              const available = event.available_seats ?? event.availableSeats ?? capacity;
+              const sold = capacity > available ? capacity - available : 0;
+              return acc + sold;
+          }, 0);
 
-        setStats({ totalReservations: totalResCount });
-    } catch (error) {
-        console.error("❌ 데이터 로드 실패:", error);
-        toast.error("이벤트 목록을 불러오지 못했습니다.");
-    } finally {
-        setLoading(false);
-    }
-};
+          setStats({ totalReservations: totalResCount });
+      } catch (error) {
+          console.error("❌ 데이터 로드 실패:", error);
+          toast.error("이벤트 목록을 불러오지 못했습니다.");
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  // 핵심 주석: 백엔드 API에서 최근 5일 예매 데이터 호출
+  const fetchDailySales = async () => {
+      try {
+          const memberId = localStorage.getItem('memberId');
+          if (!memberId) return;
+
+          const response = await resApi.get(`/my/daily-sales?artistId=${memberId}`);
+          // 컨트롤러 구조에 맞춰 data 추출
+          setDailySales(response.data.data || response.data || []);
+      } catch (error) {
+          console.error("❌ 일별 예매 추이 로드 실패:", error);
+      }
+  };
 
   // 🌟 추가: 컴포넌트 마운트 시 데이터 불러오기
   useEffect(() => {
     fetchMyEvents();
+    fetchDailySales();
   }, []);
 
   // 🌟 수정: 기존 더미 데이터 대신 백엔드에서 가져온 myEvents 사용
@@ -387,20 +404,40 @@ const fetchMyEvents = async () => {
                 </div>
             </div>
             
-            <div className="glass-card rounded-3xl p-6 bg-gradient-to-br from-violet-500/10 to-transparent border-violet-100">
+            {/* 핵심 주석: 동적 예매 추이 차트 */}
+            <div className="glass-card rounded-3xl p-6 bg-gradient-to-br from-violet-500/10 to-transparent border-violet-100 flex flex-col justify-between">
                 <div className="flex items-center gap-2 mb-4">
-                    <Map className="text-violet-500" size={20} />
-                    <h2 className="font-bold text-lg" style={{ fontFamily: "'Playfair Display', serif" }}>주요 지역 팬 분포</h2>
+                    <TrendingUp className="text-violet-500" size={20} />
+                    <h2 className="font-bold text-lg" style={{ fontFamily: "'Playfair Display', serif" }}>최근 5일 예매 추이</h2>
                 </div>
-                <div className="flex items-end gap-2 h-16">
-                    <div className="flex-1 bg-violet-200 rounded-t-lg h-[40%]"></div>
-                    <div className="flex-1 bg-violet-400 rounded-t-lg h-[80%]"></div>
-                    <div className="flex-1 bg-violet-600 rounded-t-lg h-[100%]"></div>
-                    <div className="flex-1 bg-violet-400 rounded-t-lg h-[60%]"></div>
-                    <div className="flex-1 bg-violet-200 rounded-t-lg h-[30%]"></div>
+                
+                <div className="flex items-end gap-3 h-20 relative pt-4">
+                    {dailySales.length > 0 ? dailySales.map((day, idx) => {
+                        // 가장 많이 팔린 날을 100%로 두고 막대 높이를 계산
+                        const maxSales = Math.max(...dailySales.map(d => d.count), 1);
+                        const heightPercent = Math.round((day.count / maxSales) * 100);
+                        
+                        return (
+                            <div key={idx} className="flex-1 flex flex-col justify-end group relative h-full">
+                                {/* 마우스를 올리면 보이는 툴팁 */}
+                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none shadow-md font-bold">
+                                    {day.count}건
+                                </div>
+                                <div 
+                                    className="w-full bg-violet-300 group-hover:bg-violet-500 rounded-t-lg transition-all duration-300"
+                                    style={{ height: `${heightPercent}%`, minHeight: '4px' }}
+                                ></div>
+                            </div>
+                        );
+                    }) : (
+                        <div className="w-full text-center text-xs text-muted-foreground pb-2">데이터를 불러오는 중입니다...</div>
+                    )}
                 </div>
-                <div className="flex justify-between text-[10px] text-muted-foreground mt-2">
-                    <span>경기</span><span>서울</span><span>부산</span><span>대구</span><span>강원</span>
+                
+                <div className="flex justify-between text-[10px] text-muted-foreground mt-2 font-medium">
+                    {dailySales.map((day, idx) => (
+                        <span key={idx} className="flex-1 text-center">{day.date}</span>
+                    ))}
                 </div>
             </div>
         </div>

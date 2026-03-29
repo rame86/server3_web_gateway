@@ -30,27 +30,44 @@ export default function UserArtists() {
       return url.startsWith('/') ? url : `/${url}`; 
   };
 
-  // 1. 데이터 가져오기 (아티스트 + 전체 이벤트 딱 1번)
+  // 1. 데이터 가져오기 (방탄 버전 🛡️)
   useEffect(() => {
     const fetchArtists = async () => {
       try {
-        // 1-1. 아티스트 목록 & 팔로우 가져오기
-        const [artistRes, followRes] = await Promise.all([
+        const [artistRes, followRes, eventRes] = await Promise.all([
           coreApi.get('/artist/list'),
-          coreApi.get('/artist/my-follows')
+          coreApi.get('/artist/my-follows'),
+          resApi.get('/eventsList')
         ]);
         
-        const baseArtists = artistRes.data || [];
+        // ✅ 1. 아티스트 목록 안전하게 빼내기 (배열이 아니면 빈 배열로)
+        let baseArtists = artistRes.data?.data || artistRes.data?.content || artistRes.data || [];
+        if (!Array.isArray(baseArtists)) baseArtists = [];
+
+        // ✅ 2. 팔로우 목록 안전하게 빼내기
+        let rawFollows = followRes.data?.data || followRes.data || [];
+        if (!Array.isArray(rawFollows)) rawFollows = [];
+        const safeFollows = rawFollows.map(item => item.memberId || item);
+
+        // ✅ 3. 이벤트 목록 안전하게 빼내기
+        let allEvents = eventRes.data?.events || eventRes.data?.data || eventRes.data || [];
+        if (!Array.isArray(allEvents)) allEvents = [];
         
-        // 핵심 주석: 이벤트 통신을 삭제했으므로 모든 아티스트의 이벤트 개수는 0으로 매핑됨
+        // 4. 이벤트 개수 매핑
         const artistsWithEvents = baseArtists.map(artist => {
-          return { ...artist, eventCount: 0 };
+          const eventCount = allEvents.filter(
+            event => Number(event.artist_id) === Number(artist.memberId)
+          ).length;
+          return { ...artist, eventCount };
         });
 
+        // 상태 업데이트
         setArtistList(artistsWithEvents);
-        setFollowed(followRes.data.map(item => item.memberId || item)); 
+        setFollowed(safeFollows); 
+
       } catch (err) {
-        toast.error("아티스트 목록을 불러오지 못했습니다.");
+        toast.error("데이터를 불러오지 못했습니다.");
+        console.error("fetchArtists Error:", err);
       }
     };
     fetchArtists();
@@ -153,7 +170,7 @@ export default function UserArtists() {
                       <p className="text-xs text-muted-foreground">팬</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-sm font-bold text-foreground">0</p>
+                      <p className="text-sm font-bold text-foreground">{artist.eventCount}</p>
                       <p className="text-xs text-muted-foreground">이벤트</p>
                     </div>
                     <div className="text-center">
