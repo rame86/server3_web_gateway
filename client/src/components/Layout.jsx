@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import TopNav from './TopNav';
-import { coreApi } from '@/lib/api';
+import { coreApi, resApi } from '@/lib/api';
 
 // --- 네비게이션 항목 정의 (역할별) ---
 
@@ -92,7 +92,19 @@ export default function Layout({ children, role }) {
     const fetchInitialCounts = async () => {
       try {
         const res = await coreApi.get('/admin/dashboard');
-        // 대시보드 API에서 주는 필드명에 맞춰서 매핑합니다.
+
+
+        // 🌟 2. 추가: Res 환불 대기 목록 API 호출해서 개수 가져오기
+        let pendingRefundCount = 0;
+        try {
+          const refundRes = await resApi.post('/refundList', { _t: Date.now() });
+          const refundData = refundRes.data?.data || refundRes.data;
+          pendingRefundCount = Array.isArray(refundData) ? refundData.length : 0;
+        } catch (err) {
+          console.error("환불 대기 카운트 로딩 실패:", err);
+        }
+
+        // 3. 상태 업데이트
         setAdminCounts(prev => ({
           ...prev,
           artist: res.data.pendingArtists || 0,
@@ -100,7 +112,7 @@ export default function Layout({ children, role }) {
           event: res.data.pendingEvents || 0,
           user: res.data.totalUsers || 0,
           board: res.data.pendingReports || 0,
-          refund: res.data.pendingEvents || 0
+          refund: pendingRefundCount
         }));
       } catch (error) {
         console.error("사이드바 초기 카운트 로딩 실패:", error);

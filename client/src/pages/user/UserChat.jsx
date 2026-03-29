@@ -55,13 +55,22 @@ export default function UserChat() {
   const [currentRoom, setCurrentRoom] = useState(null);
   const [selectedFriend, setSelectedFriend] = useState(null);
 
-  // 1️⃣ 아티스트 목록 가져오기
+  // 1️⃣ 아티스트 목록 가져오기 (✅ 팔로우한 아티스트만!)
   useEffect(() => {
     const fetchArtists = async () => {
       try {
         setLoading(true);
-        const res = await coreApi.get('/artist/list');
-        setArtists(Array.isArray(res.data) ? res.data : []);
+        // ✅ 전체 리스트(/artist/list) 대신 내 팔로우 목록 API 호출
+        const res = await coreApi.get('/artist/my-follows');
+        
+        // 데이터가 배열인지 확인 후 안전하게 저장
+        const followedArtists = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        
+        // (선택) 만약 API 응답이 { memberId: 1, ... } 형태의 아티스트 정보 전체를 주지 않고,
+        // 단순 ID 리스트만 준다면 프론트나 백엔드에서 추가 가공이 필요할 수 있어. 
+        // 보통 my-follows는 해당 아티스트의 상세 정보 객체 배열을 준다고 가정하고 세팅함!
+        setArtists(followedArtists);
+
       } catch (err) {
         console.error("아티스트 로드 실패:", err);
       } finally {
